@@ -1,0 +1,19 @@
+.page {
+  min-block-size: 100dvh;
+  display: grid;
+  place-items: center;
+  padding-inline: 16px;
+}
+
+.title {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.status {
+  color: var(--ok);
+  font-weight: 600;
+  margin-block-start: 8px;
+}
