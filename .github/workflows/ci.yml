@@ -27,7 +27,9 @@ jobs:
       - run: npm run build
       - run: npx size-limit
       - uses: actions/cache@v4
-        with: { path: ~/.cache/ms-playwright, key: pw-${{ hashFiles('package-lock.json') }} }
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run e2e:smoke
       - if: failure()

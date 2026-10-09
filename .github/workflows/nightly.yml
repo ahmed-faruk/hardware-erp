@@ -58,4 +58,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
       - uses: actions/upload-artifact@v4
-        with: { name: db-backup-${{ github.run_id }}, path: backup.tgz.gpg, retention-days: 30 }
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.tgz.gpg
+          retention-days: 30
