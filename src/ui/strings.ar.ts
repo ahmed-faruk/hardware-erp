@@ -29,6 +29,7 @@ export const strings = {
     optional: 'اختياري',
     required: 'مطلوب',
     pieces: 'قطعة',
+    egp: 'ج',
   },
   sync: {
     online: 'متصل',
@@ -59,6 +60,8 @@ export const strings = {
     lock: 'قفل',
   },
   roles: { cashier: 'كاشير', storekeeper: 'أمين مخزن', manager: 'مدير' },
+  revoked: { title: 'الجهاز ده اتلغى', body: 'اطلب من المدير تفعيل جديد', reset: 'تفعيل من جديد' },
+  env: { missing: 'إعدادات الاتصال ناقصة' },
   soon: { title: 'قريبًا', body: 'شاشة البيع جاية في المرحلة الجاية' },
   forbidden: 'غير مسموح',
   products: {
@@ -238,6 +241,7 @@ export const strings = {
     socket: ['بريزة', 'مقبس كهرباء'],
     'light-switch': ['مفتاح نور', 'كباس'],
   } as Record<string, [string, string]>,
+  actions: { newItem: 'جديد', remove: 'شيل', showMore: 'اعرض أكتر', backToList: 'رجوع للقايمة' },
   update: { available: 'فيه نسخة جديدة', reload: 'حدّث دلوقتي' },
   errors: {
     generic: 'حصلت مشكلة',

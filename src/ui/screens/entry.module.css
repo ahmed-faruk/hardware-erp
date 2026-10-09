@@ -1,0 +1,32 @@
+.page {
+  min-block-size: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  inline-size: min(480px, 100%);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.card h1 {
+  margin: 0;
+  font-size: var(--fs-h1);
+}
+
+.card > * {
+  inline-size: 100%;
+}
+
+.card > svg {
+  inline-size: 56px;
+  align-self: center;
+}
