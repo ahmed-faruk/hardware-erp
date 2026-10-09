@@ -16,7 +16,8 @@
     "perf": "echo \"perf: added in phase 9\"",
     "device:add": "node tools/device-admin/add-device.mjs",
     "test:int:fresh": "supabase db reset --yes && npm run test:int",
-    "import": "node tools/ospos-import/index.ts"
+    "import": "node tools/ospos-import/index.ts",
+    "worker:add": "node tools/device-admin/add-worker.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
