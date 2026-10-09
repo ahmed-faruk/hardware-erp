@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { postSale } from '@/db/commands/post-sale';
-import { saveCustomer, saveProduct } from '@/db/commands/save-master';
+import { saveCustomer } from '@/db/commands/save-master';
+import { saveProduct } from '@/db/commands/save-product';
 
 import { newDevice, seedCatalog } from './helpers';
 

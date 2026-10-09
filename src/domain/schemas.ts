@@ -58,10 +58,29 @@ export const productFieldsSchema = z
     reorderLevel: int.min(0),
     defaultSupplierId: id.nullable(),
     imagePath: optText,
+    extraFields: z
+      .object({ icon: z.string().max(40).nullable() })
+      .partial()
+      .strict()
+      .nullable(),
     active: z.boolean(),
     deletedAt: z.string().nullable(),
   })
   .partial()
+  .strict();
+
+/** Scanner and typed codes: printable ASCII only, at most 64 characters (docs/SECURITY.md §4). */
+export const barcodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[\x21-\x7e]+$/);
+export const barcodesSchema = z.array(barcodeSchema).max(20);
+
+/** One pack unit per product in the MVP (docs/PRD.md §6): factor in milli base units (carton of 12 = 12000). */
+export const packUnitSchema = z
+  .object({ name: text, factorMilli: int.positive(), price: int.min(0).nullable() })
   .strict();
 
 export const customerFieldsSchema = z
@@ -76,6 +95,42 @@ export const customerFieldsSchema = z
     photoPath: optText,
     active: z.boolean(),
     deletedAt: z.string().nullable(),
+  })
+  .partial()
+  .strict();
+
+export const supplierFieldsSchema = z
+  .object({
+    name: text,
+    contactName: optText,
+    phone: z.string().trim().max(32).nullable(),
+    address: optText,
+    notes: optText,
+    active: z.boolean(),
+    deletedAt: z.string().nullable(),
+  })
+  .partial()
+  .strict();
+
+export const categoryFieldsSchema = z
+  .object({
+    name: text,
+    parentId: id.nullable(),
+    colorToken: z.string().max(16).nullable(),
+    icon: z.string().max(40).nullable(),
+    sort: int.min(0),
+    deletedAt: z.string().nullable(),
+  })
+  .partial()
+  .strict();
+
+/** `pin` is hashed by the command and never stored (docs/SECURITY.md §2). */
+export const workerFieldsSchema = z
+  .object({
+    name: text,
+    role: z.enum(['cashier', 'storekeeper', 'manager']),
+    active: z.boolean(),
+    pin: z.string().regex(/^\d{6,12}$/),
   })
   .partial()
   .strict();

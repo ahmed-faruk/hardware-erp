@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { saveProduct } from '@/db/commands/save-master';
+import { saveProduct } from '@/db/commands/save-product';
 import { nowIso, uuidv7 } from '@/db/ids';
 import { enqueue } from '@/db/outbox';
 import { pullAll } from '@/sync/pull';
