@@ -8,14 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run src",
     "test:related": "vitest related --run",
-    "test:int": "vitest run --dir tests/int --passWithNoTests",
+    "test:int": "vitest run tests/int --testTimeout=300000 --passWithNoTests",
     "e2e:smoke": "playwright test --grep @smoke",
     "e2e": "playwright test",
     "perf": "echo \"perf: added in phase 9\""
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
     "lucide-react": "^1.54.0",
