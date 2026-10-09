@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env*
+!.env.example
+
+# real shop data — never commit
+migration-data/
+tools/ospos-import/out/
+tools/ospos-import/.env.local
+*.sql.zip
+ospos-*.zip
