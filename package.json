@@ -10,11 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run src",
     "test:related": "vitest related --run",
-    "test:int": "supabase db reset --yes && vitest run tests/int --no-file-parallelism --testTimeout=600000 --passWithNoTests",
+    "test:int": "vitest run tests/int --no-file-parallelism --testTimeout=600000 --passWithNoTests",
     "e2e:smoke": "playwright test --grep @smoke --project=chromium --project=firefox",
     "e2e": "playwright test",
     "perf": "echo \"perf: added in phase 9\"",
-    "device:add": "node tools/device-admin/add-device.mjs"
+    "device:add": "node tools/device-admin/add-device.mjs",
+    "test:int:fresh": "supabase db reset --yes && npm run test:int"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
