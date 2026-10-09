@@ -1,3 +1,4 @@
+/* Design tokens (docs/DESIGN_SYSTEM.md §2-§4). Light is default; dark follows the system or [data-theme='dark']. */
 :root {
   --bg: #f7f6f3;
   --surface: #fff;
@@ -6,10 +7,50 @@
   --text: #1a1a1a;
   --text-muted: #5c5c5c;
   --primary: #1d4ed8;
+  --on-color: #fff;
   --ok: #15803d;
   --danger: #b91c1c;
   --warn: #b45309;
-  --font: Cairo, Tahoma, Arial, sans-serif;
+  --pay-cash: #15803d;
+  --pay-credit: #c2410c;
+  --pay-card: #1d4ed8;
+  --pay-instapay: #7e22ce;
+  --cat-1: #2563eb;
+  --cat-2: #ea580c;
+  --cat-3: #16a34a;
+  --cat-4: #9333ea;
+  --cat-5: #db2777;
+  --cat-6: #0891b2;
+  --cat-7: #ca8a04;
+  --cat-8: #4b5563;
+  --tint-primary: rgb(29 78 216 / 12%);
+  --tint-ok: rgb(21 128 61 / 12%);
+  --tint-danger: rgb(185 28 28 / 12%);
+  --tint-warn: rgb(180 83 9 / 12%);
+  --shadow-dialog: 0 8px 24px rgb(0 0 0 / 16%);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-round: 999px;
+  --target-min: 44px;
+  --target-cashier: 56px;
+
+  --font: cairo, tahoma, arial, sans-serif;
+  --fs-total: clamp(32px, 5vw, 64px);
+  --fs-price: clamp(18px, 2.2vw, 28px);
+  --fs-h1: 28px;
+  --fs-h2: 22px;
+  --fs-body: 16px;
+  --fs-label: 14px;
+  --fs-small: 13px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,9 +62,18 @@
     --text: #f2f2f2;
     --text-muted: #a8a8a8;
     --primary: #60a5fa;
+    --on-color: #0b1220;
     --ok: #4ade80;
     --danger: #f87171;
     --warn: #fbbf24;
+    --pay-cash: #4ade80;
+    --pay-credit: #fb923c;
+    --pay-card: #60a5fa;
+    --pay-instapay: #c084fc;
+    --tint-primary: rgb(96 165 250 / 18%);
+    --tint-ok: rgb(74 222 128 / 18%);
+    --tint-danger: rgb(248 113 113 / 18%);
+    --tint-warn: rgb(251 191 36 / 18%);
   }
 }
 
@@ -35,16 +85,58 @@
   --text: #f2f2f2;
   --text-muted: #a8a8a8;
   --primary: #60a5fa;
+  --on-color: #0b1220;
   --ok: #4ade80;
   --danger: #f87171;
   --warn: #fbbf24;
+  --pay-cash: #4ade80;
+  --pay-credit: #fb923c;
+  --pay-card: #60a5fa;
+  --pay-instapay: #c084fc;
+  --tint-primary: rgb(96 165 250 / 18%);
+  --tint-ok: rgb(74 222 128 / 18%);
+  --tint-danger: rgb(248 113 113 / 18%);
+  --tint-warn: rgb(251 191 36 / 18%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font);
 }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

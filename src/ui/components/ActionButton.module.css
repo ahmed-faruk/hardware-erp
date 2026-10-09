@@ -1,0 +1,62 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-inline-size: var(--target-min);
+  min-block-size: var(--target-min);
+  padding-inline: var(--space-4);
+  border: 2px solid transparent;
+  border-radius: var(--radius-control);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--on-color);
+}
+
+.stack {
+  flex-direction: column;
+  min-inline-size: var(--target-cashier);
+  min-block-size: var(--target-cashier);
+  gap: var(--space-1);
+}
+
+.ok {
+  background: var(--ok);
+}
+
+.danger {
+  background: var(--danger);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.loading svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (pointer: coarse) {
+  .button {
+    min-block-size: 48px;
+  }
+}

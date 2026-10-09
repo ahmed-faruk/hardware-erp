@@ -1,0 +1,212 @@
+import {
+  Armchair,
+  Axe,
+  Bath,
+  Battery,
+  Bolt,
+  Box,
+  Boxes,
+  BrickWall,
+  Brush,
+  BrushCleaning,
+  Cable,
+  Car,
+  CloudRain,
+  Cog,
+  Construction,
+  CookingPot,
+  DoorClosed,
+  DoorOpen,
+  Drill,
+  Droplet,
+  Droplets,
+  Fan,
+  Faucet,
+  Fence,
+  Flame,
+  Flashlight,
+  Flower,
+  Grid3x3,
+  Hammer,
+  HardHat,
+  Key,
+  Lamp,
+  LampCeiling,
+  LampDesk,
+  LampWallUp,
+  Layers,
+  Lightbulb,
+  Link,
+  Lock,
+  Magnet,
+  Nut,
+  Package,
+  PaintBucket,
+  PaintRoller,
+  Paintbrush,
+  Palette,
+  Paperclip,
+  Pickaxe,
+  Pipette,
+  Plug,
+  Refrigerator,
+  Ruler,
+  Scale,
+  Scissors,
+  Shield,
+  ShoppingBasket,
+  Shovel,
+  ShowerHead,
+  Snowflake,
+  Sofa,
+  Sparkles,
+  SprayCan,
+  Sprout,
+  Sun,
+  SwatchBook,
+  Tag,
+  Thermometer,
+  Toolbox,
+  Trees,
+  Truck,
+  Utensils,
+  Wallpaper,
+  WashingMachine,
+  Weight,
+  Wind,
+  Wrench,
+  Zap,
+} from 'lucide-react';
+import type { ComponentType } from 'react';
+
+import { normalizeArabic } from '@/domain/arabic';
+import { strings } from '../strings.ar';
+
+import {
+  LightSwitch,
+  Nails,
+  Pipe,
+  Pliers,
+  Saw,
+  Screwdriver,
+  Socket,
+  TapeMeasure,
+  type IconProps,
+} from './custom';
+
+export type IconComponent = ComponentType<IconProps>;
+
+/** Icons the manager can choose for categories and products. All are bundled, so they work offline (no CDN). */
+const ICONS: Record<string, IconComponent> = {
+  'paint-bucket': PaintBucket,
+  'paint-roller': PaintRoller,
+  paintbrush: Paintbrush,
+  brush: Brush,
+  'spray-can': SprayCan,
+  palette: Palette,
+  pipette: Pipette,
+  'swatch-book': SwatchBook,
+  droplet: Droplet,
+  droplets: Droplets,
+  hammer: Hammer,
+  drill: Drill,
+  wrench: Wrench,
+  nut: Nut,
+  bolt: Bolt,
+  ruler: Ruler,
+  scissors: Scissors,
+  shovel: Shovel,
+  pickaxe: Pickaxe,
+  axe: Axe,
+  toolbox: Toolbox,
+  'hard-hat': HardHat,
+  construction: Construction,
+  plug: Plug,
+  zap: Zap,
+  cable: Cable,
+  lightbulb: Lightbulb,
+  lamp: Lamp,
+  'lamp-ceiling': LampCeiling,
+  'lamp-wall-up': LampWallUp,
+  'lamp-desk': LampDesk,
+  faucet: Faucet,
+  'shower-head': ShowerHead,
+  bath: Bath,
+  fence: Fence,
+  'door-closed': DoorClosed,
+  'door-open': DoorOpen,
+  key: Key,
+  lock: Lock,
+  'brick-wall': BrickWall,
+  wallpaper: Wallpaper,
+  fan: Fan,
+  flame: Flame,
+  thermometer: Thermometer,
+  layers: Layers,
+  package: Package,
+  boxes: Boxes,
+  box: Box,
+  tag: Tag,
+  scale: Scale,
+  weight: Weight,
+  battery: Battery,
+  'grid-3x3': Grid3x3,
+  sparkles: Sparkles,
+  'brush-cleaning': BrushCleaning,
+  snowflake: Snowflake,
+  sun: Sun,
+  sprout: Sprout,
+  flower: Flower,
+  trees: Trees,
+  car: Car,
+  truck: Truck,
+  paperclip: Paperclip,
+  link: Link,
+  magnet: Magnet,
+  cog: Cog,
+  sofa: Sofa,
+  armchair: Armchair,
+  'cooking-pot': CookingPot,
+  utensils: Utensils,
+  'shopping-basket': ShoppingBasket,
+  'washing-machine': WashingMachine,
+  refrigerator: Refrigerator,
+  flashlight: Flashlight,
+  shield: Shield,
+  wind: Wind,
+  'cloud-rain': CloudRain,
+  screwdriver: Screwdriver,
+  saw: Saw,
+  pliers: Pliers,
+  pipe: Pipe,
+  'tape-measure': TapeMeasure,
+  nails: Nails,
+  socket: Socket,
+  'light-switch': LightSwitch,
+};
+
+export const GENERIC_ICON_KEY = 'box';
+
+export interface CatalogEntry {
+  key: string;
+  name: string;
+  Icon: IconComponent;
+  /** normalized name + search words */
+  haystack: string;
+}
+
+export const CATALOG: CatalogEntry[] = Object.entries(ICONS).map(([key, Icon]) => {
+  const [name, words] = strings.iconItems[key] ?? [key, ''];
+  return { key, name, Icon, haystack: normalizeArabic(`${name} ${words}`) };
+});
+
+/** The icon for a stored key; an unknown or empty key gives the generic box. */
+export function iconFor(key: string | null | undefined): IconComponent {
+  return (key && ICONS[key]) || (ICONS[GENERIC_ICON_KEY] as IconComponent);
+}
+
+/** Catalog entries whose name or search words contain every word of the query. */
+export function searchIcons(query: string): CatalogEntry[] {
+  const words = normalizeArabic(query).split(' ').filter(Boolean);
+  return words.length ? CATALOG.filter((e) => words.every((w) => e.haystack.includes(w))) : CATALOG;
+}

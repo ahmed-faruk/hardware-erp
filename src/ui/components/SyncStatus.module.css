@@ -1,0 +1,37 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.dot {
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: var(--radius-round);
+}
+
+.online {
+  background: var(--ok);
+}
+
+.offline {
+  background: var(--text-muted);
+}
+
+.pending {
+  background: var(--warn);
+}
+
+.last {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+@media (max-width: 599px) {
+  .word,
+  .last {
+    display: none;
+  }
+}
