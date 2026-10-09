@@ -15,6 +15,8 @@ jobs:
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
       - run: supabase start
       - run: npx playwright install --with-deps ${{ matrix.browser }}
       - run: npm run e2e -- --project=${{ matrix.browser }}
@@ -28,6 +30,8 @@ jobs:
         with: { node-version: 24, cache: npm }
       - run: npm ci && npm run build
       - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
       - run: supabase start
       - run: npx playwright install --with-deps chromium && npm run perf
       - run: npx @lhci/cli autorun
@@ -46,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
       - run: |
           supabase link --project-ref "$REF"
           supabase db dump -f schema.sql
@@ -58,4 +64,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
       - uses: actions/upload-artifact@v4
-        with: { name: db-backup-${{ github.run_id }}, path: backup.tgz.gpg, retention-days: 30 }
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.tgz.gpg
+          retention-days: 30

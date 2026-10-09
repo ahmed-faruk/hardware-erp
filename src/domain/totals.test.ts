@@ -20,13 +20,17 @@ describe('computeInvoice', () => {
   it('applies line percent and fixed discounts', () => {
     const r = computeInvoice(
       [
-        line(1000, 1000, { discount: { kind: 'percent', value: 10 } }),
+        line(1000, 1000, { discount: { kind: 'percentBp', valueBp: 1000 } }),
         line(1000, 1000, { discount: { kind: 'fixed', value: 150 } }),
       ],
       null,
     );
     expect(r.lines.map((l) => l.discount)).toEqual([100, 150]);
     expect(r.total).toBe(1750);
+  });
+  it('supports fractional percents in basis points (12.5%)', () => {
+    const r = computeInvoice([line(1000, 1000, { discount: { kind: 'percentBp', valueBp: 1250 } })], null);
+    expect(r.lines[0]?.discount).toBe(125);
   });
   it('rejects a line discount above gross', () => {
     expect(() =>
@@ -44,7 +48,7 @@ describe('computeInvoice', () => {
     expect(r.total).toBe(2900);
   });
   it('supports an invoice percent discount', () => {
-    const r = computeInvoice([line(1000, 2000), line(1000, 1000)], { kind: 'percent', value: 10 });
+    const r = computeInvoice([line(1000, 2000), line(1000, 1000)], { kind: 'percentBp', valueBp: 1000 });
     expect(r.invoiceDiscount).toBe(300);
     expect(r.total).toBe(2700);
   });

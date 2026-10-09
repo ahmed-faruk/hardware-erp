@@ -54,15 +54,26 @@ Response:
 { "ok": true, "data": { "accepted_up_to": 1042,
   "rejected": [ { "seq": 1039, "code": "E_VALIDATION", "message": "الكمية المرتجعة أكبر من المباعة" } ] } }
 ```
+`worker_id` (outer field) is the worker who performed the action; the server checks it against `workers`, the device's `max_role` and
+the permission matrix (`role_can`, a SQL copy of `permissions.ts`). A sales invoice is ONE record with its children embedded
+(`lines`, `payments`, `stock_movements`, `party_ledger`, `cash_movements`); the server checks that totals, payments and ledger rows
+agree and that the number starts with the device prefix, then inserts everything atomically. Tables not yet pushable
+(`sync_tables.push_action` is null) are added with their command.
 Rules: documents/ledgers `insert … on conflict (id) do nothing`; master data field-merge with `base_version`;
 allow-listed tables only; role check per action uses the same matrix as `src/domain/permissions.ts`.
 
 ### `pull_changes(after_seq bigint, max_rows int default 1000)`
 Returns `{ ok, data: { rows: [ { table, record } ], last_seq, has_more } }` ordered by `server_seq`, company-scoped,
 filtered by device kind (phones get 90 days of documents, no cost fields unless `max_role = 'manager'`).
+Phase 3 status: cost fields are stripped for non-manager devices; the 90-day / 13-month document window is not applied yet
+(volume is ~20k invoices a year) and is added before the first phone goes live. Devices below `manager` cannot know `unit_cost`,
+so lines they sell carry cost 0 until the server fills it in (open item, decided with the cashier screens in phase 6).
 
-### `register_device(name text, prefix text, kind text, max_role text)` — manager device only
-Creates the `devices` row for the calling auth user. Prefix must be unique.
+### `claim_device_activation(code text)`
+First call of a new device. The manager registers the device on the Mac (`npm run device:add -- --name … --prefix K1 --kind pc
+--role manager`), which prints a 10-character code (valid 24 h, single use, only its sha256 is stored). The new device signs up
+its own Supabase Auth user (random password kept on the device), then calls this RPC; the code links `auth.uid()` to the
+`devices` row. Wrong, used or expired code → `E_VALIDATION`.
 
 ### `revoke_device(device_id uuid)` — manager only
 Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
