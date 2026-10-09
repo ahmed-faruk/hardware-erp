@@ -24,5 +24,8 @@ export default defineConfig({
       workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2,mp3}'] },
     }),
   ],
-  test: { environment: 'node', include: ['src/**/*.test.ts', 'tests/int/**/*.test.ts'] },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts', 'tests/int/**/*.test.ts', 'tools/ospos-import/**/*.test.ts'],
+  },
 });

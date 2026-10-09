@@ -8,14 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run src",
+    "test": "vitest run src tools",
     "test:related": "vitest related --run",
     "test:int": "vitest run tests/int --no-file-parallelism --testTimeout=600000 --passWithNoTests",
     "e2e:smoke": "playwright test --grep @smoke --project=chromium --project=firefox",
     "e2e": "playwright test",
     "perf": "echo \"perf: added in phase 9\"",
     "device:add": "node tools/device-admin/add-device.mjs",
-    "test:int:fresh": "supabase db reset --yes && npm run test:int"
+    "test:int:fresh": "supabase db reset --yes && npm run test:int",
+    "import": "node tools/ospos-import/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
@@ -39,6 +40,7 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "exceljs": "^4.4.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.13.0",
     "prettier": "^3.9.9",
