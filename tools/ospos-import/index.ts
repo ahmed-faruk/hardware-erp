@@ -13,7 +13,8 @@ const [step = '', ...rest] = process.argv.slice(2);
 const confirm = rest.includes('--confirm') ? rest[rest.indexOf('--confirm') + 1] : undefined;
 const ROWS = `${OUT}rows/`;
 const SHEET = process.env.OSPOS_BALANCES_FILE ?? `${ROOT}migration-data/opening-balances.xlsx`;
-const APPLIED = `${OUT}opening-applied.json`;
+const appliedFile = (host: string): string =>
+  `${OUT}opening-applied-${host.replace(/[^a-z0-9.-]/gi, '_')}.json`;
 
 function readExport(): OsposExport {
   const data = JSON.parse(readFileSync(exportFile(), 'utf8')) as OsposExport;
@@ -133,7 +134,7 @@ async function main(): Promise<void> {
       const rows = openingRows(result.stats.companyId, data.meta.exportedAt, approved);
       await loadAll(db, { openings: rows.openings, party_ledger: rows.party_ledger }, console.log);
       writeFileSync(
-        APPLIED,
+        appliedFile(t.host),
         JSON.stringify({
           customers: Object.fromEntries(approved.customers),
           suppliers: Object.fromEntries(approved.suppliers),
@@ -153,8 +154,8 @@ async function main(): Promise<void> {
     case 'validate': {
       const t = target(confirm);
       const { data, result } = runTransform();
-      const applied = existsSync(APPLIED)
-        ? (JSON.parse(readFileSync(APPLIED, 'utf8')) as {
+      const applied = existsSync(appliedFile(t.host))
+        ? (JSON.parse(readFileSync(appliedFile(t.host), 'utf8')) as {
             customers: Record<string, number>;
             suppliers: Record<string, number>;
           })
