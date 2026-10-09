@@ -1,6 +1,6 @@
 import { mulDivRound, type Milli, type Piasters } from './money';
 
-export type Discount = { kind: 'percent'; value: number } | { kind: 'fixed'; value: Piasters };
+export type Discount = { kind: 'percentBp'; valueBp: number } | { kind: 'fixed'; value: Piasters };
 
 export interface LineInput {
   qtyMilli: Milli;
@@ -25,10 +25,10 @@ export interface InvoiceResult {
 
 function discountAmount(base: Piasters, d: Discount | null | undefined): Piasters {
   if (!d) return 0;
-  if (d.kind === 'percent') {
-    if (!Number.isInteger(d.value) || d.value < 0 || d.value > 100)
-      throw new RangeError('percent must be an integer 0..100');
-    return mulDivRound(base, d.value, 100);
+  if (d.kind === 'percentBp') {
+    if (!Number.isInteger(d.valueBp) || d.valueBp < 0 || d.valueBp > 10000)
+      throw new RangeError('percent must be integer basis points 0..10000');
+    return mulDivRound(base, d.valueBp, 10000);
   }
   if (!Number.isInteger(d.value) || d.value < 0)
     throw new RangeError('fixed discount must be a non-negative integer');
