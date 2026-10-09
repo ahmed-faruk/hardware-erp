@@ -167,6 +167,11 @@ the OSPOS backup button returns HTTP 500 and phpMyAdmin is not available). Mappi
   the product cannot be matched by barcode/name.
 - Openings at cutover: stock from OSPOS quantities; customer/supplier balances from the owner-approved sheet.
 
+Import details (phase 4): legacy rows carry `is_legacy = true` on documents AND on their child tables (lines, payments), and
+`pull_changes` never returns them. OSPOS cash rounding (paid 75.30 on a 75.25 sale) is kept in `sales_invoices.cash_rounding`.
+Receivings with no known supplier link to the placeholder supplier "مورد غير محدد (أرشيف قديم)". `import_batch(table, rows)` is
+service-role only and idempotent. Tool and steps: `tools/ospos-import/README.md`.
+
 ## 10. Size and retention
 - Real volume: ~55 sales/day; legacy archive = 68,504 sales/returns with 324,602 lines + 5,343 receivings (23,740 lines). Estimated server size incl. legacy archive and indexes: 150–250 MB
   → fits the 500 MB free tier; measure monthly (`select pg_database_size(current_database())`), alert at 70%.

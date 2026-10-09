@@ -83,7 +83,8 @@ Server-side versions of the reports that need legacy archive data or all devices
 synced data.
 
 ### `import_batch(kind text, rows jsonb)` — service role only
-Used by `tools/ospos-import`. Raises unless `auth.role() = 'service_role'`. Idempotent (`on conflict (id) do nothing`).
+Used by `tools/ospos-import`. `kind` is a synced table name, `rows` ≤ 1000 full records (all rows share the same keys, `company_id` included).
+Raises unless `auth.role() = 'service_role'`. Idempotent (`on conflict (id) do nothing`); unknown table or column → `E_VALIDATION`.
 
 ## 5. Storage
 - Bucket `product-images`, public read. Path `<company_id>/<product_id>.webp`, 256 px, ≤ 40 KB.
