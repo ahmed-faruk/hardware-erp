@@ -234,6 +234,8 @@ export interface OutboxRow {
   table: string;
   id: string;
   op: 'upsert';
+  /** the worker who performed the action (checked against the permission matrix on the server) */
+  workerId: string | null;
   payload: Record<string, unknown>;
   changedFields: string[] | null;
   baseVersion: number | null;

@@ -53,7 +53,7 @@ Types: `id` = uuid, `money` = bigint piasters, `qty` = bigint milli-units, `text
 | `devices` | branch_id, auth_user_id (uuid, unique), name, prefix (2–3 chars, unique per company), kind (`pc`,`mobile`), max_role, last_seen_at, app_version, revoked_at | one Supabase Auth user per device |
 | `workers` | name, role (`cashier`,`storekeeper`,`manager`), pin_hash, pin_salt, photo_path, active, legacy_employee_id | PIN checked locally (PBKDF2) |
 | `settings` | key (unique per company), value json | company-level only; per-device settings stay local |
-| `cash_accounts` | name, kind (`drawer`,`safe`,`bank`,`wallet`,`card_clearing`), device_id null | one drawer per cashier device + main safe |
+| `cash_accounts` | name, kind (`drawer`,`safe`,`bank`,`wallet`,`card_clearing`), owner_device_id null | one drawer per cashier device + main safe (`owner_device_id`, because `device_id` is the creating device) |
 | `expense_categories` | name, icon | |
 
 ### 4.2 Catalog
@@ -101,6 +101,14 @@ Every document has: `number`, `issued_at`, `worker_id`, `shift_id` (cashier docu
 | `party_ledger` | party_type (`customer`,`supplier`), party_id, amount (+ owes us / − we owe), doc_type, doc_id, occurred_at | Σ amount per party |
 | `cash_movements` | cash_account_id, shift_id null, amount (+in/−out), method, doc_type, doc_id, occurred_at | Σ amount per account |
 Which document writes which ledger rows: domain skill §5. Legacy documents write none.
+
+### 4.5b Sync support tables (server only, never synced)
+| Table | Columns | Notes |
+| --- | --- | --- |
+| `device_activations` | device_id, code_hash (sha256), expires_at, used_at | one-time codes printed on the Mac (`npm run device:add`); RLS on, no client grants |
+| `sync_tables` | table_name, kind, push_action, pull (`all`/`manager`/`none`), cost_columns | allow-list for `ingest_batch` / `pull_changes`; a new synced table adds a row in its migration |
+Writers (`ingest_batch`, `import_batch`, `claim_device_activation`, `revoke_device`) take `pg_advisory_xact_lock(7300001)`, so
+`server_seq` values commit in order and `pull_changes` can never skip a row.
 
 ### 4.6 System
 | Table | Columns | Notes |

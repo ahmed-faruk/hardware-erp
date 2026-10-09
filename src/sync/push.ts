@@ -23,6 +23,7 @@ export function toServerRow(o: OutboxRow & { seq: number }): Record<string, unkn
     device_seq: o.deviceSeq,
     table: SERVER_TABLE[o.table],
     op: o.op,
+    worker_id: o.workerId,
     record,
     changed_fields: o.changedFields
       ? Object.keys(convertRow(Object.fromEntries(o.changedFields.map((f) => [f, 1])), 'snake'))

@@ -30,7 +30,7 @@ async function saveMaster<R extends Product | Customer>(
     if (!existing) {
       const record = { ...create(), ...fields } as R;
       await store.add(record as Product);
-      await enqueue(db, table, record);
+      await enqueue(db, table, record, ctx.workerId);
       return { ok: true, id: record.id, version: record.version };
     }
     if (input.baseVersion !== undefined && input.baseVersion !== existing.version) {
@@ -42,7 +42,7 @@ async function saveMaster<R extends Product | Customer>(
     if (changed.length === 0) return { ok: true, id: existing.id, version: existing.version };
     const updated = { ...existing, ...fields, updatedAt: nowIso(), version: existing.version + 1 };
     await store.put(updated as Product);
-    await enqueue(db, table, updated, {
+    await enqueue(db, table, updated, ctx.workerId, {
       changedFields: changed,
       baseVersion: existing.version,
     });

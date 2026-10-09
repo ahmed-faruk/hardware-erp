@@ -41,7 +41,7 @@ export async function openShift(
       status: 'open',
     };
     await db.shifts.add(shift);
-    await enqueue(db, 'shifts', shift);
+    await enqueue(db, 'shifts', shift, ctx.workerId);
     return { ok: true as const, id: shift.id, number };
   });
 }

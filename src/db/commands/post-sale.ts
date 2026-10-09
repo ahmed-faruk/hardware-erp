@@ -226,15 +226,13 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
         stockMovements.map((m) => [m.productId, m.warehouseId]),
       );
       if (creditTotal > 0) await rebuildPartyBalances(db, [['customer', input.customerId!]]);
-      await enqueue(db, 'salesInvoices', {
-        ...doc,
-        lines,
-        payments,
-        stockMovements,
-        partyLedger,
-        cashMovements,
-      });
-      await enqueue(db, 'auditLog', audit);
+      await enqueue(
+        db,
+        'salesInvoices',
+        { ...doc, lines, payments, stockMovements, partyLedger, cashMovements },
+        ctx.workerId,
+      );
+      await enqueue(db, 'auditLog', audit, ctx.workerId);
       return { ok: true, id: invoiceId, number, total: invoice.total, changeDue: paid.change };
     },
   );

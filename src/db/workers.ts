@@ -77,7 +77,7 @@ export async function checkPin(
         occurredAt: nowIso(),
       };
       await db.auditLog.add(audit);
-      await enqueue(db, 'auditLog', audit);
+      await enqueue(db, 'auditLog', audit, workerId);
     }
   });
   return err('PIN_WRONG', 'الرقم السري غلط');

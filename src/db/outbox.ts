@@ -19,6 +19,7 @@ export async function enqueue(
   db: HanafyDB,
   table: keyof typeof SERVER_TABLE & string,
   record: { id: string; [extra: string]: unknown } | { id: string },
+  workerId: string | null,
   options: EnqueueOptions = {},
 ): Promise<void> {
   await db.outbox.add({
@@ -26,6 +27,7 @@ export async function enqueue(
     table,
     id: record.id,
     op: 'upsert',
+    workerId,
     payload: record as unknown as Record<string, unknown>,
     changedFields: options.changedFields ?? null,
     baseVersion: options.baseVersion ?? null,
