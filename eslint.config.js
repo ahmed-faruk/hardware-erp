@@ -16,10 +16,22 @@ export default tseslint.config(
     rules: { ...reactHooks.configs.recommended.rules },
   },
   {
+    // money never goes through floats (docs/CODE_STYLE.md §4)
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/domain/money.ts'],
+    rules: {
+      'no-restricted-properties': ['error', { property: 'toFixed', message: 'use formatMoney' }],
+      'no-restricted-globals': ['error', { name: 'parseFloat', message: 'use toPiasters / toMilli' }],
+    },
+  },
+  {
     // domain stays pure (docs/CODE_STYLE.md §7)
     files: ['src/domain/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['@/db/*', '@/sync/*', '@/ui/*', 'react', 'dexie', '@supabase/*'] }],
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['@/db/*', '@/sync/*', '@/ui/*', 'react', 'dexie', '@supabase/*'] },
+      ],
     },
   },
 );
