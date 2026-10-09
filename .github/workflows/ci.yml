@@ -20,7 +20,8 @@ jobs:
       - run: npm run lint && npm run typecheck
       - run: npm test -- --coverage --reporter=dot
       - uses: supabase/setup-cli@v1
-        with: { version: latest }
+        with:
+          version: 2.120.0
       - run: supabase start
       - run: supabase test db
       - run: npm run test:int
@@ -65,6 +66,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
       - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
       - run: supabase link --project-ref "$REF" && supabase db push
         env:
           REF: ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
