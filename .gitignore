@@ -12,3 +12,4 @@ tools/ospos-import/out/
 tools/ospos-import/.env.local
 *.sql.zip
 ospos-*.zip
+.claude/scheduled_tasks.lock
