@@ -3,22 +3,30 @@
   max-block-size: calc(100dvh - 24px);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-card);
+  border-radius: 16px;
   background: var(--surface);
+  animation: dialogIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   color: var(--text);
   box-shadow: var(--shadow-dialog);
   overflow: hidden;
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 40%);
+  background: rgb(10 15 20 / 55%);
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border-block-end: 1px solid var(--border);
 }
 
@@ -30,15 +38,18 @@
 .close {
   display: grid;
   place-items: center;
+  flex: none;
   inline-size: var(--target-cashier);
   block-size: var(--target-cashier);
+  min-inline-size: var(--target-cashier);
+  min-block-size: var(--target-cashier);
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 
 .body {
-  padding: var(--space-4);
+  padding: var(--space-5);
   overflow: auto;
   max-block-size: calc(100dvh - 100px);
 }

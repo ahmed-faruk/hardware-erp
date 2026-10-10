@@ -571,46 +571,48 @@ export function SellScreen() {
             aria-label={strings.sell.search}
             data-testid="sell-search"
           />
-          <ActionButton
-            label={strings.sell.recent}
-            icon={ReceiptIcon}
-            variant="ghost"
-            layout="stack"
-            onClick={() => setRecentOpen(true)}
-            testId="recent"
-          />
-          <ActionButton
-            label={strings.returns.button}
-            icon={Undo2}
-            variant="ghost"
-            layout="stack"
-            onClick={() => setReturnOpen(true)}
-            testId="return"
-          />
-          <ActionButton
-            label={strings.collection.button}
-            icon={HandCoins}
-            variant="ghost"
-            layout="stack"
-            onClick={() => setCollectOpen(true)}
-            testId="collect"
-          />
-          <ActionButton
-            label={strings.sell.shiftOpen}
-            icon={Clock}
-            variant="ghost"
-            layout="stack"
-            onClick={() => setShiftMenu(true)}
-            testId="shift-menu"
-          />
-          <ActionButton
-            label={strings.sell.noSale}
-            icon={Banknote}
-            variant="ghost"
-            layout="stack"
-            onClick={() => setNoSaleOpen(true)}
-            testId="no-sale"
-          />
+          <div className={styles.quick}>
+            <ActionButton
+              label={strings.sell.recent}
+              icon={ReceiptIcon}
+              variant="soft"
+              layout="stack"
+              onClick={() => setRecentOpen(true)}
+              testId="recent"
+            />
+            <ActionButton
+              label={strings.returns.button}
+              icon={Undo2}
+              variant="soft"
+              layout="stack"
+              onClick={() => setReturnOpen(true)}
+              testId="return"
+            />
+            <ActionButton
+              label={strings.collection.button}
+              icon={HandCoins}
+              variant="soft"
+              layout="stack"
+              onClick={() => setCollectOpen(true)}
+              testId="collect"
+            />
+            <ActionButton
+              label={strings.sell.shiftOpen}
+              icon={Clock}
+              variant="soft"
+              layout="stack"
+              onClick={() => setShiftMenu(true)}
+              testId="shift-menu"
+            />
+            <ActionButton
+              label={strings.sell.noSale}
+              icon={Banknote}
+              variant="soft"
+              layout="stack"
+              onClick={() => setNoSaleOpen(true)}
+              testId="no-sale"
+            />
+          </div>
         </div>
         {notice && <BigAlert tone="danger" word={notice} sound={false} />}
         <ProductGrid searchText={searchText} digits={digits} onAdd={add} />

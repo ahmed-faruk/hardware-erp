@@ -13,16 +13,36 @@
 }
 
 .toolbar {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--space-2);
 }
 
 .toolbar input {
-  flex: 1 1 12rem;
   min-inline-size: 0;
   min-block-size: var(--target-cashier);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  font-size: 17px;
+}
+
+.quick {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block-end: 2px;
+}
+
+.quick > button {
+  flex: 0 0 88px;
+  min-block-size: 64px;
+}
+
+@media (min-width: 600px) {
+  .quick {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: visible;
+  }
 }
 
 .right {
@@ -32,7 +52,7 @@
 .phoneBar {
   position: fixed;
   inset-inline: 0;
-  inset-block-end: calc(64px + env(safe-area-inset-bottom));
+  inset-block-end: calc(var(--nav-h, 64px) + env(safe-area-inset-bottom));
   z-index: 3;
 }
 
@@ -44,7 +64,19 @@
   max-inline-size: 640px;
   margin-inline: auto;
   padding: var(--space-4);
-  border-inline: 6px solid var(--ok);
+  border: 1px solid var(--border);
+  border-block-start: 4px solid var(--ok);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
 }
 
 .done > * {
@@ -77,13 +109,14 @@
 
   .right {
     position: sticky;
-    inset-block-start: 88px;
+    inset-block-start: 76px;
     display: flex;
     flex-direction: column;
-    max-block-size: calc(100dvh - 104px);
+    max-block-size: calc(100dvh - 92px);
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
-    background: var(--bg);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
     overflow: hidden;
   }
 

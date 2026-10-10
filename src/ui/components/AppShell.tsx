@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Lock } from 'lucide-react';
+import { Lock, Paintbrush } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { strings } from '../strings.ar';
@@ -35,10 +35,16 @@ export function AppShell({
   banner,
   children,
 }: AppShellProps) {
+  const single = nav.length <= 1;
   return (
-    <div className={styles.shell}>
+    <div className={cx(styles.shell, single && styles.single)}>
       <header className={styles.top}>
-        <h1 className={styles.title}>{strings.appName}</h1>
+        <div className={styles.brand}>
+          <span className={styles.mark} aria-hidden="true">
+            <Paintbrush size={20} />
+          </span>
+          <h1 className={styles.title}>{strings.appName}</h1>
+        </div>
         {status}
         <button
           type="button"
@@ -47,25 +53,30 @@ export function AppShell({
           aria-label={strings.login.lock}
           data-testid="lock"
         >
-          <Lock size={20} aria-hidden="true" />
+          <span className={styles.avatar} aria-hidden="true">
+            {workerName.trim().charAt(0) || <Lock size={18} />}
+          </span>
           <span className={styles.who}>{workerName}</span>
+          <Lock size={16} aria-hidden="true" />
         </button>
       </header>
       {banner}
-      <nav className={styles.nav} aria-label={strings.appName}>
-        {nav.map((item) => (
-          <button
-            key={item.path}
-            type="button"
-            className={cx(styles.item, item.path === current && styles.current)}
-            aria-current={item.path === current ? 'page' : undefined}
-            onClick={() => onNavigate(item.path)}
-          >
-            <item.icon size={24} aria-hidden="true" />
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      {!single && (
+        <nav className={styles.nav} aria-label={strings.appName}>
+          {nav.map((item) => (
+            <button
+              key={item.path}
+              type="button"
+              className={cx(styles.item, item.path === current && styles.current)}
+              aria-current={item.path === current ? 'page' : undefined}
+              onClick={() => onNavigate(item.path)}
+            >
+              <item.icon size={24} aria-hidden="true" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
       <main className={styles.main}>{children}</main>
     </div>
   );

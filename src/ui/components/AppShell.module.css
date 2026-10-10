@@ -3,7 +3,13 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   min-block-size: 100dvh;
-  padding-block-end: calc(64px + env(safe-area-inset-bottom));
+  --nav-h: 64px;
+  padding-block-end: calc(var(--nav-h) + env(safe-area-inset-bottom));
+}
+
+/* the cashier has one screen: no navigation at all, the sale gets the full width */
+.single {
+  --nav-h: 0px;
 }
 
 .top {
@@ -11,17 +17,37 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
-  background: var(--surface);
-  border-block-end: 1px solid var(--border);
+  min-block-size: 60px;
+  background: var(--ink);
+  color: #fff;
   position: sticky;
   inset-block-start: 0;
-  z-index: 2;
+  z-index: 4;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: var(--on-color);
 }
 
 .title {
-  flex: 1;
   margin: 0;
-  font-size: var(--fs-h2);
+  font-size: 20px;
+  font-weight: 700;
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -34,11 +60,23 @@
   gap: var(--space-2);
   min-block-size: var(--target-min);
   min-inline-size: var(--target-min);
-  padding-inline: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: transparent;
+  padding: 3px var(--space-3) 3px 3px;
+  border: 0;
+  border-radius: var(--radius-round);
+  background: var(--ink-2);
+  color: #fff;
   cursor: pointer;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-round);
+  background: var(--tint-primary);
+  color: var(--primary-strong);
+  font-weight: 700;
 }
 
 .who {
@@ -55,29 +93,32 @@
   inset-inline: 0;
   inset-block-end: 0;
   display: flex;
-  background: var(--surface);
-  border-block-start: 1px solid var(--border);
+  background: var(--ink);
   padding-block-end: env(safe-area-inset-bottom);
   z-index: 3;
-  /* more tabs than fit (a manager has nine): the strip scrolls, each tab keeps a tappable width */
+  /* more tabs than fit (a manager has eleven): the strip scrolls, each tab keeps a tappable width */
   overflow-x: auto;
 }
 
 .item {
-  flex: 1 0 64px;
+  flex: 1 0 68px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   min-block-size: 64px;
-  min-inline-size: 64px;
+  min-inline-size: 68px;
   border: 0;
+  border-block-start: 3px solid transparent;
   background: transparent;
-  color: var(--text-muted);
+  color: #aab6c3;
   font-size: var(--fs-small);
   font-weight: 600;
   cursor: pointer;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
 }
 
 .item span {
@@ -87,9 +128,13 @@
   white-space: nowrap;
 }
 
+.item:hover {
+  color: #fff;
+}
+
 .current {
-  color: var(--primary);
-  background: var(--tint-primary);
+  color: #fff;
+  border-block-start-color: var(--primary);
 }
 
 .main {
@@ -104,13 +149,21 @@
   .who {
     display: none;
   }
+
+  .lock {
+    padding-inline-end: 3px;
+  }
 }
 
 @media (min-width: 900px) {
   .shell {
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: 232px minmax(0, 1fr);
     grid-template-rows: auto auto 1fr;
     padding-block-end: 0;
+  }
+
+  .single {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .top {
@@ -119,15 +172,15 @@
 
   .nav {
     position: sticky;
-    inset-block-start: 72px;
+    inset-block-start: 60px;
     grid-row: 2 / -1;
     flex-direction: column;
+    gap: 3px;
     align-self: start;
-    block-size: calc(100dvh - 72px);
-    border-block-start: 0;
-    border-inline-end: 1px solid var(--border);
-    padding-block: var(--space-3);
+    block-size: calc(100dvh - 60px);
+    padding: var(--space-3) var(--space-2);
     overflow-x: visible;
+    overflow-y: auto;
   }
 
   .item {
@@ -135,13 +188,28 @@
     flex-direction: row;
     justify-content: flex-start;
     gap: var(--space-3);
-    padding-inline: var(--space-4);
-    min-block-size: 52px;
+    padding-inline: var(--space-3);
+    min-block-size: 48px;
+    border-block-start: 0;
+    border-radius: var(--radius-control);
     font-size: var(--fs-body);
+  }
+
+  .item:hover {
+    background: var(--ink-2);
+  }
+
+  .current {
+    background: var(--ink-2);
+    box-shadow: inset -3px 0 0 var(--primary);
   }
 
   .main {
     grid-column: 2;
     grid-row: 2 / -1;
+  }
+
+  .single .main {
+    grid-column: 1;
   }
 }

@@ -21,6 +21,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
+  animation: lineIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes lineIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+    background: var(--tint-primary);
+  }
 }
 
 .head {
@@ -31,14 +40,14 @@
 }
 
 .name {
-  font-size: var(--fs-small);
+  font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .total {
-  font-size: var(--fs-price);
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
 }
 
 .row {
@@ -58,17 +67,23 @@
 .qty {
   min-block-size: var(--target-cashier);
   min-inline-size: var(--target-cashier);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--surface-2);
   font-weight: 700;
   cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.step:active {
+  transform: scale(0.88);
 }
 
 .qty {
   min-inline-size: 72px;
   font-size: var(--fs-price);
   background: var(--surface);
+  border: 1px solid var(--border-strong);
 }
 
 .unit {
@@ -88,7 +103,7 @@
   place-items: center;
   min-block-size: var(--target-cashier);
   min-inline-size: var(--target-cashier);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   cursor: pointer;

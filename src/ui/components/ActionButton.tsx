@@ -8,7 +8,7 @@ import styles from './ActionButton.module.css';
 export interface ActionButtonProps {
   label: string;
   icon?: LucideIcon;
-  variant?: 'primary' | 'ok' | 'danger' | 'ghost';
+  variant?: 'primary' | 'ok' | 'danger' | 'ghost' | 'soft';
   /** `stack` = icon over label (cashier style); `inline` = icon beside label (forms and tables) */
   layout?: 'stack' | 'inline';
   type?: 'button' | 'submit';

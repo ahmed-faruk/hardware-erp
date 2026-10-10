@@ -1,19 +1,23 @@
 /* Design tokens (docs/DESIGN_SYSTEM.md §2-§4). Light is default; dark follows the system or [data-theme='dark']. */
 :root {
-  --bg: #f7f6f3;
-  --surface: #fff;
-  --surface-2: #efede8;
-  --border: #d9d6cf;
-  --text: #1a1a1a;
-  --text-muted: #5c5c5c;
-  --primary: #1d4ed8;
+  --bg: #e9e7e2;
+  --surface: #fbfaf7;
+  --ink: #16202b;
+  --ink-2: #223142;
+  --surface-2: #efede7;
+  --border: #d6d3cb;
+  --border-strong: #b9b5ab;
+  --text: #16202b;
+  --text-muted: #5d6672;
+  --primary: #c94a00;
+  --primary-strong: #a63c00;
   --on-color: #fff;
   --ok: #15803d;
   --danger: #b91c1c;
   --warn: #b45309;
   --pay-cash: #15803d;
   --pay-credit: #c2410c;
-  --pay-card: #1d4ed8;
+  --pay-card: #2b6cb0;
   --pay-instapay: #7e22ce;
   --cat-1: #2563eb;
   --cat-2: #ea580c;
@@ -23,11 +27,13 @@
   --cat-6: #0891b2;
   --cat-7: #ca8a04;
   --cat-8: #4b5563;
-  --tint-primary: rgb(29 78 216 / 12%);
+  --tint-primary: rgb(232 89 12 / 14%);
   --tint-ok: rgb(21 128 61 / 12%);
   --tint-danger: rgb(185 28 28 / 12%);
   --tint-warn: rgb(180 83 9 / 12%);
-  --shadow-dialog: 0 8px 24px rgb(0 0 0 / 16%);
+  --shadow-dialog: 0 24px 48px -16px rgb(10 15 20 / 45%);
+  --shadow-1: 0 1px 0 rgb(22 32 43 / 6%), 0 10px 24px -14px rgb(22 32 43 / 35%);
+  --shadow-2: 0 -8px 24px -12px rgb(22 32 43 / 35%);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -37,8 +43,8 @@
   --space-6: 32px;
   --space-7: 48px;
   --space-8: 64px;
-  --radius-control: 8px;
-  --radius-card: 12px;
+  --radius-control: 12px;
+  --radius-card: 14px;
   --radius-round: 999px;
   --target-min: 44px;
   --target-cashier: 56px;
@@ -55,48 +61,62 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #121212;
-    --surface: #1e1e1e;
-    --surface-2: #2a2a2a;
-    --border: #3a3a3a;
-    --text: #f2f2f2;
-    --text-muted: #a8a8a8;
-    --primary: #60a5fa;
-    --on-color: #0b1220;
+    --bg: #10161c;
+    --surface: #19212a;
+    --ink: #0a0f14;
+    --ink-2: #1a2531;
+    --surface-2: #232d38;
+    --border: #2b3643;
+    --border-strong: #46546a;
+    --text: #eef1f4;
+    --text-muted: #9aa5b2;
+    --primary: #ff7a33;
+    --primary-strong: #ffa070;
+    --on-color: #1a0d03;
     --ok: #4ade80;
     --danger: #f87171;
     --warn: #fbbf24;
     --pay-cash: #4ade80;
     --pay-credit: #fb923c;
-    --pay-card: #60a5fa;
+    --pay-card: #7db4ee;
     --pay-instapay: #c084fc;
-    --tint-primary: rgb(96 165 250 / 18%);
+    --tint-primary: rgb(255 122 51 / 18%);
     --tint-ok: rgb(74 222 128 / 18%);
     --tint-danger: rgb(248 113 113 / 18%);
     --tint-warn: rgb(251 191 36 / 18%);
+    --shadow-dialog: 0 24px 48px -16px #000;
+    --shadow-1: 0 10px 24px -14px #000;
+    --shadow-2: 0 -8px 24px -12px #000;
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #121212;
-  --surface: #1e1e1e;
-  --surface-2: #2a2a2a;
-  --border: #3a3a3a;
-  --text: #f2f2f2;
-  --text-muted: #a8a8a8;
-  --primary: #60a5fa;
-  --on-color: #0b1220;
+  --bg: #10161c;
+  --surface: #19212a;
+  --ink: #0a0f14;
+  --ink-2: #1a2531;
+  --surface-2: #232d38;
+  --border: #2b3643;
+  --border-strong: #46546a;
+  --text: #eef1f4;
+  --text-muted: #9aa5b2;
+  --primary: #ff7a33;
+  --primary-strong: #ffa070;
+  --on-color: #1a0d03;
   --ok: #4ade80;
   --danger: #f87171;
   --warn: #fbbf24;
   --pay-cash: #4ade80;
   --pay-credit: #fb923c;
-  --pay-card: #60a5fa;
+  --pay-card: #7db4ee;
   --pay-instapay: #c084fc;
-  --tint-primary: rgb(96 165 250 / 18%);
+  --tint-primary: rgb(255 122 51 / 18%);
   --tint-ok: rgb(74 222 128 / 18%);
   --tint-danger: rgb(248 113 113 / 18%);
   --tint-warn: rgb(251 191 36 / 18%);
+  --shadow-dialog: 0 24px 48px -16px #000;
+  --shadow-1: 0 10px 24px -14px #000;
+  --shadow-2: 0 -8px 24px -12px #000;
 }
 
 *,

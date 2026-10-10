@@ -29,8 +29,19 @@
   padding-inline: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: var(--surface-2);
+  background: var(--surface);
+  border-color: var(--border-strong);
   inline-size: 100%;
+  min-block-size: 48px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+:global(.control:focus) {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--tint-primary);
+  outline: none;
 }
 
 :global(textarea.control) {
