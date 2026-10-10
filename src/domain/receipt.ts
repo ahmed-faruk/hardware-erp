@@ -3,6 +3,8 @@ import { formatMoney, formatQty, type Milli, type Piasters } from './money';
 import type { PayMethod } from './payments';
 
 /** Everything a receipt prints, already formatted: the template only places it (skill receipt-printing §1-§2). */
+export type ReceiptKind = 'sale' | 'return' | 'void';
+
 export interface ReceiptInput {
   shop: { name: string; phone: string; address: string; footer: string };
   invoice: {
@@ -27,6 +29,8 @@ export interface ReceiptInput {
   customer: { name: string; balanceBefore: Piasters } | null;
   copy: boolean;
   digits: DigitStyle;
+  /** a return or a void prints the same layout under its own banner; default `sale` */
+  kind?: ReceiptKind;
 }
 
 export interface ReceiptData {
@@ -44,6 +48,7 @@ export interface ReceiptData {
   change: string | null;
   credit: { customer: string; previous: string; thisInvoice: string; now: string } | null;
   copy: boolean;
+  kind: ReceiptKind;
 }
 
 /** Cairo wall-clock time as `dd/mm/yyyy hh:mm`. */
@@ -61,6 +66,7 @@ export const cairoTime = (iso: string): string =>
     .replace(', ', ' ');
 
 export function buildReceipt(input: ReceiptInput): ReceiptData {
+  const kind = input.kind ?? 'sale';
   const d = (text: string): string => localizeDigits(text, input.digits);
   const money = (p: Piasters): string => d(formatMoney(p));
   const discountTotal = input.lines.reduce((a, l) => a + l.lineDiscount, 0) + input.invoice.invoiceDiscount;
@@ -92,9 +98,10 @@ export function buildReceipt(input: ReceiptInput): ReceiptData {
             customer: input.customer.name,
             previous: money(input.customer.balanceBefore),
             thisInvoice: money(creditPaid),
-            now: money(input.customer.balanceBefore + creditPaid),
+            now: money(input.customer.balanceBefore + (kind === 'sale' ? creditPaid : -creditPaid)),
           }
         : null,
     copy: input.copy,
+    kind,
   };
 }

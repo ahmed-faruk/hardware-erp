@@ -1,4 +1,4 @@
-import { buildReceipt, type ReceiptData } from '@/domain/receipt';
+import { buildReceipt, type ReceiptData, type ReceiptKind } from '@/domain/receipt';
 import { can } from '@/domain/permissions';
 import { err, ok, type Result } from '@/domain/result';
 
@@ -15,6 +15,7 @@ export async function loadReceipt(
   db: HanafyDB,
   invoiceId: string,
   copy: boolean,
+  kind: ReceiptKind = 'sale',
 ): Promise<Result<ReceiptData>> {
   const invoice = await db.salesInvoices.get(invoiceId);
   if (!invoice) return err('NOT_FOUND', 'الفاتورة مش موجودة');
@@ -70,8 +71,117 @@ export async function loadReceipt(
       customer,
       copy,
       digits: device.digits,
+      kind,
     }),
   );
+}
+
+/** The paper for a saved return: same layout, "مرتجع" banner, the refund split in the payment rows. */
+export async function loadReturnReceipt(
+  db: HanafyDB,
+  returnId: string,
+  copy: boolean,
+): Promise<Result<ReceiptData>> {
+  const ret = await db.salesReturns.get(returnId);
+  if (!ret) return err('NOT_FOUND', 'المرتجع مش موجود');
+  const [lines, payments, company, settings, device, worker] = await Promise.all([
+    db.salesReturnLines.where('returnId').equals(returnId).toArray(),
+    db.payments.where('[documentType+documentId]').equals(['sales_return', returnId]).toArray(),
+    db.companies.toCollection().first(),
+    loadSettings(db),
+    loadDeviceSettings(db),
+    ret.workerId ? db.workers.get(ret.workerId) : Promise.resolve(undefined),
+  ]);
+  const products = await db.products.bulkGet(lines.map((l) => (l.productId as string | null) ?? ''));
+  const customerId = ret.customerId as string | null;
+  let customer = null;
+  if (customerId) {
+    const c = await db.customers.get(customerId);
+    const before = (
+      await db.partyLedger.where('[partyType+partyId]').equals(['customer', customerId]).toArray()
+    )
+      .filter((r) => r.docId !== returnId && r.occurredAt <= ret.issuedAt)
+      .reduce((a, r) => a + r.amount, 0);
+    if (c) customer = { name: c.name, balanceBefore: before };
+  }
+  return ok(
+    buildReceipt({
+      shop: {
+        name: company?.name ?? '',
+        phone: settings.phone,
+        address: settings.address,
+        footer: settings.footer,
+      },
+      invoice: {
+        number: ret.number,
+        issuedAt: ret.issuedAt,
+        total: ret.total as number,
+        invoiceDiscount: 0,
+        cashTendered: 0,
+        changeDue: 0,
+      },
+      cashierName: worker?.name ?? '',
+      lines: lines.map((l, i) => ({
+        name: products[i]?.name ?? '',
+        qtyMilli: l.qty as number,
+        unitPrice: l.unitRefund as number,
+        lineDiscount: 0,
+        netAmount: l.netAmount as number,
+        allocDiscount: 0,
+      })),
+      payments: payments.map((p) => ({
+        method: p.method as 'cash',
+        amount: p.amount,
+        reference: p.reference,
+      })),
+      customer,
+      copy,
+      digits: device.digits,
+      kind: 'return',
+    }),
+  );
+}
+
+export interface CollectionSlipData {
+  shopName: string;
+  number: string;
+  at: string;
+  customerName: string;
+  amount: number;
+  method: string;
+  balanceAfter: number;
+  workerName: string;
+}
+
+export async function loadCollectionSlip(
+  db: HanafyDB,
+  receiptId: string,
+): Promise<Result<CollectionSlipData>> {
+  const r = await db.customerReceipts.get(receiptId);
+  if (!r) return err('NOT_FOUND', 'السند مش موجود');
+  const [company, customer, worker] = await Promise.all([
+    db.companies.toCollection().first(),
+    db.customers.get(r.customerId as string),
+    r.workerId ? db.workers.get(r.workerId) : Promise.resolve(undefined),
+  ]);
+  const balanceAfter = (
+    await db.partyLedger
+      .where('[partyType+partyId]')
+      .equals(['customer', r.customerId as string])
+      .toArray()
+  )
+    .filter((x) => x.occurredAt <= r.issuedAt)
+    .reduce((a, x) => a + x.amount, 0);
+  return ok({
+    shopName: company?.name ?? '',
+    number: r.number,
+    at: r.issuedAt,
+    customerName: customer?.name ?? '',
+    amount: r.amount as number,
+    method: r.method as string,
+    balanceAfter,
+    workerName: worker?.name ?? '',
+  });
 }
 
 async function audit(
