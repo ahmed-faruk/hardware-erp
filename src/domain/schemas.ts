@@ -62,7 +62,13 @@ export const productFieldsSchema = z
     defaultSupplierId: id.nullable(),
     imagePath: optText,
     extraFields: z
-      .object({ icon: z.string().max(40).nullable() })
+      .object({
+        icon: z.string().max(40).nullable(),
+        plu: z
+          .string()
+          .regex(/^\d{5}$/)
+          .nullable(),
+      })
       .partial()
       .strict()
       .nullable(),

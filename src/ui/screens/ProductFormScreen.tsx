@@ -61,6 +61,7 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   const [reorder, setReorder] = useState<number | null>(product?.reorderLevel ?? 0);
   const [supplierId, setSupplierId] = useState(product?.defaultSupplierId ?? '');
   const [active, setActive] = useState(product?.active ?? true);
+  const [plu, setPlu] = useState((product?.extraFields as { plu?: string | null } | null)?.plu ?? '');
   const [icon, setIcon] = useState<string | null>(
     (product?.extraFields as { icon?: string } | null)?.icon ?? null,
   );
@@ -98,7 +99,7 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
       reorderLevel: reorder ?? 0,
       defaultSupplierId: supplierId || null,
       active,
-      extraFields: { icon },
+      extraFields: { icon, plu: /^\d{5}$/.test(plu) ? plu : null },
     };
     if (isManager)
       Object.assign(fields, {
@@ -179,6 +180,20 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
             required
           />
         )}
+        <FormField label={strings.products.plu}>
+          {(id) => (
+            <input
+              id={id}
+              className="control"
+              dir="ltr"
+              inputMode="numeric"
+              maxLength={5}
+              value={plu}
+              onChange={(e) => setPlu(e.target.value.replace(/\D/g, ''))}
+              data-testid="product-plu"
+            />
+          )}
+        </FormField>
         {isManager &&
           (
             [

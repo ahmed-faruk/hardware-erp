@@ -504,3 +504,33 @@ describe('price lists (POS-10)', () => {
     expect(next.lines.map((l) => l.unitPrice)).toEqual([800, 1900]);
   });
 });
+
+describe('scale labels (POS-04)', () => {
+  const label = async (plu: string, value: string) => {
+    const { ean13Check } = await import('@/domain/scale');
+    const body = `20${plu}${value}`;
+    return body + ean13Check(body);
+  };
+
+  it('with the setting on, a scale label finds the product and carries the weight; off, it finds nothing', async () => {
+    const m = await setup();
+    const { findByBarcode } = await import('@/db/lookup');
+    const p = m.s.products[0]!;
+    await m.ctx.db.products.update(p.id, { qtyDecimals: 3, extraFields: { icon: null, plu: '00123' } });
+    const code = await label('00123', '01250');
+    expect(await findByBarcode(m.ctx.db, code)).toBeNull();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.enabled', true);
+    expect(await findByBarcode(m.ctx.db, code)).toMatchObject({ qtyMilli: 1250, product: { id: p.id } });
+    expect(await findByBarcode(m.ctx.db, await label('00999', '01250'))).toBeNull();
+  });
+
+  it('price mode turns the price on the label into a quantity', async () => {
+    const m = await setup();
+    const { findByBarcode } = await import('@/db/lookup');
+    const p = m.s.products[0]!; // price 10.00 per unit
+    await m.ctx.db.products.update(p.id, { extraFields: { icon: null, plu: '00123' } });
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.enabled', true);
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.mode', 'price');
+    expect(await findByBarcode(m.ctx.db, await label('00123', '02500'))).toMatchObject({ qtyMilli: 2500 });
+  });
+});

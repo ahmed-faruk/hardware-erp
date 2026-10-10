@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { ean13Check } from '../../src/domain/scale';
 import { strings } from '../../src/ui/strings.ar';
 
 import { newCashierFixture, productId, setSetting, sql, type CashierFixture } from './helpers';
@@ -262,5 +263,24 @@ test('a wholesale customer changes the price of the lines already in the cart', 
   } finally {
     sql(`update products set price_wholesale = null where id = '${productId(3)}'`);
     sql(`update customers set price_list = 'retail' where id = 'a0000000-0000-7000-8000-000000000c01'`);
+  }
+});
+
+test('scanning a scale label adds the product with the weight on it', async ({ page }) => {
+  const plu = '00987';
+  const body = `20${plu}01250`;
+  const code = body + ean13Check(body);
+  sql(
+    `update products set qty_decimals = 3, extra_fields = '{"icon":null,"plu":"${plu}"}'::jsonb where id = '${productId(1)}'`,
+  );
+  setSetting('scale.enabled', 'true');
+  try {
+    await start(page);
+    await page.keyboard.type(code, { delay: 0 }); // the scanner types fast and ends with Enter
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('qty-0')).toHaveText('1.25');
+  } finally {
+    sql(`update products set qty_decimals = 0, extra_fields = null where id = '${productId(1)}'`);
+    sql(`delete from settings where key = 'scale.enabled'`);
   }
 });

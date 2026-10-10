@@ -19,6 +19,10 @@ export interface Settings {
   shiftVarianceAbove: number;
   /** INV-11: selling below zero stock: allowed, allowed with a warning, or blocked */
   stockNegativePolicy: 'allow' | 'warn' | 'block';
+  /** POS-04: scale labels (13 digits) carry the product code and the weight or the price */
+  scaleEnabled: boolean;
+  scalePrefix: string;
+  scaleMode: 'weight' | 'price';
 }
 
 export const SETTING_KEYS = {
@@ -32,6 +36,9 @@ export const SETTING_KEYS = {
   stockApprovalAbove: 'stock.approvalAbove',
   shiftVarianceAbove: 'shift.varianceAbove',
   stockNegativePolicy: 'stock.negativePolicy',
+  scaleEnabled: 'scale.enabled',
+  scalePrefix: 'scale.prefix',
+  scaleMode: 'scale.mode',
 } as const satisfies Record<keyof Settings, string>;
 
 /** Safe defaults: the cashier may not discount or change prices until the manager allows it. */
@@ -46,6 +53,9 @@ export const DEFAULT_SETTINGS: Settings = {
   stockApprovalAbove: 50000,
   shiftVarianceAbove: 2000,
   stockNegativePolicy: 'allow',
+  scaleEnabled: false,
+  scalePrefix: '2',
+  scaleMode: 'weight',
 };
 
 export function parseSettings(rows: { key: string; value: unknown }[]): Settings {
@@ -89,6 +99,12 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
       negative === 'allow' || negative === 'warn' || negative === 'block'
         ? negative
         : DEFAULT_SETTINGS.stockNegativePolicy,
+    scaleEnabled: bool('scaleEnabled'),
+    scalePrefix: (() => {
+      const v = byKey.get(SETTING_KEYS.scalePrefix);
+      return typeof v === 'string' && /^\d{1,2}$/.test(v) ? v : DEFAULT_SETTINGS.scalePrefix;
+    })(),
+    scaleMode: byKey.get(SETTING_KEYS.scaleMode) === 'price' ? 'price' : 'weight',
   };
 }
 

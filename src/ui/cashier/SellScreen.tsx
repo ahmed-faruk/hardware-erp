@@ -172,14 +172,14 @@ export function SellScreen() {
 
   const list = useLiveQuery(() => customerPriceList(db, cart.customerId), [db, cart.customerId]) ?? 'retail';
   const add = useCallback(
-    (product: Product, unit: ProductUnit | null): void => {
+    (product: Product, unit: ProductUnit | null, qtyMilli = 1000): void => {
       setCart((c) =>
         addItem(
           c,
           productToItem(
             product,
             unit ? { id: unit.id, factor: unit.factor, price: unit.price } : null,
-            1000,
+            qtyMilli,
             list,
           ),
         ),
@@ -206,7 +206,7 @@ export function SellScreen() {
       if (returnOpen) return setScannedReceipt(code);
       if (step !== 'items' || !shift) return;
       void findByBarcode(db, code).then((found) => {
-        if (found) add(found.product, found.unit);
+        if (found) add(found.product, found.unit, found.qtyMilli);
         else {
           play('error');
           flash(strings.sell.scanUnknown);

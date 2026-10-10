@@ -38,6 +38,9 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [footer, setFooter] = useState(initial.footer);
   const [returnDays, setReturnDays] = useState(String(initial.returnPeriodDays));
   const [stockLimit, setStockLimit] = useState<number | null>(initial.stockApprovalAbove);
+  const [scaleOn, setScaleOn] = useState(initial.scaleEnabled);
+  const [scalePrefix, setScalePrefix] = useState(initial.scalePrefix);
+  const [scaleMode, setScaleMode] = useState(initial.scaleMode);
   const [negPolicy, setNegPolicy] = useState(initial.stockNegativePolicy);
   const [varianceLimit, setVarianceLimit] = useState<number | null>(initial.shiftVarianceAbove);
   const [saved, setSaved] = useState(false);
@@ -54,6 +57,9 @@ function SettingsForm({ initial }: { initial: Settings }) {
       address,
       footer,
       stockNegativePolicy: negPolicy,
+      scaleEnabled: scaleOn,
+      scalePrefix: /^\d{1,2}$/.test(scalePrefix) ? scalePrefix : DEFAULT_SETTINGS.scalePrefix,
+      scaleMode,
       shiftVarianceAbove: varianceLimit ?? DEFAULT_SETTINGS.shiftVarianceAbove,
       stockApprovalAbove: stockLimit ?? DEFAULT_SETTINGS.stockApprovalAbove,
       returnPeriodDays: /^\d{1,4}$/.test(returnDays) ? Number(returnDays) : DEFAULT_SETTINGS.returnPeriodDays,
@@ -146,6 +152,50 @@ function SettingsForm({ initial }: { initial: Settings }) {
             format={formatMoney}
             required
           />
+        </div>
+        <div className={styles.section}>
+          <h2>{strings.settings.scale}</h2>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={scaleOn}
+              onChange={(e) => setScaleOn(e.target.checked)}
+              data-testid="scale-on"
+            />
+            {strings.settings.scaleOn}
+          </label>
+          {scaleOn && (
+            <>
+              <FormField label={strings.settings.scalePrefix}>
+                {(id) => (
+                  <input
+                    id={id}
+                    className="control"
+                    dir="ltr"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={scalePrefix}
+                    onChange={(e) => setScalePrefix(e.target.value.replace(/\D/g, ''))}
+                    data-testid="scale-prefix"
+                  />
+                )}
+              </FormField>
+              <FormField label={strings.settings.scaleModeLabel}>
+                {(id) => (
+                  <select
+                    id={id}
+                    className="control"
+                    value={scaleMode}
+                    onChange={(e) => setScaleMode(e.target.value as typeof scaleMode)}
+                    data-testid="scale-mode"
+                  >
+                    <option value="weight">{strings.settings.scaleWeight}</option>
+                    <option value="price">{strings.settings.scalePrice}</option>
+                  </select>
+                )}
+              </FormField>
+            </>
+          )}
         </div>
         <div className={styles.section}>
           <h2>{strings.settings.receipt}</h2>
