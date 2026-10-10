@@ -10,6 +10,7 @@ export const DOC_TYPES = [
   'VOID',
   'SHF',
   'XFR',
+  'CAJ',
 ] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 

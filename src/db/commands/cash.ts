@@ -317,3 +317,89 @@ export async function saveExpenseCategory(
     return r.ok ? { ok: true as const, id: r.id, version: r.version } : r;
   });
 }
+
+export const CASH_ADJUST_REASONS = ['count_error', 'old_difference', 'entry_fix', 'other'] as const;
+
+const adjustInput = z.object({
+  cashAccountId: id,
+  /** + the cash is more than the books say, − it is less */
+  amount: z
+    .number()
+    .int()
+    .refine((n) => n !== 0),
+  reason: z.enum(CASH_ADJUST_REASONS),
+  note: z.string().trim().max(200).default(''),
+});
+
+/** FIN-11: a manager corrects a cash account with a voucher and a reason; there is no way to edit a balance. */
+export async function postCashAdjustment(
+  ctx: DeviceContext,
+  raw: z.input<typeof adjustInput>,
+): Promise<{ ok: true; id: string; number: string } | Err> {
+  const parsed = adjustInput.safeParse(raw);
+  if (!parsed.success) return err('E_VALIDATION', 'بيانات التسوية غير صحيحة');
+  const input = parsed.data;
+  if (can(ctx.role, 'cashAdjustment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (input.reason === 'other' && !input.note) return err('NOTE_REQUIRED', 'اكتب ملاحظة');
+  const { db } = ctx;
+  const account = await db.cashAccounts.get(input.cashAccountId);
+  if (!account || account.deletedAt) return err('NOT_FOUND', 'حساب غير موجود');
+  const openShift =
+    account.kind === 'drawer'
+      ? ((await db.shifts
+          .where('status')
+          .equals('open')
+          .filter((s) => s.cashAccountId === account.id)
+          .first()) ?? null)
+      : null;
+  const adjId = uuidv7();
+  const at = nowIso();
+  const movement: CashMovement = {
+    ...newCommon(ctx),
+    cashAccountId: account.id,
+    shiftId: openShift?.id ?? null,
+    amount: input.amount,
+    method: 'cash',
+    docType: 'cash_adjustment',
+    docId: adjId,
+    occurredAt: at,
+  };
+  return db.transaction(
+    'rw',
+    [db.cashAdjustments, db.cashMovements, db.auditLog, db.numberSequences, db.outbox, db.syncState],
+    async () => {
+      const number = await nextNumber(db, ctx.devicePrefix, 'CAJ');
+      const doc = {
+        ...newCommon(ctx),
+        id: adjId,
+        number,
+        issuedAt: at,
+        workerId: ctx.workerId,
+        shiftId: openShift?.id ?? null,
+        status: 'posted' as const,
+        voidedBy: null,
+        notes: null,
+        isLegacy: false,
+        legacy: null,
+        cashAccountId: account.id,
+        amount: input.amount,
+        reasonCode: input.reason,
+        note: input.note || null,
+      };
+      const a = audit(
+        ctx,
+        'cash_adjusted',
+        'cash_adjustments',
+        adjId,
+        { number, amount: input.amount, reason: input.reason, account: account.name },
+        at,
+      );
+      await db.cashAdjustments.add(doc);
+      await db.cashMovements.add(movement);
+      await db.auditLog.add(a);
+      await enqueue(db, 'cashAdjustments', { ...doc, cashMovements: [movement] }, ctx.workerId);
+      await enqueue(db, 'auditLog', a, ctx.workerId);
+      return { ok: true as const, id: adjId, number };
+    },
+  );
+}

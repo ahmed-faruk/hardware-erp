@@ -145,3 +145,31 @@ test.describe('shift close', () => {
     await expect(page.getByTestId('close-variance')).toHaveText('0.00');
   });
 });
+
+test('the manager corrects a cash account with a voucher; it reaches the server with its reason', async ({
+  page,
+}) => {
+  const f = newCashierFixture();
+  await page.goto('/');
+  await page.getByTestId('activation-code').fill(f.code);
+  await page.getByTestId('activate').click();
+  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
+  await page.keyboard.type(f.pin);
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('sync-status')).toBeVisible();
+  await page.getByRole('button', { name: strings.nav.expenses }).click();
+  await page.getByTestId('new-adjustment').click();
+  await page.getByTestId('adjust-direction').selectOption('minus');
+  await page.getByTestId('adjust-cash-reason').selectOption('count_error');
+  await page.getByLabel(strings.cash.amount).fill('5');
+  await page.getByTestId('save-money').click();
+  await expect
+    .poll(
+      () =>
+        sql(
+          `select reason_code || ':' || amount from cash_adjustments where number = '${f.prefix}-CAJ-000001'`,
+        ),
+      { timeout: 60_000 },
+    )
+    .toBe('count_error:-500');
+});

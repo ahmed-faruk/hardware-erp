@@ -8,6 +8,7 @@ import {
   postCashTransfer,
   postExpense,
   previewClose,
+  postCashAdjustment,
   saveExpenseCategory,
 } from '@/db/commands/cash';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
@@ -170,5 +171,36 @@ describe('expense and transfer', () => {
     const m = await setup('manager');
     expect((await saveExpenseCategory(m.ctx, { name: 'إيجار' })).ok).toBe(true);
     expect((await m.ctx.db.expenseCategories.toArray()).some((c) => c.name === 'إيجار')).toBe(true);
+  });
+});
+
+describe('cash adjustment voucher (FIN-11)', () => {
+  it('only the manager; the safe moves by exactly the voucher amount', async () => {
+    const c = await setup();
+    expect(
+      await postCashAdjustment(c.ctx, { cashAccountId: c.safe.id, amount: -500, reason: 'count_error' }),
+    ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    const m = await setup('manager');
+    const r = await postCashAdjustment(m.ctx, {
+      cashAccountId: m.safe.id,
+      amount: -500,
+      reason: 'count_error',
+    });
+    expect(r).toMatchObject({ ok: true });
+    const rows = (await m.ctx.db.cashMovements.toArray()).filter((x) => x.docType === 'cash_adjustment');
+    expect(rows.map((x) => x.amount)).toEqual([-500]);
+    expect((await m.ctx.db.outbox.toArray()).some((o) => o.table === 'cashAdjustments')).toBe(true);
+  });
+
+  it('"other" needs a note; zero is refused; a drawer with an open shift counts the voucher in that shift', async () => {
+    const m = await setup('manager');
+    expect(
+      await postCashAdjustment(m.ctx, { cashAccountId: m.safe.id, amount: 100, reason: 'other' }),
+    ).toMatchObject({ ok: false, code: 'NOTE_REQUIRED' });
+    expect(
+      await postCashAdjustment(m.ctx, { cashAccountId: m.safe.id, amount: 0, reason: 'entry_fix' }),
+    ).toMatchObject({ ok: false, code: 'E_VALIDATION' });
+    await postCashAdjustment(m.ctx, { cashAccountId: m.drawer.id, amount: -300, reason: 'old_difference' });
+    expect(await drawerBalance(m.ctx.db, m.s.shiftId)).toBe(10000 - 300);
   });
 });

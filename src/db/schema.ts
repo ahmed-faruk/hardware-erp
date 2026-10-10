@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 
 import type * as T from './types';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 /** Dexie names (camelCase) -> server table names (snake_case). */
 export const SERVER_TABLE: Record<string, string> = {
@@ -35,6 +35,7 @@ export const SERVER_TABLE: Record<string, string> = {
   stockAdjustmentLines: 'stock_adjustment_lines',
   expenses: 'expenses',
   cashTransfers: 'cash_transfers',
+  cashAdjustments: 'cash_adjustments',
   voids: 'voids',
   openings: 'openings',
   payments: 'payments',
@@ -78,6 +79,7 @@ export class HanafyDB extends Dexie {
   stockAdjustmentLines!: Table<T.LooseRow, string>;
   expenses!: Table<T.DocRow, string>;
   cashTransfers!: Table<T.DocRow, string>;
+  cashAdjustments!: Table<T.DocRow, string>;
   voids!: Table<T.DocRow, string>;
   openings!: Table<T.DocRow, string>;
   payments!: Table<T.Payment, string>;
@@ -156,5 +158,7 @@ export class HanafyDB extends Dexie {
     this.version(3).stores({
       purchaseReturnLines: 'id, returnId, originalLineId',
     });
+    // v4: cash adjustment vouchers (FIN-11)
+    this.version(4).stores({ cashAdjustments: 'id, &number, issuedAt' });
   }
 }
