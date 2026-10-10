@@ -17,6 +17,7 @@ import { strings } from '../strings.ar';
 import { CustomerBalances, CustomerPicker } from './CustomerPicker';
 import { NumEntry } from './NumEntry';
 import { PAY_METHODS, PayMethodButton } from './PayMethodButton';
+import { useShortcuts } from './useShortcuts';
 
 import styles from './PayScreen.module.css';
 
@@ -128,10 +129,13 @@ export function PayScreen({
     setBusy(false);
   };
 
+  useShortcuts({ finish: () => void finish() });
+
   return (
     <section className={styles.pay}>
       <div className={styles.top}>
         <ActionButton
+          big
           label={strings.common.back}
           icon={ArrowRight}
           variant="ghost"
@@ -185,6 +189,7 @@ export function PayScreen({
 
       <div className={styles.customer}>
         <ActionButton
+          big
           label={customer ? customer.customer.name : strings.sell.chooseCustomer}
           icon={UserRound}
           variant="ghost"
@@ -213,6 +218,7 @@ export function PayScreen({
         hint={`${strings.sell.remaining}: ${digits(formatMoney(remaining))}`}
         extra={
           <ActionButton
+            big
             label={strings.sell.fullAmount}
             variant="ghost"
             onClick={() => amountEntered(formatMoney(remaining))}

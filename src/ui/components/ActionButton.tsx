@@ -14,6 +14,8 @@ export interface ActionButtonProps {
   type?: 'button' | 'submit';
   disabled?: boolean;
   loading?: boolean;
+  /** cashier screens: 56 px high (docs/DESIGN_SYSTEM.md §4, UX-11) */
+  big?: boolean;
   onClick?: () => void;
   testId?: string;
 }
@@ -26,6 +28,7 @@ export function ActionButton({
   type = 'button',
   disabled,
   loading,
+  big,
   onClick,
   testId,
 }: ActionButtonProps) {
@@ -33,7 +36,13 @@ export function ActionButton({
   return (
     <button
       type={type}
-      className={cx(styles.button, styles[variant], styles[layout], loading && styles.loading)}
+      className={cx(
+        styles.button,
+        styles[variant],
+        styles[layout],
+        big && styles.big,
+        loading && styles.loading,
+      )}
       disabled={disabled || loading}
       aria-disabled={disabled || loading}
       onClick={onClick}

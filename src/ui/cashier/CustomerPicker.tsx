@@ -101,8 +101,8 @@ function PickerBody({ onPick }: { onPick: (id: string) => void }) {
           )}
         </FormField>
         {error && <BigAlert tone="danger" word={error} />}
-        <ActionButton label={strings.common.save} type="submit" variant="ok" testId="save-new-customer" />
-        <ActionButton label={strings.common.cancel} variant="ghost" onClick={() => setAdding(false)} />
+        <ActionButton big label={strings.common.save} type="submit" variant="ok" testId="save-new-customer" />
+        <ActionButton big label={strings.common.cancel} variant="ghost" onClick={() => setAdding(false)} />
       </form>
     );
   }
@@ -144,6 +144,7 @@ function PickerBody({ onPick }: { onPick: (id: string) => void }) {
       </ul>
       {canAdd && (
         <ActionButton
+          big
           label={strings.sell.newCustomer}
           icon={UserPlus}
           variant="ghost"

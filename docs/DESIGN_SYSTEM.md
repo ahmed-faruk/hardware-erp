@@ -95,6 +95,11 @@ active/pressed (scale .97), disabled (40% opacity + `aria-disabled`), loading (s
 | Manager-only: `DataTable`, `FormField` (label, input, helper, error), `Dialog`, `Tabs`, `DateRange` | text allowed, same tokens |
 States for data: loading = skeleton blocks the size of content; empty = `EmptyState`; error = `BigAlert` with retry.
 
+### Cashier screen (phase 6)
+Route `#/sell`. Tiles without a photo show the category icon on its color, the product code, the price and a stock dot. Fixed pay buttons:
+cash green, credit orange, card blue, InstaPay purple. Defaults of prd-v2 §16.3 for keys (F2 search, F4 customer, F8 hold, Shift+F8 held carts,
+F9 pay, Ctrl+Enter finish, Esc). All cashier buttons are 56 px high. The change is drawn as notes and coins (never photos of real money).
+
 ## 7. Screen patterns
 - Cashier flow is 3 steps with fixed colors: items (neutral) → pay (`--primary` frame) → done (`--ok` frame + receipt).
 - Max 2 menu levels. Primary action bottom-end (RTL: bottom-left) on phones, end of the pay panel on desktop.

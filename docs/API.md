@@ -61,6 +61,8 @@ agree and that the number starts with the device prefix, then inserts everything
 (`sync_tables.push_action` is null) are added with their command.
 Workers: `sync_tables.push_action = manageUsers` (managers only), and a manager login on a device below the manager level is refused.
 `pin_hash` and `pin_salt` reach every device so workers can log in offline (docs/SECURITY.md §2).
+Cost on sales: devices below manager level send cost 0; the server sets `unit_cost` on the invoice lines and stock movements from the product's
+current cost (purchase invoices keep it as a moving average, phase 7, and also set the sale price per line).
 Rules: documents/ledgers `insert … on conflict (id) do nothing`; master data field-merge with `base_version`;
 allow-listed tables only; role check per action uses the same matrix as `src/domain/permissions.ts`.
 
@@ -113,6 +115,12 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | `openShift` / `closeShift` | float / counted breakdown | `{ ok, id, variance? }` |
 | `saveProduct` | fields, `barcodes[]`, `packUnit` (one), `baseVersion` | `{ ok, id, version }` (one transaction: product, units, barcodes, search words) |
 | `saveCategory` / `saveCustomer` / `saveSupplier` | fields + `baseVersion` | `{ ok, id, version }` |
+| `approveWithPin` | managerId, pin, action | single-use token (2 min, one action); the sale spends it and the audit row records `approved_by` |
+| `postSale` rules | approvalTokens[] | needs a manager token for: a discount above the cashier limit or when discounts are off, a changed price when price changes are off, credit over the limit (`APPROVAL_REQUIRED` with the action in `message`) |
+| `holdCart` / `resumeCart` / `discardCart` / `saveCurrentCart` | cart | local only (never synced); the open cart autosaves on every change |
+| `noSale` / `reprintInvoice` | reason + token / invoice id | audit rows `no_sale` and `invoice_reprinted`; reprints are marked "copy" |
+| `saveSetting` | key, value | managers only; one row per key (deterministic id) |
+| `addCustomer` | name, phone | cashier or manager; limit 0, no discount; the server refuses anything else from a cashier |
 | `saveWorker` | name, role, active, `pin` (hashed, never stored) + `baseVersion` | `{ ok, id, version }` (managers only; `manageUsers`) |
 | `approveWithPin` | action, managerPin | `{ ok, approvalToken }` (single use, expires in 2 min) |
 

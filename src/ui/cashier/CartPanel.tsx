@@ -108,6 +108,7 @@ export function CartPanel({
         ))}
       </ul>
       <ActionButton
+        big
         label={strings.sell.discount}
         icon={Percent}
         variant="ghost"

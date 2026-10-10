@@ -60,3 +60,7 @@
     min-block-size: 48px;
   }
 }
+
+.big {
+  min-block-size: var(--target-cashier);
+}

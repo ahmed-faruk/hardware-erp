@@ -28,12 +28,14 @@ export function DiscountDialog({
       extra={
         <>
           <ActionButton
+            big
             label={strings.sell.percent}
             variant={kind === 'percentBp' ? 'primary' : 'ghost'}
             onClick={() => setKind('percentBp')}
             testId="kind-percent"
           />
           <ActionButton
+            big
             label={strings.sell.amount}
             variant={kind === 'fixed' ? 'primary' : 'ghost'}
             onClick={() => setKind('fixed')}

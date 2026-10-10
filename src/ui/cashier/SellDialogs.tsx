@@ -48,11 +48,13 @@ export function HeldCartsDialog({
               <span>{`${digits(String(h.cart.lines.length))} ${strings.sell.itemsCount}`}</span>
               <strong>{digits(formatMoney(h.total))}</strong>
               <ActionButton
+                big
                 label={strings.sell.resume}
                 onClick={() => onResume(h.id)}
                 testId={`resume-${h.id}`}
               />
               <ActionButton
+                big
                 label={strings.sell.dropped}
                 icon={Trash2}
                 variant="ghost"
@@ -100,6 +102,7 @@ export function RecentInvoicesDialog({
               <span dir="ltr">{digits(inv.number)}</span>
               <strong>{digits(formatMoney(inv.total))}</strong>
               <ActionButton
+                big
                 label={strings.sell.reprint}
                 icon={Printer}
                 onClick={() => onReprint(inv.id)}
