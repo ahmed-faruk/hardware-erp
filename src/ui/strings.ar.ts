@@ -342,6 +342,7 @@ export const strings = {
     mayDiscount: 'الكاشير يقدر يدّي خصم',
     discountLimit: 'أقصى خصم للكاشير %',
     mayChangePrice: 'الكاشير يقدر يغيّر السعر',
+    returnDays: 'مدة المرتجع بالأيام (بعدها محتاج المدير)',
     receipt: 'الإيصال',
     phone: 'تليفون المحل',
     address: 'العنوان',
