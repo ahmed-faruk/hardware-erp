@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Banknote, CircleHelp, Coins, Printer, Trash2, Undo2 } from 'lucide-react';
+import { Ban, Banknote, CircleHelp, Coins, Printer, Trash2, Undo2 } from 'lucide-react';
 
 import { useServices } from '@/app/session';
 import { discardCart, listHeldCarts, type HeldCartRow } from '@/db/commands/carts';
 import { NO_SALE_REASONS, type NoSaleReason } from '@/db/commands/receipts';
+import { VOID_REASONS } from '@/db/commands/returns';
 import { formatMoney } from '@/domain/money';
 
 import { ActionButton } from '../components/ActionButton';
@@ -73,12 +74,15 @@ export function RecentInvoicesDialog({
   shiftId,
   digits,
   onReprint,
+  onVoid,
   onClose,
 }: {
   open: boolean;
   shiftId: string | null;
   digits: (t: string) => string;
   onReprint: (id: string) => void;
+  /** only passed for a manager */
+  onVoid?: (id: string) => void;
   onClose: () => void;
 }) {
   const { db } = useServices();
@@ -108,6 +112,16 @@ export function RecentInvoicesDialog({
                 onClick={() => onReprint(inv.id)}
                 testId={`reprint-${inv.number}`}
               />
+              {onVoid && inv.status === 'posted' && (
+                <ActionButton
+                  big
+                  label={strings.voidInvoice.button}
+                  icon={Ban}
+                  variant="danger"
+                  onClick={() => onVoid(inv.id)}
+                  testId={`void-${inv.number}`}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -147,6 +161,36 @@ export function NoSaleDialog({
             </button>
           );
         })}
+      </div>
+    </Dialog>
+  );
+}
+
+/** The manager picks why the invoice is cancelled from a fixed list: no typing, no "are you sure" (UX-09). */
+export function VoidReasonDialog({
+  open,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  onPick: (reason: (typeof VOID_REASONS)[number]) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog title={strings.voidInvoice.title} open={open} onClose={onClose}>
+      <div className={styles.reasons}>
+        {VOID_REASONS.map((r) => (
+          <button
+            key={r}
+            type="button"
+            className={styles.reason}
+            onClick={() => onPick(r)}
+            data-testid={`void-reason-${r}`}
+          >
+            <Ban size={32} aria-hidden="true" />
+            <span>{strings.voidInvoice.reasons[r]}</span>
+          </button>
+        ))}
       </div>
     </Dialog>
   );
