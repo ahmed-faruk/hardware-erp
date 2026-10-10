@@ -63,7 +63,7 @@ describe('postSale', () => {
       shiftId: s.shiftId,
       cashAccountId: s.cashAccountId,
     };
-    expect(await postSale(ctx, base)).toMatchObject({ ok: false, code: 'OVER_LIMIT' });
+    expect(await postSale(ctx, base)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
     expect(await ctx.db.salesInvoices.count()).toBe(0);
   });
 

@@ -1,0 +1,93 @@
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-block-size: 140px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+}
+
+.main:active {
+  transform: scale(0.97);
+}
+
+.art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-block-size: 72px;
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
+  color: var(--tint);
+}
+
+.code {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.name {
+  padding-inline: var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-block-size: 2.5em;
+}
+
+.price {
+  padding-bottom: var(--space-2);
+  font-size: var(--fs-price);
+  font-weight: 700;
+}
+
+.dot {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: var(--radius-round);
+  border: 2px solid var(--surface);
+}
+
+.ok {
+  background: var(--ok);
+}
+
+.low {
+  background: var(--warn);
+}
+
+.out {
+  background: var(--danger);
+}
+
+.pack {
+  min-block-size: var(--target-cashier);
+  border: 0;
+  border-block-start: 1px solid var(--border);
+  background: var(--tint-primary);
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}

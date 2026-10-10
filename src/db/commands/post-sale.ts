@@ -2,6 +2,8 @@ import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { nextNumber } from '../numbering';
+import { loadSettings } from '../settings';
+import { type Approval, peekApproval, spendApproval } from './approval';
 import { enqueue } from '../outbox';
 import type {
   AuditRow,
@@ -13,6 +15,9 @@ import type {
   StockMovement,
 } from '../types';
 import { baseQty } from '@/domain/costing';
+import { mulDivRound } from '@/domain/money';
+import { discountNeedsApproval, priceNeedsApproval } from '@/domain/settings';
+import type { Action } from '@/domain/permissions';
 import { checkCredit } from '@/domain/credit';
 import { validatePayments } from '@/domain/payments';
 import { can } from '@/domain/permissions';
@@ -60,6 +65,20 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     baseQtys.push(q.value);
   }
 
+  // what needs a manager's PIN: a discount or price the settings do not allow this role, or credit above the customer's limit
+  const settings = await loadSettings(db);
+  const needs = new Set<Action>();
+  const units = await db.productUnits.bulkGet(input.lines.map((l) => l.productUnitId ?? ''));
+  input.lines.forEach((l, i) => {
+    if (discountNeedsApproval(settings, ctx.role, l.discount, invoice.lines[i]!.grossAmount))
+      needs.add('discountOverLimit');
+    const listPrice = units[i]?.price ?? mulDivRound(products[i]!.price, l.unitFactorMilli, 1000);
+    if (priceNeedsApproval(settings, ctx.role, l.unitPrice, listPrice)) needs.add('priceOverride');
+  });
+  const netSum = invoice.lines.reduce((a, l) => a + l.netAmount, 0);
+  if (discountNeedsApproval(settings, ctx.role, input.invoiceDiscount ?? undefined, netSum))
+    needs.add('discountOverLimit');
+
   const creditTotal = input.payments.filter((p) => p.method === 'credit').reduce((a, p) => a + p.amount, 0);
   if (creditTotal > 0 && input.customerId) {
     const customer = await db.customers.get(input.customerId);
@@ -71,11 +90,18 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       input.creditPolicy,
       input.isOffline,
     );
-    if (!check.ok && !(input.managerApproved && can(ctx.role, 'creditOverLimit') !== 'no')) {
-      return err(check.code, 'تجاوز حد الآجل: محتاج رقم المدير');
-    }
+    if (!check.ok && ctx.role !== 'manager') needs.add('creditOverLimit');
   }
 
+  const approvals: { token: string; approval: Approval }[] = [];
+  for (const action of needs) {
+    const token = input.approvalTokens.find((t) => peekApproval(t, action));
+    const approval = token ? peekApproval(token, action) : null;
+    if (!token || !approval) return err('APPROVAL_REQUIRED', action);
+    approvals.push({ token, approval });
+  }
+
+  for (const a of approvals) spendApproval(a.token);
   const issuedAt = nowIso();
   const invoiceId = uuidv7();
   const cashShare = input.payments.filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0);
@@ -101,7 +127,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       allocDiscount: r.allocatedInvoiceDiscount,
       taxAmount: 0,
       netAmount: r.netAmount,
-      unitCost: product.unitCost,
+      unitCost: product.unitCost ?? 0, // cashier devices never receive costs; the server fills it in
       warehouseId: input.warehouseId,
       legacyText: null,
     };
@@ -211,7 +237,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
         before: null,
         after: { number, total: invoice.total },
         workerId: ctx.workerId,
-        approvedBy: null,
+        approvedBy: approvals[0]?.approval.approvedBy ?? null,
         occurredAt: issuedAt,
       };
       await db.salesInvoices.add(doc);

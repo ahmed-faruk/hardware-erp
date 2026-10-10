@@ -1,0 +1,76 @@
+.pay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: 720px;
+  margin-inline: auto;
+  border-inline: 6px solid var(--primary);
+  padding: var(--space-4);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.numbers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 600;
+}
+
+.big {
+  font-size: var(--fs-total);
+  line-height: 1.05;
+}
+
+.okBig {
+  font-size: var(--fs-total);
+  line-height: 1.05;
+  color: var(--ok);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-round);
+  background: var(--surface);
+}
+
+.x {
+  display: grid;
+  place-items: center;
+  min-inline-size: var(--target-min);
+  min-block-size: var(--target-min);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.methods {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.customer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

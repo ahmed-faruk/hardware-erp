@@ -4,6 +4,7 @@ import { openShiftSchema } from '@/domain/schemas';
 
 import { newCommon, type DeviceContext } from './context';
 import { nowIso } from '../ids';
+import { isClockSafe } from '../clock';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
 import type { Shift } from '../types';
@@ -17,11 +18,14 @@ export async function openShift(
   if (!parsed.success) return err('E_VALIDATION', 'بيانات الوردية غير صحيحة');
   if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
+  // a device clock that went backwards or is far from the server would date the whole shift wrong (offline-sync skill §6)
+  if (!(await isClockSafe(db))) return err('CLOCK_UNSAFE', 'ساعة الجهاز غلط');
   return db.transaction('rw', [db.shifts, db.numberSequences, db.outbox, db.syncState], async () => {
+    // one open shift per drawer, whoever opened it (one shop, one cashier at a time)
     const open = await db.shifts
       .where('status')
       .equals('open')
-      .filter((s) => s.workerId === ctx.workerId)
+      .filter((s) => s.cashAccountId === parsed.data.cashAccountId)
       .first();
     if (open) return err('SHIFT_ALREADY_OPEN', 'فيه وردية مفتوحة');
     const number = await nextNumber(db, ctx.devicePrefix, 'SHF');

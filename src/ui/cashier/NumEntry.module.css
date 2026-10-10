@@ -1,0 +1,32 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.display {
+  inline-size: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+  font-size: var(--fs-total);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: end;
+  min-block-size: 64px;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+.extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+}

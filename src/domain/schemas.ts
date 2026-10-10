@@ -36,7 +36,7 @@ export const saleInputSchema = z.object({
   creditPolicy: z
     .union([z.literal('allow'), z.literal('block'), z.object({ reduceByBp: int.min(0).max(10000) })])
     .default('allow'),
-  managerApproved: z.boolean().default(false),
+  approvalTokens: z.array(z.string().max(64)).max(5).default([]),
 });
 export type SaleInput = z.input<typeof saleInputSchema>;
 

@@ -69,6 +69,12 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   const [packFactor, setPackFactor] = useState<number | null>(loaded.unit?.factor ?? null);
   const [packPrice, setPackPrice] = useState<number | null>(loaded.unit?.price ?? null);
   const [picking, setPicking] = useState(false);
+  const quickIds = useLiveQuery(
+    async () => ((await db.deviceSettings.get('quickGrid'))?.value as string[] | undefined) ?? [],
+    [db],
+  );
+  const [pinned, setPinned] = useState<boolean | null>(null);
+  const isPinned = pinned ?? (product ? (quickIds ?? []).includes(product.id) : false);
   const [missing, setMissing] = useState(false);
 
   const saver = useSaver(() => navigate('products'));
@@ -92,15 +98,22 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
       extraFields: { icon },
     };
     if (isManager) Object.assign(fields, { price: price ?? 0, unitCost: cost ?? 0 });
-    void saver.run(() =>
-      saveProduct(context, {
+    void saver.run(async () => {
+      const r = await saveProduct(context, {
         id: product?.id,
         baseVersion: product?.version,
         fields,
         barcodes: codes.map((c) => c.trim()).filter(Boolean),
         packUnit: packOn ? { name: packName.trim(), factorMilli: packFactor ?? 0, price: packPrice } : null,
-      }),
-    );
+      });
+      if (r.ok) {
+        // the quick grid is a list of product ids kept on THIS device only (POS-02)
+        const current = ((await db.deviceSettings.get('quickGrid'))?.value as string[] | undefined) ?? [];
+        const next = isPinned ? [...new Set([...current, r.id])] : current.filter((x) => x !== r.id);
+        await db.deviceSettings.put({ key: 'quickGrid', value: next });
+      }
+      return r;
+    });
   };
 
   return (
@@ -317,6 +330,15 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
         <label className={styles.check}>
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
           {strings.common.active}
+        </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={isPinned}
+            onChange={(e) => setPinned(e.target.checked)}
+            data-testid="pin-quick"
+          />
+          {strings.products.pinQuick}
         </label>
 
         {saver.error && (
