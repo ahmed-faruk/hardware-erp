@@ -1,5 +1,5 @@
 begin;
-select plan(13);
+select plan(16);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -25,6 +25,16 @@ insert into sales_return_lines (id, company_id, return_id, product_id, qty, net_
 insert into voids (id, company_id, number, issued_at, target_type, target_id, reason) values
   (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'K1-VOID-000001', '2026-10-02 08:30:00+00', 'sales_invoice', '0190f000-0000-7000-8000-0000000000b3', 'mistake');
 
+insert into audit_log (id, company_id, action, entity, after, occurred_at) values
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'price_override', 'sales_invoices', '{}', '2026-10-01 10:00:00+00'),
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'price_override', 'sales_invoices', '{}', '2026-10-02 10:00:00+00'),
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'pin_failed', 'workers', '{}', '2026-10-01 11:00:00+00'),
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'pin_locked', 'workers', '{}', '2026-10-01 11:05:00+00'),
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'setting_changed', 'settings', '{"key":"sale.cashierMayDiscount"}', '2026-10-01 12:00:00+00'),
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'price_override', 'sales_invoices', '{}', '2026-09-20 10:00:00+00');
+select is(report_exceptions_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') ->> 'price_overrides', '2', 'price overrides in the period (the one from September is out)');
+select is(report_exceptions_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') ->> 'pin_failures', '2', 'wrong PINs and lockouts are counted');
+select is(report_exceptions_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') #>> '{settings_changes,0,key}', 'sale.cashierMayDiscount', 'setting changes are listed with their key');
 select is(report_sales_summary_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') #>> '{total,gross}', '15000', 'gross sales of the period (the voided invoice is out)');
 select is(report_sales_summary_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') #>> '{total,net}', '14000', 'net = gross − returns');
 select is(report_sales_summary_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-02') #>> '{days,0,invoices}', '2', 'the 01:30 Cairo invoice counts on 1 October, not 30 September');

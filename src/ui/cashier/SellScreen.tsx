@@ -38,6 +38,7 @@ import { Skeleton } from '../components/Skeleton';
 import { play, setSoundEnabled } from '../sound';
 import { strings } from '../strings.ar';
 
+import { recordAudit } from '@/db/commands/audit';
 import { useApproval } from './ApprovalDialog';
 import { CartPanel } from './CartPanel';
 import { ChangeDisplay } from './ChangeDisplay';
@@ -65,6 +66,7 @@ import { useShortcuts } from './useShortcuts';
 import styles from './SellScreen.module.css';
 
 const DEVICE_DEFAULTS: DeviceSettings = {
+  idleLockMinutes: 10,
   paper: '80',
   copies: 1,
   autoPrint: true,
@@ -116,7 +118,10 @@ export function SellScreen() {
   const [searchText, setSearchText] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [tokens, setTokens] = useState<string[]>([]);
-  const [undo, setUndo] = useState<{ prev: Cart } | null>(null);
+  const [undo, setUndo] = useState<{
+    prev: Cart;
+    line: { productId: string; name: string; qtyMilli: number; unitPrice: number } | null;
+  } | null>(null);
   const [qtyKey, setQtyKey] = useState<string | null>(null);
   const [priceKey, setPriceKey] = useState<string | null>(null);
   const [discountTarget, setDiscountTarget] = useState<DiscountTarget>(null);
@@ -503,7 +508,18 @@ export function SellScreen() {
       }
       onQtyPad={setQtyKey}
       onRemove={(key) => {
-        setUndo({ prev: cart });
+        const gone = cart.lines.find((l) => l.key === key);
+        setUndo({
+          prev: cart,
+          line: gone
+            ? {
+                productId: gone.productId,
+                name: gone.name,
+                qtyMilli: gone.qtyMilli,
+                unitPrice: gone.unitPrice,
+              }
+            : null,
+        });
         setCart((c) => removeLine(c, key));
       }}
       onDiscount={(key) => setDiscountTarget({ key })}
@@ -584,7 +600,11 @@ export function SellScreen() {
             setCart(undo.prev);
             setUndo(null);
           }}
-          onExpire={() => setUndo(null)}
+          onExpire={() => {
+            // VOID-01: a removed line that was not taken back is audited
+            if (context && undo.line) void recordAudit(context, 'cart_line_removed', 'cart', null, undo.line);
+            setUndo(null);
+          }}
         />
       )}
 

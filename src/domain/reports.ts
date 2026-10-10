@@ -69,6 +69,13 @@ interface ExceptionsData {
   discounts: { lines: number; amount: number };
   stock_adjustments: { number: string; at: string; reason: string; approved_by: string }[];
   shift_variances: { number: string; variance: number; worker: string; approved_by: string }[];
+  negative_stock: number;
+  price_overrides: number;
+  discount_overrides: number;
+  pin_failures: number;
+  cart_removals: number;
+  settings_changes: { key: string; at: string; worker: string }[];
+  clock_warnings: { device: string; at: string; skew_ms: number }[];
 }
 
 export function exceptionsTables(
@@ -88,6 +95,12 @@ export function exceptionsTables(
         [t.discounts!, `${d.discounts.lines} (${m(d.discounts.amount)})`],
         [t.adjustments!, String(d.stock_adjustments.length)],
         [t.shiftVariances!, String(d.shift_variances.length)],
+        [t.negativeStock!, String(d.negative_stock)],
+        [t.priceOverrides!, String(d.price_overrides)],
+        [t.discountOverrides!, String(d.discount_overrides)],
+        [t.pinFailures!, String(d.pin_failures)],
+        [t.cartRemovals!, String(d.cart_removals)],
+        [t.clockWarnings!, String(d.clock_warnings.length)],
       ],
     },
     {
@@ -104,6 +117,11 @@ export function exceptionsTables(
       title: t.adjustments!,
       headers: [t.number!, t.time!, t.reason!, t.approvedBy!],
       rows: d.stock_adjustments.map((r) => [r.number, time(r.at), reasonName(r.reason), r.approved_by]),
+    },
+    {
+      title: t.settingsChanges!,
+      headers: [t.number!, t.time!, t.worker!],
+      rows: d.settings_changes.map((r) => [r.key, time(r.at), r.worker]),
     },
     {
       title: t.shiftVariances!,

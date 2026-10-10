@@ -16,6 +16,7 @@ import { openShift } from '@/db/commands/open-shift';
 import { postSale } from '@/db/commands/post-sale';
 import { noSale, reprintInvoice } from '@/db/commands/receipts';
 import { addCustomer, saveCustomer } from '@/db/commands/save-master';
+import { recordAudit } from '@/db/commands/audit';
 import { saveSetting } from '@/db/commands/save-setting';
 import { findByBarcode } from '@/db/lookup';
 import { loadSettings } from '@/db/settings';
@@ -338,5 +339,68 @@ describe('findByBarcode', () => {
     expect(await findByBarcode(ctx.db, '999')).toBeNull();
     expect(await findByBarcode(ctx.db, '333')).toBeNull();
     expect(await findByBarcode(ctx.db, '  ')).toBeNull();
+  });
+});
+
+describe('audit events (AUD-02)', () => {
+  const actions = async (ctx: DeviceContext) => (await ctx.db.auditLog.toArray()).map((a) => a.action);
+
+  it('a price override is audited with the manager who approved it', async () => {
+    const m = await setup();
+    const token = (await m.approve('priceOverride')).token;
+    const r = await m.sell({
+      lines: [{ productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 900 }],
+      payments: [{ method: 'cash', amount: 900 }],
+      approvalTokens: [token],
+    });
+    expect(r.ok).toBe(true);
+    const row = (await m.ctx.db.auditLog.toArray()).find((a) => a.action === 'price_override');
+    expect(row).toMatchObject({ approvedBy: m.manager.id, after: { listPrice: 1000, price: 900 } });
+  });
+
+  it('a changed setting is audited with before and after, an unchanged one is not', async () => {
+    const m = await setup('manager');
+    await saveSetting(m.ctx, 'sale.cashierMayChangePrice', true);
+    await saveSetting(m.ctx, 'sale.cashierMayChangePrice', true);
+    const rows = (await m.ctx.db.auditLog.toArray()).filter((a) => a.action === 'setting_changed');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.after).toMatchObject({ key: 'sale.cashierMayChangePrice', after: true });
+  });
+
+  it('every wrong PIN is audited; the fifth is the lockout', async () => {
+    const m = await setup();
+    for (let i = 0; i < 5; i++) await approveWithPin(m.ctx, m.manager.id, '000000', 'noSaleDrawer');
+    const list = await actions(m.ctx);
+    expect(list.filter((a) => a === 'pin_failed')).toHaveLength(4);
+    expect(list.filter((a) => a === 'pin_locked')).toHaveLength(1);
+  });
+
+  it('recordAudit queues the row for sync', async () => {
+    const m = await setup();
+    await recordAudit(m.ctx, 'cart_line_removed', 'cart', null, { name: 'x' });
+    expect((await m.ctx.db.outbox.toArray()).some((o) => o.table === 'auditLog')).toBe(true);
+  });
+});
+
+describe('clock audit', () => {
+  it('writes one clock_suspicious row per Cairo day', async () => {
+    const m = await setup();
+    await m.ctx.db.deviceSettings.put({
+      key: 'device',
+      value: {
+        deviceId: m.ctx.deviceId,
+        companyId: m.ctx.companyId,
+        prefix: 'K1',
+        maxRole: 'manager',
+        authEmail: 'a',
+        authPassword: 'b',
+      },
+    });
+    const { auditClock } = await import('@/sync/clock-audit');
+    await auditClock(m.ctx.db, 600_000, Date.now());
+    await auditClock(m.ctx.db, 600_000, Date.now());
+    expect((await m.ctx.db.auditLog.toArray()).filter((a) => a.action === 'clock_suspicious')).toHaveLength(
+      1,
+    );
   });
 });
