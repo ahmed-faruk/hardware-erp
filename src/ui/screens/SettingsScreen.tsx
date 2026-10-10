@@ -13,6 +13,7 @@ import { BigAlert } from '../components/BigAlert';
 import { FormField } from '../components/FormField';
 import { NumberField } from '../components/NumberField';
 import { Skeleton } from '../components/Skeleton';
+import { BackupSection } from './BackupSection';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
@@ -251,6 +252,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
             </label>
           </div>
         )}
+        {device && <BackupSection device={device} />}
       </div>
     </section>
   );

@@ -38,6 +38,7 @@ import { Skeleton } from '../components/Skeleton';
 import { play, setSoundEnabled } from '../sound';
 import { strings } from '../strings.ar';
 
+import { runBackup } from '@/app/backup-file';
 import { recordAudit } from '@/db/commands/audit';
 import { useApproval } from './ApprovalDialog';
 import { CartPanel } from './CartPanel';
@@ -67,6 +68,8 @@ import styles from './SellScreen.module.css';
 
 const DEVICE_DEFAULTS: DeviceSettings = {
   idleLockMinutes: 10,
+  backupPassphrase: '',
+  lastBackupAt: '',
   paper: '80',
   copies: 1,
   autoPrint: true,
@@ -706,6 +709,8 @@ export function SellScreen() {
         onClosed={(id) => {
           setShiftTool(null);
           printShiftReport(id);
+          // BAK-01: a backup at every shift close, when the manager set a passphrase on this device
+          if (device.backupPassphrase) void runBackup(db, device.backupPassphrase);
         }}
       />
       <CollectionDialog

@@ -15,6 +15,8 @@ const DEVICE_DEFAULTS = {
   sounds: true,
   digits: 'latn',
   idleLockMinutes: 10,
+  backupPassphrase: '',
+  lastBackupAt: '',
 } as const;
 export type DeviceSettings = {
   paper: '58' | '80';
@@ -24,6 +26,9 @@ export type DeviceSettings = {
   digits: 'latn' | 'arab';
   /** SEC-03: the screen locks after this many idle minutes */
   idleLockMinutes: number;
+  /** BAK-01: the manager's passphrase for local backups; stays on this device */
+  backupPassphrase: string;
+  lastBackupAt: string;
 };
 
 /** Settings of THIS device only (printer, sounds, digits): never synced. */
