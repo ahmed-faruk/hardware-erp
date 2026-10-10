@@ -286,6 +286,7 @@ export const strings = {
       other: 'سبب تاني',
     },
   },
+  statement: { title: 'كشف حساب', month: 'آخر شهر', quarter: 'آخر 3 شهور', all: 'الكل', print: 'اطبع A4', open: 'كشف حساب' },
   returns: {
     button: 'مرتجع',
     title: 'مرتجع',

@@ -18,6 +18,7 @@ import { NumberField } from '../components/NumberField';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
+import { StatementDialog } from './StatementDialog';
 import styles from './screens.module.css';
 import { useSaver } from './useSaver';
 
@@ -33,6 +34,7 @@ export function CustomersScreen() {
   const { db } = useServices();
   const [text, setText] = useState('');
   const [editing, setEditing] = useState<Customer | 'new' | null>(null);
+  const [statementOf, setStatementOf] = useState<Customer | null>(null);
   const rows = useLiveQuery(async () => {
     const balances = new Map(
       (await db.partyBalances.where('partyType').equals('customer').toArray()).map((b) => [
@@ -102,9 +104,28 @@ export function CustomersScreen() {
         onClose={() => setEditing(null)}
       >
         {editing && (
-          <CustomerForm customer={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+          <>
+            <CustomerForm customer={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+            {editing !== 'new' && (
+              <ActionButton
+                label={strings.statement.open}
+                variant="ghost"
+                onClick={() => {
+                  setStatementOf(editing);
+                  setEditing(null);
+                }}
+                testId="open-statement"
+              />
+            )}
+          </>
         )}
       </Dialog>
+      <StatementDialog
+        open={statementOf !== null}
+        partyType="customer"
+        party={statementOf}
+        onClose={() => setStatementOf(null)}
+      />
     </section>
   );
 }
