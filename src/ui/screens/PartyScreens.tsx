@@ -19,6 +19,7 @@ import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import { StatementDialog } from './StatementDialog';
+import { SupplierPaymentDialog } from './SupplierPaymentDialog';
 import styles from './screens.module.css';
 import { useSaver } from './useSaver';
 
@@ -235,6 +236,8 @@ export function SuppliersScreen() {
   const { db } = useServices();
   const [text, setText] = useState('');
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null);
+  const [payFor, setPayFor] = useState<Supplier | null>(null);
+  const [statementFor, setStatementFor] = useState<Supplier | null>(null);
   const rows = useLiveQuery(async () => {
     const balances = new Map(
       (await db.partyBalances.where('partyType').equals('supplier').toArray()).map((b) => [
@@ -299,9 +302,40 @@ export function SuppliersScreen() {
         onClose={() => setEditing(null)}
       >
         {editing && (
-          <SupplierForm supplier={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+          <>
+            <SupplierForm supplier={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+            {editing !== 'new' && (
+              <div className={styles.actions}>
+                <ActionButton
+                  label={strings.supplierPay.button}
+                  variant="ghost"
+                  onClick={() => {
+                    setPayFor(editing);
+                    setEditing(null);
+                  }}
+                  testId="open-supplier-payment"
+                />
+                <ActionButton
+                  label={strings.statement.open}
+                  variant="ghost"
+                  onClick={() => {
+                    setStatementFor(editing);
+                    setEditing(null);
+                  }}
+                  testId="open-supplier-statement"
+                />
+              </div>
+            )}
+          </>
         )}
       </Dialog>
+      <SupplierPaymentDialog open={payFor !== null} supplier={payFor} onClose={() => setPayFor(null)} />
+      <StatementDialog
+        open={statementFor !== null}
+        partyType="supplier"
+        party={statementFor}
+        onClose={() => setStatementFor(null)}
+      />
     </section>
   );
 }

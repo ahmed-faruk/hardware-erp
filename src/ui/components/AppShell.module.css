@@ -59,17 +59,19 @@
   border-block-start: 1px solid var(--border);
   padding-block-end: env(safe-area-inset-bottom);
   z-index: 3;
+  /* more tabs than fit (a manager has nine): the strip scrolls, each tab keeps a tappable width */
+  overflow-x: auto;
 }
 
 .item {
-  flex: 1;
+  flex: 1 0 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
   min-block-size: 64px;
-  min-inline-size: 0;
+  min-inline-size: 64px;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -125,6 +127,7 @@
     border-block-start: 0;
     border-inline-end: 1px solid var(--border);
     padding-block: var(--space-3);
+    overflow-x: visible;
   }
 
   .item {

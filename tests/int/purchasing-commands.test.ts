@@ -154,7 +154,6 @@ describe('purchase return', () => {
         originalInvoiceId: bought.id,
         warehouseId: t.warehouse.id,
         lines: [{ originalLineId: line.id, qtyMilli: qty }],
-        payments: [{ method: 'credit', amount: Math.round((5000 * qty) / 10000) }],
       });
     const r = await ret(4000);
     expect(r).toMatchObject({ ok: true, total: 2000 });
@@ -172,7 +171,6 @@ describe('purchase return', () => {
       originalInvoiceId: null,
       warehouseId: k.warehouse.id,
       lines: [{ originalLineId: null, productId: k.p1, qtyMilli: 1000, netAmount: 500 }],
-      payments: [{ method: 'credit', amount: 500 }],
     });
     expect(r).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
   });

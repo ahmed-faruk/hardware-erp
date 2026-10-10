@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import type { PurchaseDocumentData } from '@/db/purchase-document';
 import type { CollectionSlipData, NoSaleSlipData } from '@/db/commands/receipts';
 import type { DigitStyle } from '@/domain/digits';
 import type { ReceiptData } from '@/domain/receipt';
 
 import { CollectionSlip } from './CollectionSlip';
+import { PurchaseDocument } from './PurchaseDocument';
 import { a4Css, StatementDocument } from './StatementDocument';
 import { NoSaleSlip } from './NoSaleSlip';
 import { Receipt } from './Receipt';
@@ -38,3 +40,6 @@ export const renderCollectionHtml = (
 
 export const renderStatementHtml = (props: Parameters<typeof StatementDocument>[0], fontFaces = ''): string =>
   `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title></title><style>${a4Css(fontFaces)}</style></head><body>${renderToStaticMarkup(<StatementDocument {...props} />)}</body></html>`;
+
+export const renderPurchaseHtml = (doc: PurchaseDocumentData, fontFaces = ''): string =>
+  `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title></title><style>${a4Css(fontFaces)}</style></head><body>${renderToStaticMarkup(<PurchaseDocument doc={doc} />)}</body></html>`;

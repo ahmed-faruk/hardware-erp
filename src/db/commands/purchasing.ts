@@ -338,7 +338,9 @@ const purchaseReturnInput = z.object({
       }),
     )
     .min(1),
-  payments: z.array(payment).min(1),
+  /** the refund is one payment of the whole value: off what we owe, or cash back into an account */
+  refundTo: z.enum(['credit', 'cash']).default('credit'),
+  cashAccountId: id.nullable().default(null),
 });
 
 /** A purchase return: goods leave at the cost they came in; the refund lowers what we owe (credit) or comes back as cash. */
@@ -447,14 +449,19 @@ export async function postPurchaseReturn(
       });
   }
   if (total <= 0) return err('E_VALIDATION', 'قيمة المرتجع صفر');
-  const bad = checkPays(input.payments, total);
+  const refund = [
+    input.refundTo === 'cash'
+      ? { method: 'cash' as const, amount: total, reference: null, cashAccountId: input.cashAccountId }
+      : { method: 'credit' as const, amount: total, reference: null, cashAccountId: null },
+  ];
+  const bad = checkPays(refund, total);
   if (bad) return bad;
   const { payments, ledger, cash } = paymentRows(
     ctx,
     'purchase_return',
     returnId,
     supplier.id,
-    input.payments,
+    refund,
     1,
     at,
   );

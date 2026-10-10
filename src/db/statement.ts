@@ -19,7 +19,8 @@ export async function loadPartyStatement(
   const ledger: LedgerRow[] = rows.map((r) => ({
     id: r.id,
     occurredAt: r.occurredAt,
-    amount: r.amount,
+    // a supplier statement reads "what we owe": purchases positive, payments negative, so aging works the same way
+    amount: partyType === 'supplier' ? -r.amount : r.amount,
     docNumber: numberOf.get(r.docId) ?? r.docType,
   }));
   return buildStatement(ledger, period, now);

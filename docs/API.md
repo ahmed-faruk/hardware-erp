@@ -107,10 +107,10 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | `postSalesReturn` | originalInvoiceId?, lines[{originalLineId, qtyMilli, condition}], shiftId, cashAccountId, approvalTokens[] | `{ ok, id, number, total, cash, credit }`; refund split by the original payment mix (credit share lowers the debt, the rest is cash from the drawer, `DRAWER_SHORT` if the drawer lacks it); past `return.periodDays` a cashier needs a `returnAfterPeriod` token; no invoice = manager only |
 | `voidInvoice` | invoiceId, reason, shiftId | `{ ok, id, number }` manager only; exact reversing rows; refused with `HAS_RETURNS` / `ALREADY_VOIDED` |
 | `postCustomerReceipt` | customerId, amount, method, reference?, shiftId, cashAccountId | `{ ok, id, number, balanceAfter }`; cash enters the drawer, card/InstaPay need a reference |
-| `postPurchase` | supplierId, lines[{productId, unitId, qty, unitCost, discount}], payments[] | `{ ok, id, number }` |
-| `postPurchaseReturn` | supplierId, originalInvoiceId?, lines[], refund | `{ ok, id, number }` |
-| `postSupplierPayment` | supplierId, amount, method, reference? | `{ ok, id, number }` |
-| `postStockAdjustment` | warehouseId, lines[{productId, qtyDelta}], reasonCode, approval? | `{ ok, id, number }` |
+| `postPurchase` | supplierId, warehouseId, lines[{productId, productUnitId?, unitFactorMilli, qtyMilli, unitCost, discount, newSalePrice? (manager only)}], payments[{method, amount, reference?, cashAccountId?}] | `{ ok, id, number, total }`; payments must equal the total; credit = we owe the supplier; the server fixes each movement's cost per base unit and the product's moving average (`moving_average`, same maths as `movingAverage`) |
+| `postPurchaseReturn` | supplierId, originalInvoiceId?, warehouseId, lines[{originalLineId, qtyMilli}], refundTo (`credit`\|`cash`), cashAccountId? | `{ ok, id, number, total }`; goes out at the invoice cost, capped at bought − returned; no invoice = manager only |
+| `postSupplierPayment` | supplierId, amount, method, reference?, cashAccountId? | `{ ok, id, number, balanceAfter }` manager only; cash leaves the chosen account |
+| `postStockAdjustment` | warehouseId, reason (`count`\|`damaged`\|`lost`\|`found`\|`other`), lines[{productId, qtyDeltaMilli}], approvalTokens[] | `{ ok, id, number, total }`; above `stock.approvalAbove` a non-manager needs a `stockAdjustment` token; the server re-checks with the real cost |
 | `postExpense` | categoryId, amount, notes | `{ ok, id, number }` |
 | `openShift` / `closeShift` | float / counted breakdown | `{ ok, id, variance? }` |
 | `saveProduct` | fields, `barcodes[]`, `packUnit` (one), `baseVersion` | `{ ok, id, version }` (one transaction: product, units, barcodes, search words) |

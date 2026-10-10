@@ -52,7 +52,7 @@ Types: `id` = uuid, `money` = bigint piasters, `qty` = bigint milli-units, `text
 | `warehouses` | branch_id, name, kind (`main`,`showroom`,`scrap`), legacy_location_id | OSPOS location "stock" → main |
 | `devices` | branch_id, auth_user_id (uuid, unique), name, prefix (2–3 chars, unique per company), kind (`pc`,`mobile`), max_role, last_seen_at, app_version, revoked_at | one Supabase Auth user per device |
 | `workers` | name, role (`cashier`,`storekeeper`,`manager`), pin_hash, pin_salt, photo_path, active, legacy_employee_id | PIN checked locally (PBKDF2) |
-| `settings` | key (unique per company), value json | company-level only; per-device settings stay local. Keys: `sale.*`, `receipt.*`, `return.periodDays` (days a cashier may return alone, default 30) |
+| `settings` | key (unique per company), value json | company-level only; per-device settings stay local. Keys: `sale.*`, `receipt.*`, `return.periodDays` (days a cashier may return alone, default 30), `stock.approvalAbove` (piasters; a bigger stock adjustment needs a manager, default 50000) |
 | `cash_accounts` | name, kind (`drawer`,`safe`,`bank`,`wallet`,`card_clearing`), owner_device_id null | one drawer per cashier device + main safe (`owner_device_id`, because `device_id` is the creating device) |
 | `expense_categories` | name, icon | |
 
@@ -82,7 +82,7 @@ Every document has: `number`, `issued_at`, `worker_id`, `shift_id` (cashier docu
 | `sales_return_lines` | return_id, original_line_id null, product_id, qty, unit_refund, net_amount, unit_cost, condition (`good`,`damaged`), warehouse_id |
 | `purchase_invoices` | supplier_id, supplier_ref, warehouse_id, subtotal, discount, total |
 | `purchase_invoice_lines` | invoice_id, line_no, product_id null, product_unit_id, unit_factor, qty, unit_cost, discount, net_amount, legacy_text |
-| `purchase_returns` / `purchase_return_lines` | same shape as purchase, `original_invoice_id` null |
+| `purchase_returns` / `purchase_return_lines` | same shape as purchase, `original_invoice_id` null; each line may carry `original_line_id` (the purchase line it sends back, quantity capped at bought − returned) |
 | `customer_receipts` | customer_id, amount, method, reference |
 | `supplier_payments` | supplier_id, amount, method, reference |
 | `stock_adjustments` | warehouse_id, reason_code, approved_by |
