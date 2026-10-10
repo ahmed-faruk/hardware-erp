@@ -17,6 +17,7 @@ export const ACTIONS = [
   'stockAdjustment',
   'editProductData',
   'customerReceipt',
+  'addCustomer',
   'supplierPayment',
   'expenseOverLimit',
   'editPrices',
@@ -38,6 +39,7 @@ const cashier: Partial<Record<Action, Access>> = {
   creditOverLimit: 'pin',
   noSaleDrawer: 'pin',
   customerReceipt: 'yes',
+  addCustomer: 'yes',
 };
 const storekeeper: Partial<Record<Action, Access>> = {
   receivePurchase: 'yes',

@@ -1,5 +1,6 @@
 // Mac-only: registers a shop device and prints a one-time activation code (valid 24 h).
 // Usage: npm run device:add -- --name "كاشير 1" --prefix K1 --kind pc --role manager [--company <uuid>]
+// Existing device without a drawer: npm run device:add -- --drawer-for <prefix>
 // --company is only needed when the database holds more than one company (local test seed).
 // Reads TARGET_SUPABASE_URL and TARGET_SUPABASE_SERVICE_ROLE_KEY from tools/device-admin/.env.local (git-ignored).
 // The service_role key is used only here; it never enters src/, tests or CI.
@@ -20,16 +21,10 @@ if (existsSync(envFile)) {
 const args = Object.fromEntries(
   process.argv.slice(2).flatMap((a, i, all) => (a.startsWith('--') ? [[a.slice(2), all[i + 1]]] : [])),
 );
-const { name, prefix, kind = 'pc', role = 'cashier', company } = args;
-if (
-  !name ||
-  !/^[A-Z0-9]{2,3}$/.test(prefix ?? '') ||
-  !['pc', 'mobile'].includes(kind) ||
-  !['cashier', 'storekeeper', 'manager'].includes(role)
-) {
-  console.error(
-    'Usage: npm run device:add -- --name "<name>" --prefix <2-3 chars A-Z0-9> --kind pc|mobile --role cashier|storekeeper|manager',
-  );
+const { name, prefix, kind = 'pc', role = 'cashier', company, 'drawer-for': drawerFor } = args;
+if (!drawerFor && (!name || !/^[A-Z0-9]{2,3}$/.test(prefix ?? '') || !['pc', 'mobile'].includes(kind) || !['cashier', 'storekeeper', 'manager'].includes(role))) {
+  console.error('Usage: npm run device:add -- --name "<name>" --prefix <2-3 chars A-Z0-9> --kind pc|mobile --role cashier|storekeeper|manager');
+  console.error('   or: npm run device:add -- --drawer-for <prefix>   (adds the cash drawer of an existing device)');
   process.exit(1);
 }
 const url = process.env.TARGET_SUPABASE_URL;
@@ -59,6 +54,31 @@ if (!companyId) {
   companyId = companies[0].id;
 }
 
+// every cashier device has a cash drawer, and the shop has one main safe (docs/DATABASE.md §4.1); both are created once
+async function ensureCashAccounts(deviceId, deviceName) {
+  const { data: drawers, error: dErr } = await db.from('cash_accounts').select('id').eq('company_id', companyId).eq('owner_device_id', deviceId).eq('kind', 'drawer');
+  if (dErr) fail('drawer lookup', dErr);
+  if (drawers.length === 0) {
+    const { error } = await db.from('cash_accounts').insert({ id: randomUUID(), company_id: companyId, name: `درج ${deviceName}`, kind: 'drawer', owner_device_id: deviceId });
+    if (error) fail('drawer', error);
+    console.log('Cash drawer created.');
+  }
+  const { data: safes, error: sErr } = await db.from('cash_accounts').select('id').eq('company_id', companyId).eq('kind', 'safe');
+  if (sErr) fail('safe lookup', sErr);
+  if (safes.length === 0) {
+    const { error } = await db.from('cash_accounts').insert({ id: randomUUID(), company_id: companyId, name: 'الخزينة الرئيسية', kind: 'safe', owner_device_id: null });
+    if (error) fail('safe', error);
+    console.log('Main safe created.');
+  }
+}
+
+if (drawerFor) {
+  const { data: found, error } = await db.from('devices').select('id,name').eq('company_id', companyId).eq('prefix', drawerFor).limit(1);
+  if (error || found.length !== 1) fail('device', error ?? new Error(`no device with prefix ${drawerFor}`));
+  await ensureCashAccounts(found[0].id, found[0].name);
+  process.exit(0);
+}
+
 // unambiguous alphabet (no 0/O, 1/I): easy to read out and type
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code = Array.from(randomBytes(10), (b) => ALPHABET[b % ALPHABET.length]).join('');
@@ -74,6 +94,7 @@ const { error: aErr } = await db.from('device_activations').insert({
   expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
 });
 if (aErr) fail('activation', aErr);
+await ensureCashAccounts(deviceId, name);
 
 console.log(
   `\nDevice "${name}" (${prefix}) registered.\nActivation code (valid 24 h, single use):  ${code}\n`,
