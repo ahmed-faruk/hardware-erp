@@ -11,6 +11,7 @@ import {
   setQty,
   toSaleLines,
   type CartItem,
+  productToItem,
 } from './cart';
 
 const paint: CartItem = {
@@ -100,5 +101,26 @@ describe('cart', () => {
   it('an empty cart has a zero total', () => {
     const inv = cartInvoice(EMPTY_CART);
     expect(inv.ok && inv.value.total).toBe(0);
+  });
+});
+
+describe('productToItem', () => {
+  it('base unit: the product price', () => {
+    expect(productToItem({ id: 'p1', name: 'دهان', price: 12500 })).toMatchObject({
+      productUnitId: null,
+      unitFactorMilli: 1000,
+      unitPrice: 12500,
+      listPrice: 12500,
+      qtyMilli: 1000,
+    });
+  });
+  it('pack unit: its own price, or base price x factor when it has none', () => {
+    const p = { id: 'p1', name: 'دهان', price: 12500 };
+    expect(productToItem(p, { id: 'u1', factor: 12000, price: 140000 })).toMatchObject({
+      productUnitId: 'u1',
+      unitFactorMilli: 12000,
+      unitPrice: 140000,
+    });
+    expect(productToItem(p, { id: 'u1', factor: 12000, price: null }).unitPrice).toBe(150000);
   });
 });

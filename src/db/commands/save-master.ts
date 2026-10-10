@@ -166,3 +166,40 @@ export async function saveWorker(ctx: DeviceContext, input: SaveInput): Promise<
     ),
   );
 }
+
+/** A cashier adds a customer at the counter: name and phone only, credit limit 0 and no discount (the server enforces the same). */
+export async function addCustomer(
+  ctx: DeviceContext,
+  input: { name: string; phone?: string | null },
+): Promise<SaveResult> {
+  const parsed = customerFieldsSchema
+    .pick({ name: true, phone: true })
+    .safeParse({ name: input.name, phone: input.phone ?? null });
+  if (!parsed.success || !parsed.data.name) return err('E_VALIDATION', 'بيانات العميل غير صحيحة');
+  if (can(ctx.role, 'addCustomer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  const { db } = ctx;
+  return db.transaction('rw', [db.customers, db.outbox, db.syncState], async () =>
+    out(
+      await upsertRow<Customer>(
+        ctx,
+        'customers',
+        db.customers,
+        { fields: {} },
+        { name: parsed.data.name, phone: parsed.data.phone ?? null },
+        () => ({
+          ...newCommon(ctx),
+          name: '',
+          phone: null,
+          address: null,
+          company: null,
+          notes: null,
+          creditLimit: 0,
+          defaultDiscountBp: 0,
+          photoPath: null,
+          active: true,
+          legacyPersonId: null,
+        }),
+      ),
+    ),
+  );
+}
