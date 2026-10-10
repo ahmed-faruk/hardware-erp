@@ -13,11 +13,13 @@
 
 .toolbar > .fixed {
   flex: 0 0 auto;
+  max-inline-size: 100%;
 }
 
 .title {
   margin: 0 0 var(--space-4);
   font-size: var(--fs-h1);
+  font-weight: 700;
 }
 
 .form {
@@ -47,11 +49,50 @@
 .section {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
+  box-shadow: var(--shadow-1);
   grid-column: 1 / -1;
+}
+
+.reportTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  min-inline-size: 480px;
+}
+
+.reportTable th {
+  position: sticky;
+  inset-block-start: 0;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.reportTable td {
+  min-block-size: 52px;
+  padding: var(--space-3);
+  border-block-start: 1px solid var(--border);
+}
+
+.reportTable tbody tr:hover {
+  background: var(--tint-primary);
+}
+
+.num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow td {
+  background: var(--surface-2);
+  font-weight: 700;
 }
 
 .section h2 {

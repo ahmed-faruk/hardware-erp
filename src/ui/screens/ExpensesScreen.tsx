@@ -72,7 +72,7 @@ export function ExpensesScreen() {
         <div className={styles.fixed}>
           <ActionButton
             label={strings.cash.transfer}
-            variant="ghost"
+            variant="soft"
             onClick={() => setOpen('transfer')}
             testId="new-transfer"
           />
@@ -80,7 +80,7 @@ export function ExpensesScreen() {
         <div className={styles.fixed}>
           <ActionButton
             label={strings.cash.adjust}
-            variant="ghost"
+            variant="soft"
             onClick={() => setOpen('adjust')}
             testId="new-adjustment"
           />

@@ -19,13 +19,15 @@ import { callRpc } from '@/sync/errors';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { FormField } from '../components/FormField';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
+import { SmartReport } from './SmartReport';
 
-type Tab = 'sales' | 'profit' | 'exceptions' | 'devices' | 'stock';
-const TABS: Tab[] = ['sales', 'profit', 'exceptions', 'devices', 'stock'];
+type Tab = 'smart' | 'sales' | 'profit' | 'exceptions' | 'devices' | 'stock';
+const TABS: Tab[] = ['smart', 'sales', 'profit', 'exceptions', 'devices', 'stock'];
 
 const cairoDay = (offsetDays = 0, base = new Date()): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(
@@ -51,7 +53,7 @@ const methodName = (k: string): string => (strings.receipt.pay as Record<string,
 export function ReportsScreen() {
   const { db, client, runner } = useServices();
   const sync = useSyncExternalStore(runner.subscribe, runner.getSnapshot);
-  const [tab, setTab] = useState<Tab>('sales');
+  const [tab, setTab] = useState<Tab>('smart');
   const [today] = useState(() => cairoDay());
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
@@ -60,7 +62,7 @@ export function ReportsScreen() {
 
   const key = `${tab}|${from}|${to}`;
   useEffect(() => {
-    if (tab === 'stock') return;
+    if (tab === 'stock' || tab === 'smart') return;
     let live = true;
     const name = {
       sales: 'report_sales_summary',
@@ -94,10 +96,12 @@ export function ReportsScreen() {
       ? stockRows
         ? [stockTable(stockRows, { ...labels, title: strings.reports.tabs.stock })]
         : null
-      : loaded?.key === key
-        ? loaded.tables
-        : null;
-  const error = tab !== 'stock' && loaded?.key === key ? loaded.error : null;
+      : tab === 'smart'
+        ? null
+        : loaded?.key === key
+          ? loaded.tables
+          : null;
+  const error = tab !== 'stock' && tab !== 'smart' && loaded?.key === key ? loaded.error : null;
   const upTo = sync.lastSyncAt
     ? `${strings.reports.upTo}: ${cairoTime(new Date(sync.lastSyncAt).toISOString())}`
     : strings.reports.notSynced;
@@ -141,164 +145,159 @@ export function ReportsScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.reports.title}</h1>
-      <div className={styles.actions} role="tablist">
-        {TABS.map((x) => (
-          <ActionButton
-            key={x}
-            label={strings.reports.tabs[x]}
-            variant={tab === x ? 'primary' : 'ghost'}
-            onClick={() => setTab(x)}
-            testId={`report-tab-${x}`}
+      <div className={styles.toolbar}>
+        <div className={styles.fixed}>
+          <SegmentedControl
+            label={strings.reports.title}
+            options={TABS.map((x) => ({ key: x, label: strings.reports.tabs[x] }))}
+            value={tab}
+            onChange={setTab}
+            testIdPrefix="report-tab-"
           />
-        ))}
-      </div>
-      {tab !== 'stock' && tab !== 'devices' && (
-        <div className={styles.toolbar}>
-          <div className={styles.fixed}>
-            <ActionButton
-              label={strings.reports.today}
-              variant="ghost"
-              onClick={() => preset(today, today)}
-              testId="period-today"
-            />
-          </div>
-          <div className={styles.fixed}>
-            <ActionButton
-              label={strings.reports.yesterday}
-              variant="ghost"
-              onClick={() => preset(cairoDay(-1), cairoDay(-1))}
-              testId="period-yesterday"
-            />
-          </div>
-          <div className={styles.fixed}>
-            <ActionButton
-              label={strings.reports.thisMonth}
-              variant="ghost"
-              onClick={() => preset(monthStart(today), today)}
-              testId="period-month"
-            />
-          </div>
-          <div className={styles.fixed}>
-            <ActionButton
-              label={strings.reports.lastMonth}
-              variant="ghost"
-              onClick={() => {
-                const last = cairoDay(-1, new Date(`${monthStart(today)}T12:00:00Z`));
-                preset(monthStart(last), last);
-              }}
-              testId="period-last-month"
-            />
-          </div>
-          <FormField label={strings.reports.from}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                type="date"
-                value={from}
-                onChange={(e) => e.target.value && setFrom(e.target.value)}
-                data-testid="report-from"
-              />
-            )}
-          </FormField>
-          <FormField label={strings.reports.to}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                type="date"
-                value={to}
-                onChange={(e) => e.target.value && setTo(e.target.value)}
-                data-testid="report-to"
-              />
-            )}
-          </FormField>
         </div>
-      )}
-      <p data-testid="report-up-to">{upTo}</p>
-      {error === 'offline' && <BigAlert tone="warn" word={strings.reports.needsNet} sound={false} />}
-      {error === 'failed' && <BigAlert tone="danger" word={strings.reports.failed} sound={false} />}
-      {!tables && !error && <Skeleton />}
-      {tables && (
+      </div>
+      {tab === 'smart' ? (
+        <SmartReport />
+      ) : (
         <>
-          <div className={styles.actions}>
-            <ActionButton
-              label={strings.reports.print}
-              icon={Printer}
-              variant="ghost"
-              onClick={() => void print()}
-              testId="report-print"
-            />
-            <ActionButton
-              label={strings.reports.csv}
-              icon={Download}
-              variant="ghost"
-              onClick={exportCsv}
-              testId="report-csv"
-            />
-          </div>
-          {tables.map((t, i) => (
-            <div key={i} className={styles.section} data-testid={`report-table-${i}`}>
-              {i > 0 && <h2>{t.title}</h2>}
-              {t.rows.length === 0 && !t.totals ? (
-                <p>{strings.reports.none}</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        {t.headers.map((h) => (
-                          <th
-                            key={h}
-                            style={{
-                              textAlign: 'start',
-                              padding: 6,
-                              borderBottom: '1px solid var(--border)',
-                            }}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {t.rows.map((r, ri) => (
-                        <tr key={ri}>
-                          {r.map((c, ci) => (
-                            <td
-                              key={ci}
-                              dir={ci > 0 ? 'ltr' : undefined}
-                              style={{
-                                padding: 6,
-                                borderBottom: '1px solid var(--border)',
-                                textAlign: ci > 0 ? 'end' : 'start',
-                              }}
-                            >
-                              {c}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                      {t.totals && (
-                        <tr data-testid={`report-totals-${i}`} style={{ fontWeight: 700 }}>
-                          {t.totals.map((c, ci) => (
-                            <td
-                              key={ci}
-                              dir={ci > 0 ? 'ltr' : undefined}
-                              style={{ padding: 6, textAlign: ci > 0 ? 'end' : 'start' }}
-                            >
-                              {c}
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {t.note && <p>{t.note}</p>}
+          {tab !== 'stock' && tab !== 'devices' && (
+            <div className={styles.toolbar}>
+              <div className={styles.fixed}>
+                <ActionButton
+                  label={strings.reports.today}
+                  variant="soft"
+                  onClick={() => preset(today, today)}
+                  testId="period-today"
+                />
+              </div>
+              <div className={styles.fixed}>
+                <ActionButton
+                  label={strings.reports.yesterday}
+                  variant="soft"
+                  onClick={() => preset(cairoDay(-1), cairoDay(-1))}
+                  testId="period-yesterday"
+                />
+              </div>
+              <div className={styles.fixed}>
+                <ActionButton
+                  label={strings.reports.thisMonth}
+                  variant="soft"
+                  onClick={() => preset(monthStart(today), today)}
+                  testId="period-month"
+                />
+              </div>
+              <div className={styles.fixed}>
+                <ActionButton
+                  label={strings.reports.lastMonth}
+                  variant="soft"
+                  onClick={() => {
+                    const last = cairoDay(-1, new Date(`${monthStart(today)}T12:00:00Z`));
+                    preset(monthStart(last), last);
+                  }}
+                  testId="period-last-month"
+                />
+              </div>
+              <FormField label={strings.reports.from}>
+                {(id) => (
+                  <input
+                    id={id}
+                    className="control"
+                    type="date"
+                    value={from}
+                    onChange={(e) => e.target.value && setFrom(e.target.value)}
+                    data-testid="report-from"
+                  />
+                )}
+              </FormField>
+              <FormField label={strings.reports.to}>
+                {(id) => (
+                  <input
+                    id={id}
+                    className="control"
+                    type="date"
+                    value={to}
+                    onChange={(e) => e.target.value && setTo(e.target.value)}
+                    data-testid="report-to"
+                  />
+                )}
+              </FormField>
             </div>
-          ))}
+          )}
+          <p data-testid="report-up-to">{upTo}</p>
+          {error === 'offline' && <BigAlert tone="warn" word={strings.reports.needsNet} sound={false} />}
+          {error === 'failed' && <BigAlert tone="danger" word={strings.reports.failed} sound={false} />}
+          {!tables && !error && <Skeleton />}
+          {tables && (
+            <>
+              <div className={styles.actions}>
+                <ActionButton
+                  label={strings.reports.print}
+                  icon={Printer}
+                  variant="ghost"
+                  onClick={() => void print()}
+                  testId="report-print"
+                />
+                <ActionButton
+                  label={strings.reports.csv}
+                  icon={Download}
+                  variant="ghost"
+                  onClick={exportCsv}
+                  testId="report-csv"
+                />
+              </div>
+              {tables.map((t, i) => (
+                <div key={i} className={styles.section} data-testid={`report-table-${i}`}>
+                  {i > 0 && <h2>{t.title}</h2>}
+                  {t.rows.length === 0 && !t.totals ? (
+                    <p>{strings.reports.none}</p>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className={styles.reportTable}>
+                        <thead>
+                          <tr>
+                            {t.headers.map((h, hi) => (
+                              <th key={h} className={hi > 0 ? styles.num : undefined}>
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {t.rows.map((r, ri) => (
+                            <tr key={ri}>
+                              {r.map((c, ci) => (
+                                <td
+                                  key={ci}
+                                  dir={ci > 0 ? 'ltr' : undefined}
+                                  className={ci > 0 ? styles.num : undefined}
+                                >
+                                  {c}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                          {t.totals && (
+                            <tr data-testid={`report-totals-${i}`} className={styles.totalRow}>
+                              {t.totals.map((c, ci) => (
+                                <td
+                                  key={ci}
+                                  dir={ci > 0 ? 'ltr' : undefined}
+                                  className={ci > 0 ? styles.num : undefined}
+                                >
+                                  {c}
+                                </td>
+                              ))}
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {t.note && <p>{t.note}</p>}
+                </div>
+              ))}
+            </>
+          )}
         </>
       )}
     </section>

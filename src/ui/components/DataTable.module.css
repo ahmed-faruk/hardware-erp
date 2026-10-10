@@ -4,7 +4,7 @@
   gap: var(--space-2);
 }
 
-.head {
+.row.head {
   display: none;
 }
 
@@ -16,7 +16,11 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
+  box-shadow: var(--shadow-1);
   min-block-size: var(--target-min);
+  transition:
+    background-color 0.15s,
+    border-color 0.2s;
 }
 
 .clickable {
@@ -25,6 +29,7 @@
 
 .clickable:hover {
   border-color: var(--primary);
+  background: var(--tint-primary);
 }
 
 .cell {
@@ -66,6 +71,7 @@
     border-radius: var(--radius-card);
     overflow: hidden;
     background: var(--surface);
+    box-shadow: var(--shadow-1);
   }
 
   .row {
@@ -76,13 +82,17 @@
     border: 0;
     border-block-end: 1px solid var(--border);
     border-radius: 0;
+    box-shadow: none;
+    min-block-size: 52px;
   }
 
-  .head {
+  .row.head {
     display: grid;
     background: var(--surface-2);
+    color: var(--text-muted);
     font-weight: 700;
-    font-size: var(--fs-label);
+    font-size: var(--fs-small);
+    min-block-size: 44px;
   }
 
   .cell::before {
