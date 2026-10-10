@@ -63,22 +63,20 @@ export async function checkPin(
       key,
       value: { count: locked ? 0 : count, lockedUntil: locked ? nowMs + LOCK_MS : 0 },
     });
-    if (locked) {
-      const audit = {
-        ...newCommon(ctx),
-        createdBy: null,
-        action: 'pin_locked',
-        entity: 'workers',
-        entityId: workerId,
-        before: null,
-        after: null,
-        workerId,
-        approvedBy: null,
-        occurredAt: nowIso(),
-      };
-      await db.auditLog.add(audit);
-      await enqueue(db, 'auditLog', audit, workerId);
-    }
+    const audit = {
+      ...newCommon(ctx),
+      createdBy: null,
+      action: locked ? 'pin_locked' : 'pin_failed',
+      entity: 'workers',
+      entityId: workerId,
+      before: null,
+      after: { attempts: count },
+      workerId,
+      approvedBy: null,
+      occurredAt: nowIso(),
+    };
+    await db.auditLog.add(audit);
+    await enqueue(db, 'auditLog', audit, workerId);
   });
   return locked ? err('PIN_LOCKED', 'الرقم السري مقفول مؤقتًا') : err('PIN_WRONG', 'الرقم السري غلط');
 }

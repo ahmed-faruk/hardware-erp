@@ -97,7 +97,7 @@ export function SessionProvider({ services, children }: { services: Services; ch
     void services.db.deviceSettings.get('idleLockMinutes').then((row) => {
       if (typeof row?.value === 'number' && row.value > 0) idleMs.current = row.value * 60_000;
     });
-  }, [services]);
+  }, [services, worker]); // read again at every login so a changed setting applies at once
 
   // screen lock after idle time (docs/SECURITY.md §2); any touch, key or pointer resets it
   useEffect(() => {

@@ -8,13 +8,22 @@ export async function loadSettings(db: HanafyDB): Promise<Settings> {
   return parseSettings(rows.map((r) => ({ key: r.key, value: r.value })));
 }
 
-const DEVICE_DEFAULTS = { paper: '80', copies: 1, autoPrint: true, sounds: true, digits: 'latn' } as const;
+const DEVICE_DEFAULTS = {
+  paper: '80',
+  copies: 1,
+  autoPrint: true,
+  sounds: true,
+  digits: 'latn',
+  idleLockMinutes: 10,
+} as const;
 export type DeviceSettings = {
   paper: '58' | '80';
   copies: number;
   autoPrint: boolean;
   sounds: boolean;
   digits: 'latn' | 'arab';
+  /** SEC-03: the screen locks after this many idle minutes */
+  idleLockMinutes: number;
 };
 
 /** Settings of THIS device only (printer, sounds, digits): never synced. */

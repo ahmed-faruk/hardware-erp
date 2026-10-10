@@ -1,6 +1,7 @@
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
+import { auditRow } from './audit';
 import { nextNumber } from '../numbering';
 import { loadSettings } from '../settings';
 import { type Approval, peekApproval, spendApproval } from './approval';
@@ -68,16 +69,37 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
   // what needs a manager's PIN: a discount or price the settings do not allow this role, or credit above the customer's limit
   const settings = await loadSettings(db);
   const needs = new Set<Action>();
+  // AUD-02: what the manager's PIN allowed on this sale, written next to it
+  const overrides: { action: string; approves: Action; after: unknown }[] = [];
   const units = await db.productUnits.bulkGet(input.lines.map((l) => l.productUnitId ?? ''));
   input.lines.forEach((l, i) => {
-    if (discountNeedsApproval(settings, ctx.role, l.discount, invoice.lines[i]!.grossAmount))
+    if (discountNeedsApproval(settings, ctx.role, l.discount, invoice.lines[i]!.grossAmount)) {
       needs.add('discountOverLimit');
+      overrides.push({
+        action: 'discount_over_limit',
+        approves: 'discountOverLimit',
+        after: { target: 'line', productId: l.productId, discount: l.discount },
+      });
+    }
     const listPrice = units[i]?.price ?? mulDivRound(products[i]!.price, l.unitFactorMilli, 1000);
-    if (priceNeedsApproval(settings, ctx.role, l.unitPrice, listPrice)) needs.add('priceOverride');
+    if (priceNeedsApproval(settings, ctx.role, l.unitPrice, listPrice)) {
+      needs.add('priceOverride');
+      overrides.push({
+        action: 'price_override',
+        approves: 'priceOverride',
+        after: { productId: l.productId, listPrice, price: l.unitPrice },
+      });
+    }
   });
   const netSum = invoice.lines.reduce((a, l) => a + l.netAmount, 0);
-  if (discountNeedsApproval(settings, ctx.role, input.invoiceDiscount ?? undefined, netSum))
+  if (discountNeedsApproval(settings, ctx.role, input.invoiceDiscount ?? undefined, netSum)) {
     needs.add('discountOverLimit');
+    overrides.push({
+      action: 'discount_over_limit',
+      approves: 'discountOverLimit',
+      after: { target: 'invoice', discount: input.invoiceDiscount },
+    });
+  }
 
   const creditTotal = input.payments.filter((p) => p.method === 'credit').reduce((a, p) => a + p.amount, 0);
   if (creditTotal > 0 && input.customerId) {
@@ -247,6 +269,18 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       await db.partyLedger.bulkAdd(partyLedger);
       await db.cashMovements.bulkAdd(cashMovements);
       await db.auditLog.add(audit);
+      for (const o of overrides) {
+        const extra = auditRow(
+          ctx,
+          o.action,
+          'sales_invoices',
+          invoiceId,
+          o.after,
+          approvals.find((a) => a.approval.action === o.approves)?.approval.approvedBy ?? null,
+        );
+        await db.auditLog.add(extra);
+        await enqueue(db, 'auditLog', extra, ctx.workerId);
+      }
       await rebuildStockBalances(
         db,
         stockMovements.map((m) => [m.productId, m.warehouseId]),

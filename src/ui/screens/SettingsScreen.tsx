@@ -202,6 +202,23 @@ function SettingsForm({ initial }: { initial: Settings }) {
                 </select>
               )}
             </FormField>
+            <FormField label={strings.settings.idleLock}>
+              {(id) => (
+                <select
+                  id={id}
+                  className="control"
+                  value={device.idleLockMinutes}
+                  onChange={(e) => void saveDeviceSetting(db, 'idleLockMinutes', Number(e.target.value))}
+                  data-testid="idle-lock"
+                >
+                  {[5, 10, 15, 30, 60].map((n) => (
+                    <option key={n} value={n}>
+                      {`${n} ${strings.settings.minutes}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
             <FormField label={strings.settings.digits}>
               {(id) => (
                 <select

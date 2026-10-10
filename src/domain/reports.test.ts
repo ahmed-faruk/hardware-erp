@@ -59,3 +59,38 @@ describe('report tables', () => {
     expect(r.rows[0]).toEqual(['K1 (K1) — revoked', 'never', '', '', '0']);
   });
 });
+
+describe('exceptions report extras', () => {
+  it('lists the audit counters and the setting changes', async () => {
+    const { exceptionsTables } = await import('./reports');
+    const tables = exceptionsTables(
+      {
+        voids: [],
+        reprints: 0,
+        no_sales: [],
+        discounts: { lines: 0, amount: 0 },
+        stock_adjustments: [],
+        shift_variances: [],
+        negative_stock: 2,
+        price_overrides: 3,
+        discount_overrides: 1,
+        pin_failures: 4,
+        cart_removals: 5,
+        settings_changes: [{ key: 'sale.cashierMayDiscount', at: '2026-10-10T09:00:00Z', worker: 'م' }],
+        clock_warnings: [],
+      },
+      t,
+      (x) => x,
+      (x) => x,
+    );
+    const summary = Object.fromEntries(tables[0]!.rows.map((r) => [r[0], r[1]]));
+    expect(summary).toMatchObject({
+      negativeStock: '2',
+      priceOverrides: '3',
+      discountOverrides: '1',
+      pinFailures: '4',
+      cartRemovals: '5',
+    });
+    expect(tables.find((x) => x.title === 'settingsChanges')?.rows[0]![0]).toBe('sale.cashierMayDiscount');
+  });
+});
