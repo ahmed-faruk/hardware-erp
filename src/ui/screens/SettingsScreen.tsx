@@ -36,6 +36,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [address, setAddress] = useState(initial.address);
   const [footer, setFooter] = useState(initial.footer);
   const [returnDays, setReturnDays] = useState(String(initial.returnPeriodDays));
+  const [stockLimit, setStockLimit] = useState<number | null>(initial.stockApprovalAbove);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +50,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
       phone,
       address,
       footer,
+      stockApprovalAbove: stockLimit ?? DEFAULT_SETTINGS.stockApprovalAbove,
       returnPeriodDays: /^\d{1,4}$/.test(returnDays) ? Number(returnDays) : DEFAULT_SETTINGS.returnPeriodDays,
     };
     for (const name of Object.keys(values) as (keyof Settings)[])
@@ -105,6 +107,17 @@ function SettingsForm({ initial }: { initial: Settings }) {
               />
             )}
           </FormField>
+        </div>
+        <div className={styles.section}>
+          <h2>{strings.settings.stockRules}</h2>
+          <NumberField
+            label={strings.settings.stockApprovalAbove}
+            value={stockLimit}
+            onChange={setStockLimit}
+            parse={toPiasters}
+            format={formatMoney}
+            required
+          />
         </div>
         <div className={styles.section}>
           <h2>{strings.settings.receipt}</h2>

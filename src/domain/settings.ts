@@ -13,6 +13,8 @@ export interface Settings {
   footer: string;
   /** days after the sale in which a cashier may take a return without the manager */
   returnPeriodDays: number;
+  /** a stock adjustment worth more than this (piasters) needs the manager's PIN */
+  stockApprovalAbove: number;
 }
 
 export const SETTING_KEYS = {
@@ -23,6 +25,7 @@ export const SETTING_KEYS = {
   address: 'receipt.address',
   footer: 'receipt.footer',
   returnPeriodDays: 'return.periodDays',
+  stockApprovalAbove: 'stock.approvalAbove',
 } as const satisfies Record<keyof Settings, string>;
 
 /** Safe defaults: the cashier may not discount or change prices until the manager allows it. */
@@ -34,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   address: '',
   footer: '',
   returnPeriodDays: 30,
+  stockApprovalAbove: 50000,
 };
 
 export function parseSettings(rows: { key: string; value: unknown }[]): Settings {
@@ -47,6 +51,7 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
     return typeof v === 'string' ? v : (DEFAULT_SETTINGS[name] as string);
   };
   const limit = byKey.get(SETTING_KEYS.cashierDiscountLimitBp);
+  const stockLimit = byKey.get(SETTING_KEYS.stockApprovalAbove);
   const days = byKey.get(SETTING_KEYS.returnPeriodDays);
   return {
     cashierMayDiscount: bool('cashierMayDiscount'),
@@ -62,6 +67,10 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
       typeof days === 'number' && Number.isInteger(days) && days >= 0 && days <= 3650
         ? days
         : DEFAULT_SETTINGS.returnPeriodDays,
+    stockApprovalAbove:
+      typeof stockLimit === 'number' && Number.isInteger(stockLimit) && stockLimit >= 0
+        ? stockLimit
+        : DEFAULT_SETTINGS.stockApprovalAbove,
   };
 }
 
