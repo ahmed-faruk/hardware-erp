@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     include: [
       'src/**/*.test.ts',
+      'src/**/*.test.tsx',
       'tests/int/**/*.test.ts',
       'tools/ospos-import/**/*.test.ts',
       'tools/build/**/*.test.ts',
