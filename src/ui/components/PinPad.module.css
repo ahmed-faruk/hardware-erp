@@ -16,11 +16,15 @@
   block-size: 20px;
   border: 2px solid var(--text-muted);
   border-radius: var(--radius-round);
+  transition:
+    background-color 0.15s,
+    transform 0.15s;
 }
 
 .filled {
   background: var(--text);
   border-color: var(--text);
+  transform: scale(1.15);
 }
 
 .shake {

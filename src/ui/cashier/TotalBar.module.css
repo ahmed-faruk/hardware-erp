@@ -5,8 +5,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border-block-start: 3px solid var(--primary);
+  border-block-start: 2px dashed var(--border-strong);
   background: var(--surface);
+  box-shadow: var(--shadow-2);
 }
 
 .numbers {
@@ -29,8 +30,17 @@
 
 .actions {
   display: flex;
+  flex: 1 1 280px;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.actions > button[data-testid='pay'] {
+  flex: 1 1 140px;
+  min-block-size: 68px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .held {
@@ -38,9 +48,9 @@
   place-items: center;
   min-inline-size: var(--target-cashier);
   min-block-size: var(--target-cashier);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-round);
-  background: var(--surface-2);
+  background: var(--surface);
   font-weight: 700;
   cursor: pointer;
 }

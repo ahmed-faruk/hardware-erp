@@ -4,10 +4,12 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-block-size: 96px;
+  min-block-size: 104px;
   inline-size: 100%;
   border: 3px solid transparent;
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.12s;
   background: var(--pay);
   color: var(--on-color);
   font-size: var(--fs-h2);

@@ -133,83 +133,86 @@ export function PayScreen({
 
   return (
     <section className={styles.pay}>
-      <div className={styles.top}>
-        <ActionButton
-          big
-          label={strings.common.back}
-          icon={ArrowRight}
-          variant="ghost"
-          onClick={onBack}
-          testId="pay-back"
-        />
-        <div className={styles.numbers}>
-          <span>{strings.sell.total}</span>
-          <strong className={styles.big} data-testid="pay-total">
-            {digits(formatMoney(total))}
-          </strong>
-        </div>
-        <div className={styles.numbers}>
-          <span>{strings.sell.remaining}</span>
-          <strong className={remaining === 0 ? styles.okBig : styles.big} data-testid="remaining">
-            {digits(formatMoney(remaining))}
-          </strong>
-        </div>
-      </div>
-
-      {payments.length > 0 && (
-        <ul className={styles.chips}>
-          {payments.map((p, i) => (
-            <li key={i} className={styles.chip} data-testid={`payment-${i}`}>
-              <span>{strings.sell[`pay_${p.method as Method}`]}</span>
-              <strong>{digits(formatMoney(p.amount))}</strong>
-              <button
-                type="button"
-                className={styles.x}
-                onClick={() => setPayments((l) => l.filter((_, j) => j !== i))}
-                aria-label={strings.actions.remove}
-              >
-                <Trash2 size={20} aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className={styles.methods}>
-        {PAY_METHODS.map((m) => (
-          <PayMethodButton
-            key={m.method}
-            method={m.method}
-            selected={method === m.method}
-            disabled={remaining === 0}
-            onClick={() => choose(m.method)}
+      <div className={styles.col}>
+        <div className={styles.top}>
+          <ActionButton
+            big
+            label={strings.common.back}
+            icon={ArrowRight}
+            variant="ghost"
+            onClick={onBack}
+            testId="pay-back"
           />
-        ))}
-      </div>
+          <div className={styles.numbers}>
+            <span>{strings.sell.total}</span>
+            <strong className={styles.big} data-testid="pay-total">
+              {digits(formatMoney(total))}
+            </strong>
+          </div>
+          <div className={styles.numbers}>
+            <span>{strings.sell.remaining}</span>
+            <strong className={remaining === 0 ? styles.okBig : styles.big} data-testid="remaining">
+              {digits(formatMoney(remaining))}
+            </strong>
+          </div>
+        </div>
 
-      <div className={styles.customer}>
+        {payments.length > 0 && (
+          <ul className={styles.chips}>
+            {payments.map((p, i) => (
+              <li key={i} className={styles.chip} data-testid={`payment-${i}`}>
+                <span>{strings.sell[`pay_${p.method as Method}`]}</span>
+                <strong>{digits(formatMoney(p.amount))}</strong>
+                <button
+                  type="button"
+                  className={styles.x}
+                  onClick={() => setPayments((l) => l.filter((_, j) => j !== i))}
+                  aria-label={strings.actions.remove}
+                >
+                  <Trash2 size={20} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className={styles.customer}>
+          <ActionButton
+            big
+            label={customer ? customer.customer.name : strings.sell.chooseCustomer}
+            icon={UserRound}
+            variant="ghost"
+            onClick={() => setPickerOpen(true)}
+            testId="choose-customer"
+          />
+          {customer && <CustomerBalances info={customer} digits={digits} />}
+        </div>
+      </div>
+      <div className={styles.col}>
+        <div className={styles.methods}>
+          {PAY_METHODS.map((m) => (
+            <PayMethodButton
+              key={m.method}
+              method={m.method}
+              selected={method === m.method}
+              disabled={remaining === 0}
+              onClick={() => choose(m.method)}
+            />
+          ))}
+        </div>
+
+        {error && <BigAlert tone="danger" word={error} />}
         <ActionButton
-          big
-          label={customer ? customer.customer.name : strings.sell.chooseCustomer}
-          icon={UserRound}
-          variant="ghost"
-          onClick={() => setPickerOpen(true)}
-          testId="choose-customer"
+          label={strings.sell.paid}
+          icon={Check}
+          variant="ok"
+          layout="stack"
+          onClick={() => void finish()}
+          disabled={remaining !== 0}
+          loading={busy}
+          testId="finish"
         />
-        {customer && <CustomerBalances info={customer} digits={digits} />}
       </div>
-
-      {error && <BigAlert tone="danger" word={error} />}
-      <ActionButton
-        label={strings.sell.paid}
-        icon={Check}
-        variant="ok"
-        layout="stack"
-        onClick={() => void finish()}
-        disabled={remaining !== 0}
-        loading={busy}
-        testId="finish"
-      />
 
       <NumEntry
         title={method ? strings.sell[`pay_${method}`] : strings.sell.pay}

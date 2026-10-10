@@ -13,6 +13,17 @@
   cursor: pointer;
   background: var(--primary);
   color: var(--on-color);
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.12s ease,
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--primary-strong);
+  box-shadow: var(--shadow-1);
 }
 
 .stack {
@@ -26,14 +37,35 @@
   background: var(--ok);
 }
 
+.ok:hover:not(:disabled) {
+  background: var(--ok);
+}
+
 .danger {
   background: var(--danger);
 }
 
-.ghost {
-  background: transparent;
+.danger:hover:not(:disabled) {
+  background: var(--danger);
+}
+
+.soft {
+  background: var(--tint-primary);
   color: var(--primary);
-  border-color: var(--primary);
+}
+
+.soft:hover:not(:disabled) {
+  background: var(--tint-primary);
+}
+
+.ghost {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
 }
 
 .button:active:not(:disabled) {
