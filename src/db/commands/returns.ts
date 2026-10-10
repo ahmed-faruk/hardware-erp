@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
+import { drawerBalance } from '../cash';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
 import { loadSettings } from '../settings';
@@ -49,12 +50,6 @@ export interface PostedDoc {
   total: number;
   cash: number;
   credit: number;
-}
-
-async function drawerBalance(ctx: DeviceContext, shiftId: string): Promise<number> {
-  const shift = await ctx.db.shifts.get(shiftId);
-  const moved = await ctx.db.cashMovements.where('shiftId').equals(shiftId).toArray();
-  return (shift?.openingFloat ?? 0) + moved.reduce((a, m) => a + m.amount, 0);
 }
 
 /** RET-01..06: a return by invoice (cashier or manager) or without invoice (manager). One transaction, no network. */
@@ -180,7 +175,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   if (!split.ok) return split;
   const customerId = invoice?.customerId ?? input.customerId;
   if (split.credit > 0 && !customerId) return err('E_VALIDATION', 'العميل مطلوب');
-  if (split.cash > (await drawerBalance(ctx, input.shiftId)))
+  if (split.cash > (await drawerBalance(db, input.shiftId)))
     return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
 
   for (const t of tokens) spendApproval(t);

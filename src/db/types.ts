@@ -148,6 +148,8 @@ export interface Shift extends Common {
   expectedTotal: number | null;
   variance: number | null;
   closeNote: string | null;
+  /** the manager who approved a drawer difference above the limit */
+  approvedBy?: string | null;
   status: 'open' | 'closed';
 }
 export interface SalesInvoice extends DocCommon {

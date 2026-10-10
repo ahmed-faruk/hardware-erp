@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Banknote, HandCoins, Printer, Receipt as ReceiptIcon, Undo2 } from 'lucide-react';
+import { Banknote, Clock, HandCoins, Printer, Receipt as ReceiptIcon, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -47,6 +47,13 @@ import { PayScreen } from './PayScreen';
 import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog, VoidReasonDialog } from './SellDialogs';
 import { CollectionDialog } from './CollectionDialog';
 import { ReturnDialog } from './ReturnDialog';
+import {
+  CloseShiftDialog,
+  ExpenseDialog,
+  ShiftMenuDialog,
+  TransferDialog,
+  type ShiftTool,
+} from './ShiftTools';
 import { ProductGrid } from './ProductGrid';
 import { ShiftOpen } from './ShiftOpen';
 import { TotalBar } from './TotalBar';
@@ -123,6 +130,8 @@ export function SellScreen() {
   const [scannedReceipt, setScannedReceipt] = useState<string | null>(null);
   const [collectOpen, setCollectOpen] = useState(false);
   const [voidTarget, setVoidTarget] = useState<string | null>(null);
+  const [shiftMenu, setShiftMenu] = useState(false);
+  const [shiftTool, setShiftTool] = useState<Exclude<ShiftTool, 'x'> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const { ask, dialog: approvalDialog } = useApproval();
 
@@ -276,6 +285,46 @@ export function SellScreen() {
     const receipt = await loadReceipt(db, id, false, 'void');
     if (receipt.ok)
       await printDoc((render, faces) => render.renderReceiptHtml(receipt.value, device.paper, faces));
+  };
+
+  const printShiftReport = (shiftId: string): void => {
+    void (async () => {
+      const { loadShiftReport } = await import('@/db/shift-report');
+      const data = await loadShiftReport(db, shiftId);
+      if (data) await printDoc((r, faces) => r.renderShiftHtml(data, device.digits, device.paper, faces));
+    })();
+  };
+
+  const printMoneySlip = (kind: 'expense' | 'transfer', id: string): void => {
+    void (async () => {
+      const shop = (await db.companies.toCollection().first())?.name ?? '';
+      const doc = kind === 'expense' ? await db.expenses.get(id) : await db.cashTransfers.get(id);
+      if (!doc) return;
+      const worker = doc.workerId ? await db.workers.get(doc.workerId) : undefined;
+      const category =
+        kind === 'expense' ? await db.expenseCategories.get(doc.categoryId as string) : undefined;
+      await printDoc((r, faces) =>
+        r.renderMoneySlipHtml(
+          {
+            shopName: shop,
+            title: kind === 'expense' ? strings.cash.expense : strings.cash.transfer,
+            number: doc.number,
+            at: doc.issuedAt,
+            lines: [{ label: category?.name ?? strings.cash.transfer, amount: doc.amount as number }],
+            worker: worker?.name ?? '',
+            digits: device.digits,
+          },
+          device.paper,
+          faces,
+        ),
+      );
+    })();
+  };
+
+  const pickShiftTool = (tool: ShiftTool): void => {
+    setShiftMenu(false);
+    if (tool === 'x' && shift) printShiftReport(shift.id);
+    else if (tool !== 'x') setShiftTool(tool);
   };
 
   const onPaid = (sale: SaleReceipt): void => {
@@ -503,6 +552,14 @@ export function SellScreen() {
             testId="collect"
           />
           <ActionButton
+            label={strings.sell.shiftOpen}
+            icon={Clock}
+            variant="ghost"
+            layout="stack"
+            onClick={() => setShiftMenu(true)}
+            testId="shift-menu"
+          />
+          <ActionButton
             label={strings.sell.noSale}
             icon={Banknote}
             variant="ghost"
@@ -595,6 +652,41 @@ export function SellScreen() {
           setScannedReceipt(null);
         }}
         onDone={onReturnDone}
+      />
+      <ShiftMenuDialog open={shiftMenu} onPick={pickShiftTool} onClose={() => setShiftMenu(false)} />
+      <ExpenseDialog
+        open={shiftTool === 'expense'}
+        shiftId={shift.id}
+        cashAccountId={sale.cashAccountId}
+        digits={digits}
+        onClose={() => setShiftTool(null)}
+        onDone={(id) => {
+          setShiftTool(null);
+          flash(strings.cash.saved);
+          if (device.autoPrint) printMoneySlip('expense', id);
+        }}
+      />
+      <TransferDialog
+        open={shiftTool === 'transfer'}
+        shiftId={shift.id}
+        cashAccountId={sale.cashAccountId}
+        onClose={() => setShiftTool(null)}
+        onDone={(id) => {
+          setShiftTool(null);
+          flash(strings.cash.saved);
+          if (device.autoPrint) printMoneySlip('transfer', id);
+        }}
+      />
+      <CloseShiftDialog
+        open={shiftTool === 'close'}
+        shiftId={shift.id}
+        digits={digits}
+        ask={ask}
+        onClose={() => setShiftTool(null)}
+        onClosed={(id) => {
+          setShiftTool(null);
+          printShiftReport(id);
+        }}
       />
       <CollectionDialog
         open={collectOpen}
