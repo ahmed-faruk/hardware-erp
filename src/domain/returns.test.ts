@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeReturnLine, returnableQty } from './returns';
+import { allocateRefund, computeReturnLine, returnableQty } from './returns';
 
 const sold = { id: 'l1', qtyMilli: 3000, finalAmount: 2999, unitCost: 80 };
 
@@ -28,5 +28,24 @@ describe('returns', () => {
   });
   it('rejects zero quantity', () => {
     expect(computeReturnLine(sold, [], 0)).toMatchObject({ ok: false, code: 'INVALID_QTY' });
+  });
+});
+
+describe('allocateRefund', () => {
+  const mix = [
+    { method: 'cash', amount: 5000 },
+    { method: 'credit', amount: 2000 },
+  ];
+  it('splits a refund by the original mix and adds up exactly', () => {
+    expect(allocateRefund(mix, 1000)).toEqual({ ok: true, credit: 286, cash: 714 });
+    expect(allocateRefund(mix, 7000)).toEqual({ ok: true, credit: 2000, cash: 5000 });
+  });
+  it('a cash-only invoice refunds cash only; more than paid is refused', () => {
+    expect(allocateRefund([{ method: 'card', amount: 900 }], 300)).toEqual({
+      ok: true,
+      credit: 0,
+      cash: 300,
+    });
+    expect(allocateRefund(mix, 7001)).toMatchObject({ ok: false });
   });
 });

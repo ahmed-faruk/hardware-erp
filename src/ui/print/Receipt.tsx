@@ -34,6 +34,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
         {data.shop.phone && <div className="small">{`${strings.receipt.phone}: ${data.shop.phone}`}</div>}
         {data.shop.address && <div className="small">{data.shop.address}</div>}
       </div>
+      {data.kind !== 'sale' && <div className="banner">{strings.receipt.kind[data.kind]}</div>}
       {data.copy && <div className="banner">{strings.receipt.copy}</div>}
       <hr className="rule" />
       <Barcode value={data.barcodeValue} />

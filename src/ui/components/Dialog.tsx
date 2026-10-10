@@ -22,7 +22,13 @@ export function Dialog({ title, open, onClose, children }: DialogProps) {
     if (!open && el.open) el.close();
   }, [open]);
   return (
-    <dialog ref={ref} className={styles.dialog} aria-label={title} onClose={onClose}>
+    <dialog
+      ref={ref}
+      className={styles.dialog}
+      aria-label={title}
+      // React bubbles `close` up the component tree: a dialog nested in another must not close its parent
+      onClose={(e) => e.target === e.currentTarget && onClose()}
+    >
       <header className={styles.header}>
         <h2>{title}</h2>
         <button type="button" className={styles.close} onClick={onClose} aria-label={strings.common.close}>

@@ -1,11 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Banknote, Printer, Receipt as ReceiptIcon } from 'lucide-react';
+import { Banknote, HandCoins, Printer, Receipt as ReceiptIcon, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { holdCart, listHeldCarts, loadCurrentCart, resumeCart, saveCurrentCart } from '@/db/commands/carts';
 import type { SaleReceipt } from '@/db/commands/post-sale';
 import { noSale, reprintInvoice, type NoSaleReason } from '@/db/commands/receipts';
+import { voidInvoice, type VOID_REASONS } from '@/db/commands/returns';
 import { findByBarcode } from '@/db/lookup';
 import { searchProducts } from '@/db/search';
 import { loadDeviceSettings, loadSettings, type DeviceSettings } from '@/db/settings';
@@ -43,7 +44,9 @@ import { ChangeDisplay } from './ChangeDisplay';
 import { DiscountDialog } from './DiscountDialog';
 import { NumEntry } from './NumEntry';
 import { PayScreen } from './PayScreen';
-import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
+import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog, VoidReasonDialog } from './SellDialogs';
+import { CollectionDialog } from './CollectionDialog';
+import { ReturnDialog } from './ReturnDialog';
 import { ProductGrid } from './ProductGrid';
 import { ShiftOpen } from './ShiftOpen';
 import { TotalBar } from './TotalBar';
@@ -116,6 +119,10 @@ export function SellScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [scannedReceipt, setScannedReceipt] = useState<string | null>(null);
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [voidTarget, setVoidTarget] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const { ask, dialog: approvalDialog } = useApproval();
 
@@ -157,6 +164,7 @@ export function SellScreen() {
 
   const scan = useCallback(
     (code: string): void => {
+      if (returnOpen) return setScannedReceipt(code);
       if (step !== 'items' || !shift) return;
       void findByBarcode(db, code).then((found) => {
         if (found) add(found.product, found.unit);
@@ -166,7 +174,7 @@ export function SellScreen() {
         }
       });
     },
-    [db, add, step, shift],
+    [db, add, step, shift, returnOpen],
   );
   useBarcodeScanner(scan);
 
@@ -214,6 +222,60 @@ export function SellScreen() {
     if (!receipt.ok) return false;
     const { cairoFontFaces } = await import('../print/printHtml');
     return printHtmlFor((r) => r.renderReceiptHtml(receipt.value, device.paper, cairoFontFaces()));
+  };
+
+  const printDoc = async (
+    make: (render: typeof import('../print/render'), faces: string) => string,
+  ): Promise<void> => {
+    const { cairoFontFaces } = await import('../print/printHtml');
+    if (!(await printHtmlFor((render) => make(render, cairoFontFaces())))) flash(strings.sell.printFailed);
+  };
+
+  const onReturnDone = (posted: { id: string }): void => {
+    setReturnOpen(false);
+    setScannedReceipt(null);
+    flash(strings.returns.done);
+    if (!device.autoPrint) return;
+    void (async () => {
+      const { loadReturnReceipt } = await import('@/db/commands/receipts');
+      const receipt = await loadReturnReceipt(db, posted.id, false);
+      if (receipt.ok) await printDoc((r, faces) => r.renderReceiptHtml(receipt.value, device.paper, faces));
+    })();
+  };
+
+  const onCollectDone = (id: string): void => {
+    setCollectOpen(false);
+    flash(strings.collection.done);
+    if (!device.autoPrint) return;
+    void (async () => {
+      const { loadCollectionSlip } = await import('@/db/commands/receipts');
+      const slip = await loadCollectionSlip(db, id);
+      if (slip.ok)
+        await printDoc((r, faces) => r.renderCollectionHtml(slip.value, device.digits, device.paper, faces));
+    })();
+  };
+
+  const doVoid = async (reason: (typeof VOID_REASONS)[number]): Promise<void> => {
+    const id = voidTarget;
+    setVoidTarget(null);
+    if (!context || !id || !shift) return;
+    const r = await voidInvoice(context, { invoiceId: id, reason, shiftId: shift.id });
+    if (!r.ok) {
+      play('error');
+      return flash(
+        r.code === 'HAS_RETURNS'
+          ? strings.voidInvoice.hasReturns
+          : r.code === 'ALREADY_VOIDED'
+            ? strings.voidInvoice.already
+            : strings.errors.saveFailed,
+      );
+    }
+    play('done');
+    flash(strings.voidInvoice.done);
+    const { loadReceipt } = await import('@/db/commands/receipts');
+    const receipt = await loadReceipt(db, id, false, 'void');
+    if (receipt.ok)
+      await printDoc((render, faces) => render.renderReceiptHtml(receipt.value, device.paper, faces));
   };
 
   const onPaid = (sale: SaleReceipt): void => {
@@ -425,6 +487,22 @@ export function SellScreen() {
             testId="recent"
           />
           <ActionButton
+            label={strings.returns.button}
+            icon={Undo2}
+            variant="ghost"
+            layout="stack"
+            onClick={() => setReturnOpen(true)}
+            testId="return"
+          />
+          <ActionButton
+            label={strings.collection.button}
+            icon={HandCoins}
+            variant="ghost"
+            layout="stack"
+            onClick={() => setCollectOpen(true)}
+            testId="collect"
+          />
+          <ActionButton
             label={strings.sell.noSale}
             icon={Banknote}
             variant="ghost"
@@ -498,6 +576,33 @@ export function SellScreen() {
         digits={digits}
         onClose={() => setRecentOpen(false)}
         onReprint={(id) => void printInvoice(id, true)}
+        onVoid={role === 'manager' ? setVoidTarget : undefined}
+      />
+      <VoidReasonDialog
+        open={voidTarget !== null}
+        onPick={(r) => void doVoid(r)}
+        onClose={() => setVoidTarget(null)}
+      />
+      <ReturnDialog
+        open={returnOpen}
+        shiftId={shift.id}
+        cashAccountId={sale.cashAccountId}
+        digits={digits}
+        ask={ask}
+        scanned={scannedReceipt}
+        onClose={() => {
+          setReturnOpen(false);
+          setScannedReceipt(null);
+        }}
+        onDone={onReturnDone}
+      />
+      <CollectionDialog
+        open={collectOpen}
+        shiftId={shift.id}
+        cashAccountId={sale.cashAccountId}
+        digits={digits}
+        onClose={() => setCollectOpen(false)}
+        onDone={onCollectDone}
       />
       <NoSaleDialog open={noSaleOpen} onPick={(r) => void doNoSale(r)} onClose={() => setNoSaleOpen(false)} />
       {approvalDialog}

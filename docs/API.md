@@ -57,7 +57,7 @@ Response:
 `worker_id` (outer field) is the worker who performed the action; the server checks it against `workers`, the device's `max_role` and
 the permission matrix (`role_can`, a SQL copy of `permissions.ts`). A sales invoice is ONE record with its children embedded
 (`lines`, `payments`, `stock_movements`, `party_ledger`, `cash_movements`); the server checks that totals, payments and ledger rows
-agree and that the number starts with the device prefix, then inserts everything atomically. Tables not yet pushable
+agree and that the number starts with the device prefix, then inserts everything atomically. Returns (`sales_returns`: lines, payments and the three ledgers embedded), voids (`voids`: the reversing ledger rows embedded) and customer receipts are bundles in the same way: the server re-computes the refund share of every returned line from the invoice, caps the quantity at sold − already returned, copies `unit_cost` from the original line, and checks that a void's rows are exactly the negation of the invoice's. Tables not yet pushable
 (`sync_tables.push_action` is null) are added with their command.
 Workers: `sync_tables.push_action = manageUsers` (managers only), and a manager login on a device below the manager level is refused.
 `pin_hash` and `pin_salt` reach every device so workers can log in offline (docs/SECURITY.md §2).
@@ -104,9 +104,9 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | --- | --- | --- |
 | `postSale` | cart lines, customerId?, payments[], invoiceDiscount?, approvals[] | `{ ok, id, number, changeDue }` |
 | `holdCart` / `resumeCart` | cart | cart id |
-| `postSalesReturn` | originalInvoiceId?, lines[{originalLineId, qty, condition}], refundMethod, reason? | `{ ok, id, number }` |
-| `voidDocument` | targetType, targetId, reason, managerApproval | `{ ok, id }` |
-| `postCustomerReceipt` | customerId, amount, method, reference? | `{ ok, id, number, newBalance }` |
+| `postSalesReturn` | originalInvoiceId?, lines[{originalLineId, qtyMilli, condition}], shiftId, cashAccountId, approvalTokens[] | `{ ok, id, number, total, cash, credit }`; refund split by the original payment mix (credit share lowers the debt, the rest is cash from the drawer, `DRAWER_SHORT` if the drawer lacks it); past `return.periodDays` a cashier needs a `returnAfterPeriod` token; no invoice = manager only |
+| `voidInvoice` | invoiceId, reason, shiftId | `{ ok, id, number }` manager only; exact reversing rows; refused with `HAS_RETURNS` / `ALREADY_VOIDED` |
+| `postCustomerReceipt` | customerId, amount, method, reference?, shiftId, cashAccountId | `{ ok, id, number, balanceAfter }`; cash enters the drawer, card/InstaPay need a reference |
 | `postPurchase` | supplierId, lines[{productId, unitId, qty, unitCost, discount}], payments[] | `{ ok, id, number }` |
 | `postPurchaseReturn` | supplierId, originalInvoiceId?, lines[], refund | `{ ok, id, number }` |
 | `postSupplierPayment` | supplierId, amount, method, reference? | `{ ok, id, number }` |

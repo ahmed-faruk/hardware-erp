@@ -33,3 +33,25 @@ export function computeReturnLine(
     mulDivRound(line.finalAmount, already, line.qtyMilli);
   return { ok: true, qtyMilli, refund, unitCost: line.unitCost };
 }
+
+export interface OriginalPayment {
+  method: string;
+  amount: Piasters;
+}
+
+/**
+ * The refund follows the original payment mix: the credit share reduces the customer's debt, everything else is
+ * handed back in cash. Largest-remainder-free by construction: cash = refund - credit, so the parts add up exactly.
+ */
+export function allocateRefund(
+  originalPayments: OriginalPayment[],
+  refund: Piasters,
+): { ok: true; credit: Piasters; cash: Piasters } | Err {
+  const total = originalPayments.reduce((a, p) => a + p.amount, 0);
+  if (!Number.isInteger(refund) || refund < 0 || refund > total)
+    return err('REFUND_EXCEEDS_PAID', 'refund is more than the invoice');
+  if (total === 0) return { ok: true, credit: 0, cash: 0 };
+  const creditPaid = originalPayments.filter((p) => p.method === 'credit').reduce((a, p) => a + p.amount, 0);
+  const credit = mulDivRound(refund, creditPaid, total);
+  return { ok: true, credit, cash: refund - credit };
+}

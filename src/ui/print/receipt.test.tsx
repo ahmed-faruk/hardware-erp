@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatMoney } from '@/domain/money';
 import { buildReceipt, type ReceiptInput } from '@/domain/receipt';
 
-import { renderNoSaleHtml, renderReceiptHtml } from './render';
+import { renderCollectionHtml, renderNoSaleHtml, renderReceiptHtml, renderStatementHtml } from './render';
 
 const base: ReceiptInput = {
   shop: { name: 'مركز حنفي للتلوين', phone: '0100 000 0000', address: 'القاهرة', footer: 'شكرًا لتعاملكم' },
@@ -104,5 +104,68 @@ describe('Receipt HTML', () => {
     expect(html).toContain('فتح الدرج بدون بيع');
     expect(html).toContain('عبدالله');
     expect(html).toContain('فكة لعميل');
+  });
+});
+
+describe('return, collection and statement paper', () => {
+  it('a return prints the مرتجع banner and takes the credit refund off the balance', () => {
+    const data = buildReceipt({
+      ...base,
+      kind: 'return',
+      payments: [
+        { method: 'cash', amount: 500, reference: null },
+        { method: 'credit', amount: 500, reference: null },
+      ],
+      customer: { name: 'عميل', balanceBefore: 1500 },
+    });
+    expect(data.credit?.now).toBe('10.00');
+    const html = renderReceiptHtml(data, '80');
+    expect(html).toContain('مرتجع');
+    expect(html).toMatchSnapshot();
+  });
+  it('a sale has no extra banner', () => {
+    expect(renderReceiptHtml(buildReceipt(base), '80')).not.toContain('مرتجع');
+  });
+  it('collection slip (snapshot)', () => {
+    const html = renderCollectionHtml(
+      {
+        shopName: 'مركز حنفي',
+        number: 'K1-RCV-000003',
+        at: '2026-10-10T09:30:00.000Z',
+        customerName: 'عميل',
+        amount: 50000,
+        method: 'cash',
+        balanceAfter: 120000,
+        workerName: 'عبدالله',
+      },
+      'latn',
+      '80',
+    );
+    expect(html).toContain('سند تحصيل');
+    expect(html).toMatchSnapshot();
+  });
+  it('A4 statement is an A4 page with the aging table', () => {
+    const html = renderStatementHtml({
+      shopName: 'مركز حنفي',
+      partyName: 'عميل',
+      period: { from: '2026-10-01', to: '2026-10-10' },
+      statement: {
+        opening: 1000,
+        rows: [
+          {
+            id: 'a',
+            occurredAt: '2026-10-05T09:00:00Z',
+            amount: 500,
+            docNumber: 'K1-INV-000001',
+            balance: 1500,
+          },
+        ],
+        closing: 1500,
+        aging: { d0to30: 1500, d31to60: 0, d61to90: 0, d90plus: 0 },
+      },
+      digits: 'latn',
+    });
+    expect(html).toContain('size: A4');
+    expect(html).toContain('K1-INV-000001');
   });
 });

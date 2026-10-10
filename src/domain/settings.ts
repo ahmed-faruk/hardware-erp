@@ -11,6 +11,8 @@ export interface Settings {
   phone: string;
   address: string;
   footer: string;
+  /** days after the sale in which a cashier may take a return without the manager */
+  returnPeriodDays: number;
 }
 
 export const SETTING_KEYS = {
@@ -20,6 +22,7 @@ export const SETTING_KEYS = {
   phone: 'receipt.phone',
   address: 'receipt.address',
   footer: 'receipt.footer',
+  returnPeriodDays: 'return.periodDays',
 } as const satisfies Record<keyof Settings, string>;
 
 /** Safe defaults: the cashier may not discount or change prices until the manager allows it. */
@@ -30,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   phone: '',
   address: '',
   footer: '',
+  returnPeriodDays: 30,
 };
 
 export function parseSettings(rows: { key: string; value: unknown }[]): Settings {
@@ -43,6 +47,7 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
     return typeof v === 'string' ? v : (DEFAULT_SETTINGS[name] as string);
   };
   const limit = byKey.get(SETTING_KEYS.cashierDiscountLimitBp);
+  const days = byKey.get(SETTING_KEYS.returnPeriodDays);
   return {
     cashierMayDiscount: bool('cashierMayDiscount'),
     cashierDiscountLimitBp:
@@ -53,6 +58,10 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
     phone: text('phone'),
     address: text('address'),
     footer: text('footer'),
+    returnPeriodDays:
+      typeof days === 'number' && Number.isInteger(days) && days >= 0 && days <= 3650
+        ? days
+        : DEFAULT_SETTINGS.returnPeriodDays,
   };
 }
 

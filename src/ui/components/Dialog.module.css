@@ -30,8 +30,8 @@
 .close {
   display: grid;
   place-items: center;
-  inline-size: var(--target-min);
-  block-size: var(--target-min);
+  inline-size: var(--target-cashier);
+  block-size: var(--target-cashier);
   border: 0;
   background: transparent;
   cursor: pointer;

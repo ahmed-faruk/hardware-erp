@@ -77,3 +77,49 @@ test('the sale and pay screens at every width: no horizontal scroll, tap targets
   }
   expect(problems).toEqual([]);
 });
+
+test('return and collection dialogs fit every width with 56 px targets', async ({ page }, info) => {
+  const f = newCashierFixture();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/');
+  await page.getByTestId('activation-code').fill(f.code);
+  await page.getByTestId('activate').click();
+  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
+  await page.keyboard.type(f.cashierPin);
+  await page.keyboard.press('Enter');
+  await page.getByTestId('open-shift').click();
+  await page.keyboard.type('100');
+  await page.keyboard.press('Enter');
+  await page
+    .locator(`[data-testid="tile-${productId(2)}"] button`)
+    .first()
+    .click();
+  await page.locator('[data-testid="pay"]:visible').first().click();
+  await page.getByTestId('pay-cash').click();
+  await page.keyboard.type('20');
+  await page.keyboard.press('Enter');
+  await page.getByTestId('finish').click();
+  await page.getByTestId('new-sale').click();
+
+  const problems: string[] = [];
+  for (const [width, height] of [
+    [320, 568],
+    [390, 844],
+    [1024, 768],
+    [1366, 768],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.getByTestId('return').click();
+    await page.getByTestId(`return-${f.prefix}-INV-000001`).click();
+    await page.getByTestId('plus-1').click();
+    problems.push(...(await check(page, `${width}x${height} return`)));
+    await page.screenshot({ path: info.outputPath(`return-${width}x${height}.png`) });
+    await page.locator('dialog[open] > header button').last().click();
+    await page.getByTestId('collect').click();
+    await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
+    problems.push(...(await check(page, `${width}x${height} collect`)));
+    await page.screenshot({ path: info.outputPath(`collect-${width}x${height}.png`) });
+    await page.locator('dialog[open] > header button').last().click();
+  }
+  expect(problems).toEqual([]);
+});
