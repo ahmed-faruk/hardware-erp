@@ -11,7 +11,7 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { activateDevice, loadIdentity, signInDevice } from '@/app/device-setup';
 import { SessionProvider, useServices, useSession, type Services } from '@/app/session';
@@ -30,21 +30,44 @@ import { Skeleton } from './components/Skeleton';
 import { SyncStatus } from './components/SyncStatus';
 import { UpdateBanner } from './components/UpdateBanner';
 import { navigate, useRoute } from './router';
-import { SellScreen } from './cashier/SellScreen';
-import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ComingSoonScreen } from './screens/ComingSoonScreen';
-import { ExpensesScreen } from './screens/ExpensesScreen';
 import { LoginScreen } from './screens/LoginScreen';
-import { CustomersScreen, SuppliersScreen } from './screens/PartyScreens';
-import { ProductFormScreen } from './screens/ProductFormScreen';
-import { ProductsScreen } from './screens/ProductsScreen';
-import { PurchasesScreen } from './screens/PurchasesScreen';
-import { StockScreen } from './screens/StockScreen';
-import { ReportsScreen } from './screens/ReportsScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
 import { SetupScreen } from './screens/SetupScreen';
-import { WorkersScreen } from './screens/WorkersScreen';
 import { strings } from './strings.ar';
+
+// manager screens load when first opened: the cashier's first paint carries only the sale screen
+const SellScreen = lazy(() => import('./cashier/SellScreen').then((m) => ({ default: m.SellScreen })));
+const CategoriesScreen = lazy(() =>
+  import('./screens/CategoriesScreen').then((m) => ({ default: m.CategoriesScreen })),
+);
+const CustomersScreen = lazy(() =>
+  import('./screens/PartyScreens').then((m) => ({ default: m.CustomersScreen })),
+);
+const SuppliersScreen = lazy(() =>
+  import('./screens/PartyScreens').then((m) => ({ default: m.SuppliersScreen })),
+);
+const ExpensesScreen = lazy(() =>
+  import('./screens/ExpensesScreen').then((m) => ({ default: m.ExpensesScreen })),
+);
+const ProductFormScreen = lazy(() =>
+  import('./screens/ProductFormScreen').then((m) => ({ default: m.ProductFormScreen })),
+);
+const ProductsScreen = lazy(() =>
+  import('./screens/ProductsScreen').then((m) => ({ default: m.ProductsScreen })),
+);
+const PurchasesScreen = lazy(() =>
+  import('./screens/PurchasesScreen').then((m) => ({ default: m.PurchasesScreen })),
+);
+const ReportsScreen = lazy(() =>
+  import('./screens/ReportsScreen').then((m) => ({ default: m.ReportsScreen })),
+);
+const SettingsScreen = lazy(() =>
+  import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })),
+);
+const StockScreen = lazy(() => import('./screens/StockScreen').then((m) => ({ default: m.StockScreen })));
+const WorkersScreen = lazy(() =>
+  import('./screens/WorkersScreen').then((m) => ({ default: m.WorkersScreen })),
+);
 
 type Boot =
   | { state: 'loading' }
@@ -189,7 +212,7 @@ function Shell() {
       onLock={lock}
       banner={<UpdateBanner />}
     >
-      {screen}
+      <Suspense fallback={<Skeleton rows={3} />}>{screen}</Suspense>
     </AppShell>
   );
 }

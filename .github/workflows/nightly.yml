@@ -36,6 +36,8 @@ jobs:
       - run: npx playwright install --with-deps chromium && npm run perf
       - run: npx @lhci/cli autorun
       - uses: grafana/setup-k6-action@v1
+      - name: local Supabase URL and anon key for k6 (public values only)
+        run: supabase status -o env | grep -E '^(API_URL|ANON_KEY)=' | tr -d '"' | sed -e 's/^API_URL=/SUPABASE_URL=/' -e 's/^ANON_KEY=/SUPABASE_ANON_KEY=/' >> "$GITHUB_ENV"
       - run: k6 run tests/perf/ingest.k6.js
 
   zap:
