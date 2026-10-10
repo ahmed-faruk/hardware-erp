@@ -22,6 +22,11 @@ const SCREENS = [
   { hash: 'customers', title: strings.customers.title },
   { hash: 'suppliers', title: strings.suppliers.title },
   { hash: 'workers', title: strings.workers.title },
+  { hash: 'purchases', title: strings.purchases.title },
+  { hash: 'stock', title: strings.stock.title },
+  { hash: 'expenses', title: strings.cash.expenses },
+  { hash: 'reports', title: strings.reports.title },
+  { hash: 'settings', title: strings.settings.title },
 ];
 
 async function activateAndLogin(page: Page, f: Fixture): Promise<void> {

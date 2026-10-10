@@ -8,6 +8,7 @@ import type { ReceiptData } from '@/domain/receipt';
 
 import { CollectionSlip } from './CollectionSlip';
 import { MoneySlip, ShiftSlip } from './ShiftSlip';
+import { ReportDocument } from './ReportDocument';
 import { PurchaseDocument } from './PurchaseDocument';
 import { a4Css, StatementDocument } from './StatementDocument';
 import { NoSaleSlip } from './NoSaleSlip';
@@ -58,3 +59,6 @@ export const renderMoneySlipHtml = (
   paper: Paper,
   fontFaces = '',
 ): string => page(renderToStaticMarkup(<MoneySlip {...props} />), paper, fontFaces);
+
+export const renderReportHtml = (props: Parameters<typeof ReportDocument>[0], fontFaces = ''): string =>
+  `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title></title><style>${a4Css(fontFaces)}</style></head><body>${renderToStaticMarkup(<ReportDocument {...props} />)}</body></html>`;
