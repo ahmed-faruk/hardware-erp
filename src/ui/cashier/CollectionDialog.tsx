@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Banknote, CreditCard, Smartphone } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { postCustomerReceipt } from '@/db/commands/returns';
@@ -38,36 +38,60 @@ export function CollectionDialog({
   onClose: () => void;
   onDone: (receiptId: string) => void;
 }) {
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  // the picker also reports `close` right after a pick; that must not cancel the collection
+  const picked = useRef(false);
+  const close = (): void => {
+    picked.current = false;
+    setCustomerId(null);
+    onClose();
+  };
   return (
-    <Dialog title={strings.collection.title} open={open} onClose={onClose}>
-      <Body
-        shiftId={shiftId}
-        cashAccountId={cashAccountId}
-        digits={digits}
-        onClose={onClose}
-        onDone={onDone}
+    <>
+      <CustomerPicker
+        open={open && !customerId}
+        onPick={(id) => {
+          picked.current = true;
+          setCustomerId(id);
+        }}
+        onClose={() => {
+          if (!picked.current) close();
+        }}
       />
-    </Dialog>
+      <Dialog title={strings.collection.title} open={open && customerId !== null} onClose={close}>
+        {customerId && (
+          <Body
+            customerId={customerId}
+            shiftId={shiftId}
+            cashAccountId={cashAccountId}
+            digits={digits}
+            onDone={(id) => {
+              picked.current = false;
+              setCustomerId(null);
+              onDone(id);
+            }}
+          />
+        )}
+      </Dialog>
+    </>
   );
 }
 
 function Body({
+  customerId,
   shiftId,
   cashAccountId,
   digits,
-  onClose,
   onDone,
 }: {
+  customerId: string;
   shiftId: string;
   cashAccountId: string;
   digits: (t: string) => string;
-  onClose: () => void;
   onDone: (id: string) => void;
 }) {
   const { db } = useServices();
   const { context } = useSession();
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [pickOpen, setPickOpen] = useState(true);
   const [amount, setAmount] = useState<number | null>(null);
   const [amountOpen, setAmountOpen] = useState(false);
   const [method, setMethod] = useState<Method>('cash');
@@ -106,17 +130,6 @@ function Body({
 
   return (
     <div className={styles.stack}>
-      <CustomerPicker
-        open={pickOpen}
-        onPick={(id) => {
-          setCustomerId(id);
-          setPickOpen(false);
-        }}
-        onClose={() => {
-          setPickOpen(false);
-          if (!customerId) onClose();
-        }}
-      />
       {customer && (
         <>
           <p className={styles.lead}>{customer.name}</p>

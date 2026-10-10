@@ -50,8 +50,7 @@ create function pg_temp.ret(p_actor uuid, p_number text, p_inv uuid, q bigint, n
   from ids;
 $$;
 
--- fixtures as the superuser: a scrap warehouse, an old invoice (60 days ago) with a line
-insert into warehouses (id, company_id, branch_id, name, kind) values ('a0000000-0000-7000-8000-0000000000c2', 'a0000000-0000-7000-8000-000000000001', 'a0000000-0000-7000-8000-0000000000b1', 'Scrap', 'scrap');
+-- fixtures as the superuser (the seed has the scrap warehouse): an old invoice (60 days ago) with a line
 insert into sales_invoices (id, company_id, number, issued_at, total, subtotal) values ('0190f000-0000-7000-8000-0000000000e0', 'a0000000-0000-7000-8000-000000000001', 'K1-INV-000900', now() - interval '60 days', 1000, 1000);
 insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost)
 values (md5('0190f000-0000-7000-8000-0000000000e0a')::uuid, 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000e0', 1, 'a0000000-0000-7000-8000-000000000001', 1000, 1000, 1000, 1000, 650);
