@@ -92,6 +92,10 @@ export interface Product extends Common {
   baseUnitName: string;
   qtyDecimals: number;
   price: number;
+  /** POS-10: the price on each customer list; null = same as retail */
+  priceWholesale?: number | null;
+  priceCraftsman?: number | null;
+  priceContractor?: number | null;
   unitCost: number;
   reorderLevel: number;
   defaultSupplierId: string | null;
@@ -121,6 +125,7 @@ export interface Customer extends Common {
   notes: string | null;
   creditLimit: number;
   defaultDiscountBp: number;
+  priceList?: 'retail' | 'wholesale' | 'craftsman' | 'contractor';
   photoPath: string | null;
   active: boolean;
   legacyPersonId: number | null;

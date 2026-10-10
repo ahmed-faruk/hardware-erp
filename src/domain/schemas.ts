@@ -54,12 +54,21 @@ export const productFieldsSchema = z
     baseUnitName: text,
     qtyDecimals: int.min(0).max(3),
     price: int.min(0),
+    priceWholesale: int.min(0).nullable(),
+    priceCraftsman: int.min(0).nullable(),
+    priceContractor: int.min(0).nullable(),
     unitCost: int.min(0),
     reorderLevel: int.min(0),
     defaultSupplierId: id.nullable(),
     imagePath: optText,
     extraFields: z
-      .object({ icon: z.string().max(40).nullable() })
+      .object({
+        icon: z.string().max(40).nullable(),
+        plu: z
+          .string()
+          .regex(/^\d{5}$/)
+          .nullable(),
+      })
       .partial()
       .strict()
       .nullable(),
@@ -92,6 +101,7 @@ export const customerFieldsSchema = z
     notes: optText,
     creditLimit: int.min(0),
     defaultDiscountBp: int.min(0).max(10000),
+    priceList: z.enum(['retail', 'wholesale', 'craftsman', 'contractor']),
     photoPath: optText,
     active: z.boolean(),
     deletedAt: z.string().nullable(),

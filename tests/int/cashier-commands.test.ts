@@ -404,3 +404,133 @@ describe('clock audit', () => {
     );
   });
 });
+
+describe('negative stock policy (INV-11)', () => {
+  const line = (m: Awaited<ReturnType<typeof setup>>) => [
+    { productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000 },
+  ];
+
+  it('allow (the default) sells below zero and audits it', async () => {
+    const m = await setup();
+    expect((await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] })).ok).toBe(true);
+    expect((await m.ctx.db.auditLog.toArray()).some((a) => a.action === 'negative_stock_sale')).toBe(true);
+  });
+
+  it('block refuses the sale and writes nothing', async () => {
+    const m = await setup();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'stock.negativePolicy', 'block');
+    const r = await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] });
+    expect(r).toMatchObject({ ok: false, code: 'NEGATIVE_STOCK' });
+    expect(await m.ctx.db.salesInvoices.count()).toBe(0);
+  });
+
+  it('block lets a sale through when the stock is there', async () => {
+    const m = await setup();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'stock.negativePolicy', 'block');
+    await m.ctx.db.stockBalances.put({
+      productId: m.s.products[0]!.id,
+      warehouseId: m.s.warehouseId,
+      qty: 5000,
+    });
+    expect((await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] })).ok).toBe(true);
+  });
+});
+
+describe('collections against invoices (FIN-06)', () => {
+  it('a collection names the invoice it settles; more than is open, or for another customer, is refused', async () => {
+    const m = await setup();
+    const sold = await m.sell({
+      lines: [{ productId: m.s.products[0]!.id, qtyMilli: 2000, unitPrice: 1000 }],
+      payments: [{ method: 'credit', amount: 2000 }],
+      customerId: m.s.customer.id,
+    });
+    if (!sold.ok) throw new Error(sold.code);
+    const { postCustomerReceipt } = await import('@/db/commands/returns');
+    const { openCreditInvoices } = await import('@/db/allocations');
+    const open = await openCreditInvoices(m.ctx.db, 'customer', m.s.customer.id);
+    expect(open).toMatchObject([{ invoiceId: sold.id, open: 2000 }]);
+    const pay = (amount: number, alloc: { invoice_id: string; amount: number }[]) =>
+      postCustomerReceipt(m.ctx, {
+        customerId: m.s.customer.id,
+        amount,
+        method: 'cash',
+        shiftId: m.s.shiftId,
+        cashAccountId: m.s.cashAccountId,
+        allocations: alloc,
+      });
+    expect((await pay(1500, [{ invoice_id: sold.id, amount: 1500 }])).ok).toBe(true);
+    expect(await pay(600, [{ invoice_id: sold.id, amount: 600 }])).toMatchObject({
+      ok: false,
+      code: 'E_VALIDATION',
+    });
+    expect(await pay(100, [{ invoice_id: sold.id, amount: 150 }])).toMatchObject({
+      ok: false,
+      code: 'E_VALIDATION',
+    });
+    expect((await openCreditInvoices(m.ctx.db, 'customer', m.s.customer.id))[0]?.open).toBe(500);
+    const receipt = (await m.ctx.db.customerReceipts.toArray())[0]!;
+    expect(receipt.allocations).toEqual([{ invoice_id: sold.id, amount: 1500 }]);
+  });
+});
+
+describe('price lists (POS-10)', () => {
+  it('a wholesale customer buys at the wholesale price with no approval; others need approval for it', async () => {
+    const m = await setup();
+    const p = m.s.products[0]!;
+    await m.ctx.db.products.update(p.id, { priceWholesale: 800 });
+    await m.ctx.db.customers.update(m.s.customer.id, { priceList: 'wholesale' });
+    const line = [{ productId: p.id, qtyMilli: 1000, unitPrice: 800 }];
+    expect(
+      await m.sell({ lines: line, payments: [{ method: 'cash', amount: 800 }], customerId: m.s.customer.id }),
+    ).toMatchObject({ ok: true });
+    expect(await m.sell({ lines: line, payments: [{ method: 'cash', amount: 800 }] })).toMatchObject({
+      ok: false,
+      code: 'APPROVAL_REQUIRED',
+      message: 'priceOverride',
+    });
+  });
+
+  it('repricing on a customer change moves list-price lines and keeps a hand-typed price', async () => {
+    const m = await setup();
+    const { addItem, EMPTY_CART, productToItem } = await import('@/domain/cart');
+    const { repriceForCustomer } = await import('@/db/pricing');
+    const [a, b] = m.s.products;
+    await m.ctx.db.products.update(a!.id, { priceWholesale: 800 });
+    await m.ctx.db.products.update(b!.id, { priceWholesale: 1500 });
+    await m.ctx.db.customers.update(m.s.customer.id, { priceList: 'wholesale' });
+    let cart = addItem(EMPTY_CART, productToItem((await m.ctx.db.products.get(a!.id))!, null));
+    cart = addItem(cart, { ...productToItem((await m.ctx.db.products.get(b!.id))!, null), unitPrice: 1900 });
+    const next = await repriceForCustomer(m.ctx.db, cart, m.s.customer.id);
+    expect(next.lines.map((l) => l.unitPrice)).toEqual([800, 1900]);
+  });
+});
+
+describe('scale labels (POS-04)', () => {
+  const label = async (plu: string, value: string) => {
+    const { ean13Check } = await import('@/domain/scale');
+    const body = `20${plu}${value}`;
+    return body + ean13Check(body);
+  };
+
+  it('with the setting on, a scale label finds the product and carries the weight; off, it finds nothing', async () => {
+    const m = await setup();
+    const { findByBarcode } = await import('@/db/lookup');
+    const p = m.s.products[0]!;
+    await m.ctx.db.products.update(p.id, { qtyDecimals: 3, extraFields: { icon: null, plu: '00123' } });
+    const code = await label('00123', '01250');
+    expect(await findByBarcode(m.ctx.db, code)).toBeNull();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.enabled', true);
+    expect(await findByBarcode(m.ctx.db, code)).toMatchObject({ qtyMilli: 1250, product: { id: p.id } });
+    expect(await findByBarcode(m.ctx.db, await label('00999', '01250'))).toBeNull();
+  });
+
+  it('price mode turns the price on the label into a quantity', async () => {
+    const m = await setup();
+    const { findByBarcode } = await import('@/db/lookup');
+    const p = m.s.products[0]!; // price 10.00 per unit
+    await m.ctx.db.products.update(p.id, { extraFields: { icon: null, plu: '00123' } });
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.enabled', true);
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'scale.mode', 'price');
+    expect(await findByBarcode(m.ctx.db, await label('00123', '02500'))).toMatchObject({ qtyMilli: 2500 });
+  });
+});

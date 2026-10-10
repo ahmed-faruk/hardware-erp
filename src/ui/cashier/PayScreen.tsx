@@ -123,7 +123,7 @@ export function PayScreen({
           continue;
         }
       }
-      setError(strings.sell.saleFailed);
+      setError(result.code === 'NEGATIVE_STOCK' ? strings.sell.negativeBlocked : strings.sell.saleFailed);
       break;
     }
     setBusy(false);

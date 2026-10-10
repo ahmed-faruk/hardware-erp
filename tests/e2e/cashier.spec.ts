@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { ean13Check } from '../../src/domain/scale';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, setSetting, sql, type CashierFixture } from './helpers';
 
 /** Every print() (the receipt frame calls it) is recorded instead of opening a dialog: window.__prints holds the printed HTML. */
 async function recordPrints(page: Page): Promise<void> {
@@ -227,4 +228,59 @@ test.describe('cashier journeys', () => {
     await page.keyboard.press('Control+Enter');
     await expect(page.getByTestId('done')).toBeVisible();
   });
+});
+
+test('with the negative-stock policy on block, selling a product with no stock is refused', async ({
+  page,
+}) => {
+  setSetting('stock.negativePolicy', '"block"');
+  try {
+    await start(page);
+    await tap(page, 2); // the shared test catalog has no stock for it
+    await vis(page, 'pay').click();
+    await page.getByTestId('pay-cash').click();
+    await page.keyboard.type('20');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('finish').click();
+    await expect(page.getByText(strings.sell.negativeBlocked)).toBeVisible();
+    await expect(page.getByTestId('done')).toHaveCount(0);
+  } finally {
+    sql(`delete from settings where key = 'stock.negativePolicy'`);
+  }
+});
+
+test('a wholesale customer changes the price of the lines already in the cart', async ({ page }) => {
+  sql(`update products set price_wholesale = 1500 where id = '${productId(3)}'`); // retail 17.50
+  sql(`update customers set price_list = 'wholesale' where id = 'a0000000-0000-7000-8000-000000000c01'`);
+  try {
+    await start(page);
+    await tap(page, 3);
+    await expect(vis(page, 'total')).toHaveText('17.50');
+    await vis(page, 'pay').click();
+    await page.getByTestId('choose-customer').click();
+    await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
+    await expect(page.getByTestId('pay-total')).toHaveText('15.00');
+  } finally {
+    sql(`update products set price_wholesale = null where id = '${productId(3)}'`);
+    sql(`update customers set price_list = 'retail' where id = 'a0000000-0000-7000-8000-000000000c01'`);
+  }
+});
+
+test('scanning a scale label adds the product with the weight on it', async ({ page }) => {
+  const plu = '00987';
+  const body = `20${plu}01250`;
+  const code = body + ean13Check(body);
+  sql(
+    `update products set qty_decimals = 3, extra_fields = '{"icon":null,"plu":"${plu}"}'::jsonb where id = '${productId(1)}'`,
+  );
+  setSetting('scale.enabled', 'true');
+  try {
+    await start(page);
+    await page.keyboard.type(code, { delay: 0 }); // the scanner types fast and ends with Enter
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('qty-0')).toHaveText('1.25');
+  } finally {
+    sql(`update products set qty_decimals = 0, extra_fields = null where id = '${productId(1)}'`);
+    sql(`delete from settings where key = 'scale.enabled'`);
+  }
 });

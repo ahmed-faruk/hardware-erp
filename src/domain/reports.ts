@@ -76,6 +76,7 @@ interface ExceptionsData {
   cart_removals: number;
   settings_changes: { key: string; at: string; worker: string }[];
   clock_warnings: { device: string; at: string; skew_ms: number }[];
+  cash_adjustments?: { number: string; at: string; account: string; amount: number; reason: string }[];
 }
 
 export function exceptionsTables(
@@ -122,6 +123,11 @@ export function exceptionsTables(
       title: t.settingsChanges!,
       headers: [t.number!, t.time!, t.worker!],
       rows: d.settings_changes.map((r) => [r.key, time(r.at), r.worker]),
+    },
+    {
+      title: t.cashAdjustments!,
+      headers: [t.number!, t.time!, t.account!, t.amount!],
+      rows: (d.cash_adjustments ?? []).map((r) => [r.number, time(r.at), r.account, m(r.amount)]),
     },
     {
       title: t.shiftVariances!,

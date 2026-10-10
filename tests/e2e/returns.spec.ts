@@ -109,3 +109,35 @@ test.describe('returns, voids and collections', () => {
       .toBe('500');
   });
 });
+
+test('a collection ticked on a credit invoice reaches the server with its allocation', async ({ page }) => {
+  const f = await start(page, 'cashier');
+  await page
+    .locator(`[data-testid="tile-${productId(2)}"] button`)
+    .first()
+    .click();
+  await vis(page, 'pay').click();
+  await page.getByTestId('pay-credit').click();
+  await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
+  await page.getByTestId('full-amount').click();
+  await page.getByTestId('finish').click();
+  await expect(page.getByTestId('done')).toBeVisible();
+  await page.getByTestId('new-sale').click();
+
+  await page.getByTestId('collect').click();
+  await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
+  await page.getByTestId(`alloc-${f.prefix}-INV-000001`).check();
+  await page.getByTestId('collect-amount-btn').click();
+  await page.keyboard.type('5');
+  await page.keyboard.press('Enter');
+  await page.getByTestId('collect-save').click();
+  await expect
+    .poll(
+      () =>
+        sql(
+          `select allocations -> 0 ->> 'amount' from customer_receipts where number = '${f.prefix}-RCV-000001'`,
+        ),
+      { timeout: 60_000 },
+    )
+    .toBe('500');
+});

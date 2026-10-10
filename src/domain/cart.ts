@@ -1,5 +1,6 @@
 import { err, ok, type Result } from './result';
-import { mulDivRound, type Milli, type Piasters } from './money';
+import type { Milli, Piasters } from './money';
+import { priceFor, type PriceList } from './pricing';
 import { computeInvoice, type Discount, type InvoiceResult } from './totals';
 
 export interface CartItem {
@@ -98,11 +99,20 @@ export function toSaleLines(cart: Cart) {
 
 /** A tapped or scanned product becomes a cart item; a pack unit uses its own price, or the base price times its factor. */
 export function productToItem(
-  product: { id: string; name: string; price: Piasters; qtyDecimals?: number },
+  product: {
+    id: string;
+    name: string;
+    price: Piasters;
+    qtyDecimals?: number;
+    priceWholesale?: Piasters | null;
+    priceCraftsman?: Piasters | null;
+    priceContractor?: Piasters | null;
+  },
   unit?: { id: string; factor: Milli; price: Piasters | null } | null,
   qtyMilli: Milli = 1000,
+  list: PriceList = 'retail',
 ): CartItem {
-  const price = unit ? (unit.price ?? mulDivRound(product.price, unit.factor, 1000)) : product.price;
+  const price = priceFor(product, unit ?? null, list);
   return {
     productId: product.id,
     productUnitId: unit?.id ?? null,

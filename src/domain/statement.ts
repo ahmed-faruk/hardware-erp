@@ -7,6 +7,9 @@ export interface LedgerRow {
   /** + the party owes us (customer) / - we owe the party */
   amount: Piasters;
   docNumber: string;
+  /** the document this row belongs to; a payment's `allocations` name the invoices (by this id) it settles */
+  docId?: string;
+  allocations?: { docId: string; amount: Piasters }[];
 }
 
 export interface Aging {
@@ -44,13 +47,26 @@ export function buildStatement(
     .filter((r) => cairoDate(r.occurredAt) >= period.from)
     .map((r) => ({ ...r, balance: (running += r.amount) }));
 
-  // settle the oldest debt first with everything paid so far
-  let paid = -upTo.filter((r) => r.amount < 0).reduce((a, r) => a + r.amount, 0);
+  // explicit allocations settle the named invoices first; whatever was paid beyond that settles the oldest debt first
+  const debits = upTo.filter((x) => x.amount > 0);
+  const left = new Map(debits.map((r) => [r.id, r.amount]));
+  const byDoc = new Map(debits.filter((r) => r.docId).map((r) => [r.docId as string, r]));
+  let explicit = 0;
+  for (const pay of upTo.filter((x) => x.amount < 0))
+    for (const a of pay.allocations ?? []) {
+      const target = byDoc.get(a.docId);
+      if (!target) continue;
+      const take = Math.min(a.amount, left.get(target.id) ?? 0);
+      left.set(target.id, (left.get(target.id) ?? 0) - take);
+      explicit += take;
+    }
+  let paid = -upTo.filter((r) => r.amount < 0).reduce((a, r) => a + r.amount, 0) - explicit;
   const aging: Aging = { d0to30: 0, d31to60: 0, d61to90: 0, d90plus: 0 };
-  for (const r of upTo.filter((x) => x.amount > 0)) {
-    const used = Math.min(paid, r.amount);
+  for (const r of debits) {
+    const remaining = left.get(r.id) ?? 0;
+    const used = Math.min(Math.max(paid, 0), remaining);
     paid -= used;
-    const open = r.amount - used;
+    const open = remaining - used;
     if (open === 0) continue;
     const days = cairoDaysBetween(r.occurredAt, now);
     const key = days <= 30 ? 'd0to30' : days <= 60 ? 'd31to60' : days <= 90 ? 'd61to90' : 'd90plus';

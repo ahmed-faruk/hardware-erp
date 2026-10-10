@@ -54,10 +54,14 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   const [baseUnitName, setBaseUnitName] = useState(product?.baseUnitName ?? strings.common.pieces);
   const [decimals, setDecimals] = useState(product?.qtyDecimals ?? 0);
   const [price, setPrice] = useState<number | null>(product?.price ?? 0);
+  const [wholesale, setWholesale] = useState<number | null>(product?.priceWholesale ?? null);
+  const [craftsman, setCraftsman] = useState<number | null>(product?.priceCraftsman ?? null);
+  const [contractor, setContractor] = useState<number | null>(product?.priceContractor ?? null);
   const [cost, setCost] = useState<number | null>(product?.unitCost ?? 0);
   const [reorder, setReorder] = useState<number | null>(product?.reorderLevel ?? 0);
   const [supplierId, setSupplierId] = useState(product?.defaultSupplierId ?? '');
   const [active, setActive] = useState(product?.active ?? true);
+  const [plu, setPlu] = useState((product?.extraFields as { plu?: string | null } | null)?.plu ?? '');
   const [icon, setIcon] = useState<string | null>(
     (product?.extraFields as { icon?: string } | null)?.icon ?? null,
   );
@@ -95,9 +99,16 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
       reorderLevel: reorder ?? 0,
       defaultSupplierId: supplierId || null,
       active,
-      extraFields: { icon },
+      extraFields: { icon, plu: /^\d{5}$/.test(plu) ? plu : null },
     };
-    if (isManager) Object.assign(fields, { price: price ?? 0, unitCost: cost ?? 0 });
+    if (isManager)
+      Object.assign(fields, {
+        price: price ?? 0,
+        unitCost: cost ?? 0,
+        priceWholesale: wholesale,
+        priceCraftsman: craftsman,
+        priceContractor: contractor,
+      });
     void saver.run(async () => {
       const r = await saveProduct(context, {
         id: product?.id,
@@ -169,6 +180,38 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
             required
           />
         )}
+        <FormField label={strings.products.plu}>
+          {(id) => (
+            <input
+              id={id}
+              className="control"
+              dir="ltr"
+              inputMode="numeric"
+              maxLength={5}
+              value={plu}
+              onChange={(e) => setPlu(e.target.value.replace(/\D/g, ''))}
+              data-testid="product-plu"
+            />
+          )}
+        </FormField>
+        {isManager &&
+          (
+            [
+              [strings.products.wholesale, wholesale, setWholesale],
+              [strings.products.craftsman, craftsman, setCraftsman],
+              [strings.products.contractor, contractor, setContractor],
+            ] as const
+          ).map(([label, value, set]) => (
+            <NumberField
+              key={label}
+              label={`${strings.products.priceLists}: ${label}`}
+              suffix={strings.common.egp}
+              value={value}
+              onChange={set}
+              parse={toPiasters}
+              format={formatMoney}
+            />
+          ))}
         {isManager && (
           <NumberField
             label={strings.products.cost}

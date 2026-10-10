@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
+import { validateAllocations } from '../allocations';
 import { drawerBalance } from '../cash';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
@@ -412,6 +413,8 @@ const receiptInput = z.object({
   reference: z.string().max(60).nullable().default(null),
   shiftId: uuid.nullable().default(null),
   cashAccountId: uuid.nullable().default(null),
+  /** the credit invoices this collection settles (FIN-06); the rest stays on account */
+  allocations: z.array(z.object({ invoice_id: uuid, amount: z.number().int().positive() })).default([]),
 });
 
 /** FIN-06 / CUS-03: a customer pays on account. Cash goes into the open drawer; other methods only reduce the debt. */
@@ -428,6 +431,8 @@ export async function postCustomerReceipt(
   const { db } = ctx;
   const customer = await db.customers.get(input.customerId);
   if (!customer || customer.deletedAt) return err('CUSTOMER_NOT_FOUND', 'عميل غير موجود');
+  if (!(await validateAllocations(db, 'customer', customer.id, input.amount, input.allocations)))
+    return err('E_VALIDATION', 'تخصيص غير صحيح');
   const id = uuidv7();
   const now = nowIso();
   const partyLedger: PartyLedgerRow = {
@@ -484,6 +489,7 @@ export async function postCustomerReceipt(
         amount: input.amount,
         method: input.method,
         reference: input.reference,
+        allocations: input.allocations.length ? input.allocations : null,
       };
       const audit: AuditRow = {
         ...newCommon(ctx),

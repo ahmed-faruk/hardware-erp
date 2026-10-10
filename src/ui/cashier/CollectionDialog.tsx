@@ -3,10 +3,13 @@ import { Banknote, CreditCard, Smartphone } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { openCreditInvoices } from '@/db/allocations';
+import { allocateInOrder } from '@/domain/allocations';
 import { postCustomerReceipt } from '@/db/commands/returns';
 import { formatMoney, toPiasters } from '@/domain/money';
 
 import { ActionButton } from '../components/ActionButton';
+import { InvoiceAllocations } from '../components/InvoiceAllocations';
 import { BigAlert } from '../components/BigAlert';
 import { Dialog } from '../components/Dialog';
 import { play } from '../sound';
@@ -98,6 +101,11 @@ function Body({
   const [reference, setReference] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checked, setChecked] = useState<string[]>([]);
+  const openInvoices =
+    useLiveQuery(() => openCreditInvoices(db, 'customer', customerId), [db, customerId]) ?? [];
+  const allocations = amount ? allocateInOrder(amount, checked, openInvoices) : [];
+  const allocatedBy = new Map(allocations.map((a) => [a.invoice_id, a.amount]));
   const customer = useLiveQuery(
     async () => (customerId ? await db.customers.get(customerId) : undefined),
     [db, customerId],
@@ -117,6 +125,7 @@ function Body({
       reference: method === 'cash' ? null : reference || null,
       shiftId,
       cashAccountId: method === 'cash' ? cashAccountId : null,
+      allocations,
     });
     setBusy(false);
     if (r.ok) {
@@ -143,6 +152,13 @@ function Body({
               <strong data-testid="collect-amount">{amount ? digits(formatMoney(amount)) : '—'}</strong>
             </span>
           </div>
+          <InvoiceAllocations
+            open={openInvoices}
+            checked={checked}
+            allocated={allocatedBy}
+            digits={digits}
+            onToggle={(id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))}
+          />
           <ActionButton
             big
             variant="ghost"

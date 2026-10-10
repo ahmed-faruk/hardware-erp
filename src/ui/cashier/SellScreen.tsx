@@ -25,7 +25,7 @@ import {
   type Cart,
 } from '@/domain/cart';
 import { localizeDigits } from '@/domain/digits';
-import { formatMoney, toMilli, toPiasters } from '@/domain/money';
+import { formatMoney, mulDivRound, toMilli, toPiasters } from '@/domain/money';
 import { discountNeedsApproval, priceNeedsApproval, DEFAULT_SETTINGS } from '@/domain/settings';
 import { speakChange, speakTotal } from '@/domain/speak';
 import type { Discount } from '@/domain/totals';
@@ -38,6 +38,7 @@ import { Skeleton } from '../components/Skeleton';
 import { play, setSoundEnabled } from '../sound';
 import { strings } from '../strings.ar';
 
+import { customerPriceList, repriceForCustomer } from '@/db/pricing';
 import { runBackup } from '@/app/backup-file';
 import { recordAudit } from '@/db/commands/audit';
 import { useApproval } from './ApprovalDialog';
@@ -169,22 +170,43 @@ export function SellScreen() {
     setTimeout(() => setNotice(null), 3000);
   };
 
-  const add = useCallback((product: Product, unit: ProductUnit | null): void => {
-    setCart((c) =>
-      addItem(
-        c,
-        productToItem(product, unit ? { id: unit.id, factor: unit.factor, price: unit.price } : null),
-      ),
-    );
-    play('ok');
-  }, []);
+  const list = useLiveQuery(() => customerPriceList(db, cart.customerId), [db, cart.customerId]) ?? 'retail';
+  const add = useCallback(
+    (product: Product, unit: ProductUnit | null, qtyMilli = 1000): void => {
+      setCart((c) =>
+        addItem(
+          c,
+          productToItem(
+            product,
+            unit ? { id: unit.id, factor: unit.factor, price: unit.price } : null,
+            qtyMilli,
+            list,
+          ),
+        ),
+      );
+      play('ok');
+      // INV-11 `warn`: tell the cashier when the shelf count says the product is gone, but let the sale go on
+      if (settings.stockNegativePolicy === 'warn' && product.type === 'stock' && warehouse) {
+        const inCart = cart.lines
+          .filter((l) => l.productId === product.id)
+          .reduce((a, l) => a + mulDivRound(l.qtyMilli, l.unitFactorMilli, 1000), 0);
+        void db.stockBalances.get([product.id, warehouse.id]).then((b) => {
+          if ((b?.qty ?? 0) - inCart - (unit?.factor ?? 1000) < 0) {
+            play('error');
+            flash(strings.sell.negativeWarn);
+          }
+        });
+      }
+    },
+    [db, settings.stockNegativePolicy, warehouse, cart.lines, list],
+  );
 
   const scan = useCallback(
     (code: string): void => {
       if (returnOpen) return setScannedReceipt(code);
       if (step !== 'items' || !shift) return;
       void findByBarcode(db, code).then((found) => {
-        if (found) add(found.product, found.unit);
+        if (found) add(found.product, found.unit, found.qtyMilli);
         else {
           play('error');
           flash(strings.sell.scanUnknown);
@@ -479,7 +501,10 @@ export function SellScreen() {
           ask={ask}
           pickerOpen={pickerOpen}
           setPickerOpen={setPickerOpen}
-          onCustomer={(id) => setCart((c) => setCustomer(c, id))}
+          onCustomer={(id) => {
+            setCart((c) => setCustomer(c, id));
+            void repriceForCustomer(db, setCustomer(cart, id), id).then(setCart);
+          }}
           onBack={() => setStep('items')}
           onPaid={onPaid}
         />

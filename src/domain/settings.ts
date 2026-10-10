@@ -17,6 +17,12 @@ export interface Settings {
   stockApprovalAbove: number;
   /** a drawer difference above this (piasters, either way) needs the manager at shift close */
   shiftVarianceAbove: number;
+  /** INV-11: selling below zero stock: allowed, allowed with a warning, or blocked */
+  stockNegativePolicy: 'allow' | 'warn' | 'block';
+  /** POS-04: scale labels (13 digits) carry the product code and the weight or the price */
+  scaleEnabled: boolean;
+  scalePrefix: string;
+  scaleMode: 'weight' | 'price';
 }
 
 export const SETTING_KEYS = {
@@ -29,6 +35,10 @@ export const SETTING_KEYS = {
   returnPeriodDays: 'return.periodDays',
   stockApprovalAbove: 'stock.approvalAbove',
   shiftVarianceAbove: 'shift.varianceAbove',
+  stockNegativePolicy: 'stock.negativePolicy',
+  scaleEnabled: 'scale.enabled',
+  scalePrefix: 'scale.prefix',
+  scaleMode: 'scale.mode',
 } as const satisfies Record<keyof Settings, string>;
 
 /** Safe defaults: the cashier may not discount or change prices until the manager allows it. */
@@ -42,6 +52,10 @@ export const DEFAULT_SETTINGS: Settings = {
   returnPeriodDays: 30,
   stockApprovalAbove: 50000,
   shiftVarianceAbove: 2000,
+  stockNegativePolicy: 'allow',
+  scaleEnabled: false,
+  scalePrefix: '2',
+  scaleMode: 'weight',
 };
 
 export function parseSettings(rows: { key: string; value: unknown }[]): Settings {
@@ -56,6 +70,7 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
   };
   const limit = byKey.get(SETTING_KEYS.cashierDiscountLimitBp);
   const varianceLimit = byKey.get(SETTING_KEYS.shiftVarianceAbove);
+  const negative = byKey.get(SETTING_KEYS.stockNegativePolicy);
   const stockLimit = byKey.get(SETTING_KEYS.stockApprovalAbove);
   const days = byKey.get(SETTING_KEYS.returnPeriodDays);
   return {
@@ -80,6 +95,16 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
       typeof varianceLimit === 'number' && Number.isInteger(varianceLimit) && varianceLimit >= 0
         ? varianceLimit
         : DEFAULT_SETTINGS.shiftVarianceAbove,
+    stockNegativePolicy:
+      negative === 'allow' || negative === 'warn' || negative === 'block'
+        ? negative
+        : DEFAULT_SETTINGS.stockNegativePolicy,
+    scaleEnabled: bool('scaleEnabled'),
+    scalePrefix: (() => {
+      const v = byKey.get(SETTING_KEYS.scalePrefix);
+      return typeof v === 'string' && /^\d{1,2}$/.test(v) ? v : DEFAULT_SETTINGS.scalePrefix;
+    })(),
+    scaleMode: byKey.get(SETTING_KEYS.scaleMode) === 'price' ? 'price' : 'weight',
   };
 }
 

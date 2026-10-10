@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useServices, useSession } from '@/app/session';
 import { saveCustomer, saveSupplier } from '@/db/commands/save-master';
 import type { Customer, Supplier } from '@/db/types';
+import { PRICE_LISTS } from '@/domain/pricing';
 import { formatMoney, toPiasters } from '@/domain/money';
 import { normalizeArabic } from '@/domain/arabic';
 
@@ -139,6 +140,7 @@ function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone:
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [limit, setLimit] = useState<number | null>(customer?.creditLimit ?? 0);
   const [discount, setDiscount] = useState<number | null>(customer?.defaultDiscountBp ?? 0);
+  const [priceList, setPriceList] = useState(customer?.priceList ?? 'retail');
   const [missing, setMissing] = useState(false);
   const saver = useSaver(onDone);
   return (
@@ -160,6 +162,7 @@ function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone:
               notes: notes.trim() || null,
               creditLimit: limit ?? 0,
               defaultDiscountBp: discount ?? 0,
+              priceList,
             },
           }),
         );
@@ -212,6 +215,23 @@ function CustomerForm({ customer, onDone }: { customer: Customer | null; onDone:
         parse={percentBp}
         format={formatMoney}
       />
+      <FormField label={strings.customers.priceList}>
+        {(id) => (
+          <select
+            id={id}
+            className="control"
+            value={priceList}
+            onChange={(e) => setPriceList(e.target.value as typeof priceList)}
+            data-testid="customer-price-list"
+          >
+            {PRICE_LISTS.map((l) => (
+              <option key={l} value={l}>
+                {strings.customers.priceLists[l]}
+              </option>
+            ))}
+          </select>
+        )}
+      </FormField>
       <FormField label={strings.customers.notes}>
         {(id) => (
           <textarea id={id} className="control" value={notes} onChange={(e) => setNotes(e.target.value)} />
