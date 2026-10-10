@@ -38,6 +38,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [footer, setFooter] = useState(initial.footer);
   const [returnDays, setReturnDays] = useState(String(initial.returnPeriodDays));
   const [stockLimit, setStockLimit] = useState<number | null>(initial.stockApprovalAbove);
+  const [negPolicy, setNegPolicy] = useState(initial.stockNegativePolicy);
   const [varianceLimit, setVarianceLimit] = useState<number | null>(initial.shiftVarianceAbove);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,6 +53,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
       phone,
       address,
       footer,
+      stockNegativePolicy: negPolicy,
       shiftVarianceAbove: varianceLimit ?? DEFAULT_SETTINGS.shiftVarianceAbove,
       stockApprovalAbove: stockLimit ?? DEFAULT_SETTINGS.stockApprovalAbove,
       returnPeriodDays: /^\d{1,4}$/.test(returnDays) ? Number(returnDays) : DEFAULT_SETTINGS.returnPeriodDays,
@@ -113,6 +115,21 @@ function SettingsForm({ initial }: { initial: Settings }) {
         </div>
         <div className={styles.section}>
           <h2>{strings.settings.stockRules}</h2>
+          <FormField label={strings.settings.negativePolicy}>
+            {(id) => (
+              <select
+                id={id}
+                className="control"
+                value={negPolicy}
+                onChange={(e) => setNegPolicy(e.target.value as typeof negPolicy)}
+                data-testid="negative-policy"
+              >
+                <option value="allow">{strings.settings.negAllow}</option>
+                <option value="warn">{strings.settings.negWarn}</option>
+                <option value="block">{strings.settings.negBlock}</option>
+              </select>
+            )}
+          </FormField>
           <NumberField
             label={strings.settings.stockApprovalAbove}
             value={stockLimit}

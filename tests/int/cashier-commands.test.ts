@@ -404,3 +404,34 @@ describe('clock audit', () => {
     );
   });
 });
+
+describe('negative stock policy (INV-11)', () => {
+  const line = (m: Awaited<ReturnType<typeof setup>>) => [
+    { productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000 },
+  ];
+
+  it('allow (the default) sells below zero and audits it', async () => {
+    const m = await setup();
+    expect((await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] })).ok).toBe(true);
+    expect((await m.ctx.db.auditLog.toArray()).some((a) => a.action === 'negative_stock_sale')).toBe(true);
+  });
+
+  it('block refuses the sale and writes nothing', async () => {
+    const m = await setup();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'stock.negativePolicy', 'block');
+    const r = await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] });
+    expect(r).toMatchObject({ ok: false, code: 'NEGATIVE_STOCK' });
+    expect(await m.ctx.db.salesInvoices.count()).toBe(0);
+  });
+
+  it('block lets a sale through when the stock is there', async () => {
+    const m = await setup();
+    await saveSetting({ ...m.ctx, role: 'manager' }, 'stock.negativePolicy', 'block');
+    await m.ctx.db.stockBalances.put({
+      productId: m.s.products[0]!.id,
+      warehouseId: m.s.warehouseId,
+      qty: 5000,
+    });
+    expect((await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] })).ok).toBe(true);
+  });
+});

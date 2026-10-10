@@ -25,7 +25,7 @@ import {
   type Cart,
 } from '@/domain/cart';
 import { localizeDigits } from '@/domain/digits';
-import { formatMoney, toMilli, toPiasters } from '@/domain/money';
+import { formatMoney, mulDivRound, toMilli, toPiasters } from '@/domain/money';
 import { discountNeedsApproval, priceNeedsApproval, DEFAULT_SETTINGS } from '@/domain/settings';
 import { speakChange, speakTotal } from '@/domain/speak';
 import type { Discount } from '@/domain/totals';
@@ -169,15 +169,30 @@ export function SellScreen() {
     setTimeout(() => setNotice(null), 3000);
   };
 
-  const add = useCallback((product: Product, unit: ProductUnit | null): void => {
-    setCart((c) =>
-      addItem(
-        c,
-        productToItem(product, unit ? { id: unit.id, factor: unit.factor, price: unit.price } : null),
-      ),
-    );
-    play('ok');
-  }, []);
+  const add = useCallback(
+    (product: Product, unit: ProductUnit | null): void => {
+      setCart((c) =>
+        addItem(
+          c,
+          productToItem(product, unit ? { id: unit.id, factor: unit.factor, price: unit.price } : null),
+        ),
+      );
+      play('ok');
+      // INV-11 `warn`: tell the cashier when the shelf count says the product is gone, but let the sale go on
+      if (settings.stockNegativePolicy === 'warn' && product.type === 'stock' && warehouse) {
+        const inCart = cart.lines
+          .filter((l) => l.productId === product.id)
+          .reduce((a, l) => a + mulDivRound(l.qtyMilli, l.unitFactorMilli, 1000), 0);
+        void db.stockBalances.get([product.id, warehouse.id]).then((b) => {
+          if ((b?.qty ?? 0) - inCart - (unit?.factor ?? 1000) < 0) {
+            play('error');
+            flash(strings.sell.negativeWarn);
+          }
+        });
+      }
+    },
+    [db, settings.stockNegativePolicy, warehouse, cart.lines],
+  );
 
   const scan = useCallback(
     (code: string): void => {

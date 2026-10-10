@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, setSetting, sql, type CashierFixture } from './helpers';
 
 /** Every print() (the receipt frame calls it) is recorded instead of opening a dialog: window.__prints holds the printed HTML. */
 async function recordPrints(page: Page): Promise<void> {
@@ -227,4 +227,23 @@ test.describe('cashier journeys', () => {
     await page.keyboard.press('Control+Enter');
     await expect(page.getByTestId('done')).toBeVisible();
   });
+});
+
+test('with the negative-stock policy on block, selling a product with no stock is refused', async ({
+  page,
+}) => {
+  setSetting('stock.negativePolicy', '"block"');
+  try {
+    await start(page);
+    await tap(page, 2); // the shared test catalog has no stock for it
+    await vis(page, 'pay').click();
+    await page.getByTestId('pay-cash').click();
+    await page.keyboard.type('20');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('finish').click();
+    await expect(page.getByText(strings.sell.negativeBlocked)).toBeVisible();
+    await expect(page.getByTestId('done')).toHaveCount(0);
+  } finally {
+    sql(`delete from settings where key = 'stock.negativePolicy'`);
+  }
 });

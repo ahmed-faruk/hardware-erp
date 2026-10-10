@@ -2,6 +2,7 @@ import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { auditRow } from './audit';
+import { negativeAfterSale } from '@/domain/stock';
 import { nextNumber } from '../numbering';
 import { loadSettings } from '../settings';
 import { type Approval, peekApproval, spendApproval } from './approval';
@@ -68,6 +69,27 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
 
   // what needs a manager's PIN: a discount or price the settings do not allow this role, or credit above the customer's limit
   const settings = await loadSettings(db);
+
+  // INV-11: would this sale take a product below zero stock? `block` refuses before anything is written
+  const negatives = negativeAfterSale(
+    await Promise.all(
+      input.lines.flatMap((l, i) =>
+        products[i]!.type === 'stock'
+          ? [
+              db.stockBalances.get([l.productId, input.warehouseId]).then((b) => ({
+                productId: l.productId,
+                before: b?.qty ?? 0,
+                sold: baseQtys[i]!,
+              })),
+            ]
+          : [],
+      ),
+    ),
+  );
+  if (settings.stockNegativePolicy === 'block' && negatives.length > 0) {
+    const first = products.find((p) => p?.id === negatives[0]!.productId);
+    return err('NEGATIVE_STOCK', first?.name ?? '');
+  }
   const needs = new Set<Action>();
   // AUD-02: what the manager's PIN allowed on this sale, written next to it
   const overrides: { action: string; approves: Action; after: unknown }[] = [];
@@ -269,6 +291,11 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       await db.partyLedger.bulkAdd(partyLedger);
       await db.cashMovements.bulkAdd(cashMovements);
       await db.auditLog.add(audit);
+      if (negatives.length > 0) {
+        const extra = auditRow(ctx, 'negative_stock_sale', 'sales_invoices', invoiceId, { lines: negatives });
+        await db.auditLog.add(extra);
+        await enqueue(db, 'auditLog', extra, ctx.workerId);
+      }
       for (const o of overrides) {
         const extra = auditRow(
           ctx,
