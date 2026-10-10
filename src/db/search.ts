@@ -6,6 +6,9 @@ import type { Product } from './types';
 /** Candidates kept after intersecting the words; keeps a one-letter query fast on 20,000 products. */
 const MAX_CANDIDATES = 500;
 
+/** One collator for every sort: `localeCompare` builds a new one per call and is several times slower. */
+const collator = new Intl.Collator('ar');
+
 const live = (p: Product | undefined): p is Product => !!p && !p.deletedAt;
 
 /** Index words of one product: name, sku and every active barcode. */
@@ -87,17 +90,25 @@ export async function searchProducts(
 ): Promise<Product[]> {
   const words = tokenize(text);
   if (words.length === 0) return [];
-  let candidates: string[] | null = null;
+  // read every word's matches, then start from the most selective one: "دهان" may list 20,000 products, "12345" only one
+  const lists: string[][] = [];
   for (const word of words) {
     const hit = new Set<string>();
     for (const row of await db.searchIndex.where('token').startsWith(word).toArray())
       for (const id of row.productIds) hit.add(id);
-    candidates = candidates === null ? [...hit] : candidates.filter((id) => hit.has(id));
+    if (hit.size === 0) return [];
+    lists.push([...hit]);
+  }
+  lists.sort((a, b) => a.length - b.length);
+  let candidates: string[] = lists[0] as string[];
+  for (const other of lists.slice(1)) {
+    const set = new Set(other);
+    candidates = candidates.filter((id) => set.has(id));
     if (candidates.length === 0) return [];
   }
-  const ids = (candidates ?? []).slice(0, MAX_CANDIDATES);
+  const ids = candidates.slice(0, MAX_CANDIDATES);
   const found = (await db.products.bulkGet(ids))
     .filter(live)
     .filter((p) => options.includeInactive || p.active);
-  return found.sort((a, b) => a.name.localeCompare(b.name, 'ar')).slice(0, options.limit ?? 50);
+  return found.sort((a, b) => collator.compare(a.name, b.name)).slice(0, options.limit ?? 50);
 }

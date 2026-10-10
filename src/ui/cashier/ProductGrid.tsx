@@ -18,6 +18,8 @@ import styles from './ProductGrid.module.css';
 
 const QUICK = 'quick';
 const LIMIT = 60;
+/** A search narrows fast; drawing 60 tiles for the first letter costs more than it helps. */
+const SEARCH_LIMIT = 24;
 
 export interface GridProps {
   searchText: string;
@@ -26,7 +28,7 @@ export interface GridProps {
 }
 
 async function load(db: HanafyDB, view: string, text: string, quickIds: string[]): Promise<Product[]> {
-  if (text.trim()) return searchProducts(db, text, { limit: LIMIT });
+  if (text.trim()) return searchProducts(db, text, { limit: SEARCH_LIMIT });
   if (view === QUICK)
     return (
       (await db.products.bulkGet(quickIds)).filter((p) => p && p.active && !p.deletedAt) as Product[]
