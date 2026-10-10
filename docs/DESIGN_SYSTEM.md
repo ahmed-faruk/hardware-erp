@@ -63,6 +63,14 @@ and never reused for anything else; one accent per screen region.
 - Sounds (`public/sounds/`, preloaded): `ok.mp3` item added, `error.mp3` rejected (different pitch), `paid.mp3` sale done,
   plus ~60 recorded Egyptian-Arabic clips to speak any amount (see skill `pos-ui-low-literacy` §5). Setting: sounds on/off, speech on/off.
 
+### Icon catalog for categories and products
+The manager picks an icon for a category and (optionally) for a single product; tiles without a photo show it on the category color.
+`src/ui/icons/catalog.ts` holds 85 icons: 77 from Lucide (already a dependency, ISC) plus 8 hand-drawn in the same style for what
+Lucide lacks (screwdriver, saw, pliers, pipe, tape measure, nails, socket, light switch, in `icons/custom.tsx`). All are bundled in the
+app, so they work offline with no CDN. Arabic names and search words live in `strings.ar.ts` (`iconItems`). The stored value is the
+key string: `categories.icon`, and `products.extra_fields.icon` for a single product. Unknown or empty key → the generic box.
+Photos are not built yet (open item, decided with the cashier screens).
+
 ## 6. Components (`src/ui/components`) and their states
 Every component defines: default, hover (only with `(hover: hover)`), focus-visible (3 px `--primary` ring, 2 px offset),
 active/pressed (scale .97), disabled (40% opacity + `aria-disabled`), loading (spinner replaces icon, keeps size).

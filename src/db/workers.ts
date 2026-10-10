@@ -80,5 +80,5 @@ export async function checkPin(
       await enqueue(db, 'auditLog', audit, workerId);
     }
   });
-  return err('PIN_WRONG', 'الرقم السري غلط');
+  return locked ? err('PIN_LOCKED', 'الرقم السري مقفول مؤقتًا') : err('PIN_WRONG', 'الرقم السري غلط');
 }

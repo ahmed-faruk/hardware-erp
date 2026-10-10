@@ -66,7 +66,7 @@ describe('worker PIN', () => {
     expect(await checkPin(ctx, ctx.workerId, '123456')).toMatchObject({ ok: true });
     for (let i = 0; i < 4; i++)
       expect(await checkPin(ctx, ctx.workerId, '000000')).toMatchObject({ code: 'PIN_WRONG' });
-    expect(await checkPin(ctx, ctx.workerId, '000000', 1_000)).toMatchObject({ code: 'PIN_WRONG' });
+    expect(await checkPin(ctx, ctx.workerId, '000000', 1_000)).toMatchObject({ code: 'PIN_LOCKED' });
     expect(await checkPin(ctx, ctx.workerId, '123456', 2_000)).toMatchObject({ code: 'PIN_LOCKED' });
     expect((await ctx.db.auditLog.toArray()).filter((a) => a.action === 'pin_locked')).toHaveLength(1);
     expect(await checkPin(ctx, ctx.workerId, '123456', Date.now() + 6 * 60_000)).toMatchObject({ ok: true });
