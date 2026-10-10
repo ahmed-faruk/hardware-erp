@@ -182,7 +182,19 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
         p_from: `${k}-01`,
         p_to: `${k}-${String(last).padStart(2, '0')}`,
       });
-      const net = error ? NaN : Number((rep as { total: { net: number } }).total.net);
+      // invoices made in the new system since go-live are not in the OSPOS export: take them out before comparing
+      const cairoMonth = (iso: string): string =>
+        new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(iso)).slice(0, 7);
+      let fresh = 0;
+      for (const r of await fetchAll(db, 'sales_invoices', 'issued_at,total,status', cid, {
+        is_legacy: false,
+      }))
+        if (r.status === 'posted' && cairoMonth(String(r.issued_at)) === k) fresh += Number(r.total);
+      for (const r of await fetchAll(db, 'sales_returns', 'issued_at,total,status', cid, {
+        is_legacy: false,
+      }))
+        if (r.status === 'posted' && cairoMonth(String(r.issued_at)) === k) fresh -= Number(r.total);
+      const net = error ? NaN : Number((rep as { total: { net: number } }).total.net) - fresh;
       lines.push(`${k}: ${error ? error.message : egp(net)} EGP`);
       if (net !== result.stats.salesTotalByMonth[k]) bad.push(k);
     }
