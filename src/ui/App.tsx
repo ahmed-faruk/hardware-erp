@@ -1,4 +1,14 @@
-import { Package, Settings, ShoppingCart, Tags, Truck, UserCog, Users } from 'lucide-react';
+import {
+  ClipboardList,
+  Package,
+  PackagePlus,
+  Settings,
+  ShoppingCart,
+  Tags,
+  Truck,
+  UserCog,
+  Users,
+} from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { activateDevice, loadIdentity, signInDevice } from '@/app/device-setup';
@@ -25,6 +35,8 @@ import { LoginScreen } from './screens/LoginScreen';
 import { CustomersScreen, SuppliersScreen } from './screens/PartyScreens';
 import { ProductFormScreen } from './screens/ProductFormScreen';
 import { ProductsScreen } from './screens/ProductsScreen';
+import { PurchasesScreen } from './screens/PurchasesScreen';
+import { StockScreen } from './screens/StockScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { SetupScreen } from './screens/SetupScreen';
 import { WorkersScreen } from './screens/WorkersScreen';
@@ -99,6 +111,8 @@ const NAV: (NavItem & { action: Action })[] = [
   { path: 'sell', label: strings.nav.sell, icon: ShoppingCart, action: 'sell' },
   { path: 'products', label: strings.nav.products, icon: Package, action: 'editProductData' },
   { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'editProductData' },
+  { path: 'purchases', label: strings.nav.purchases, icon: PackagePlus, action: 'receivePurchase' },
+  { path: 'stock', label: strings.nav.stock, icon: ClipboardList, action: 'stockAdjustment' },
   { path: 'customers', label: strings.nav.customers, icon: Users, action: 'settings' },
   { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'settings' },
   { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'manageUsers' },
@@ -150,6 +164,8 @@ function Shell() {
     else if (section === 'products')
       screen = route[1] ? <ProductFormScreen id={route[1]} /> : <ProductsScreen />;
     else if (section === 'categories') screen = <CategoriesScreen />;
+    else if (section === 'purchases') screen = <PurchasesScreen />;
+    else if (section === 'stock') screen = <StockScreen />;
     else if (section === 'customers') screen = <CustomersScreen />;
     else if (section === 'suppliers') screen = <SuppliersScreen />;
     else if (section === 'workers') screen = <WorkersScreen />;

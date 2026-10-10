@@ -1,0 +1,232 @@
+import 'fake-indexeddb/auto';
+
+import { describe, expect, it } from 'vitest';
+
+import { approveWithPin } from '@/db/commands/approval';
+import { newCommon, type DeviceContext } from '@/db/commands/context';
+import {
+  postPurchase,
+  postPurchaseReturn,
+  postStockAdjustment,
+  postSupplierPayment,
+} from '@/db/commands/purchasing';
+import { uuidv7 } from '@/db/ids';
+import type { Supplier, Worker } from '@/db/types';
+import { hashPin } from '@/db/workers';
+
+import { newDevice, seedCatalog } from './helpers';
+
+const PIN = '482915';
+
+async function setup(role: DeviceContext['role'] = 'manager') {
+  const seedCtx = newDevice('K1', 'manager');
+  const s = await seedCatalog(seedCtx);
+  // seeding needs a manager (opens a shift); the test then acts with the requested role on the same database
+  const ctx: DeviceContext = { ...seedCtx, role };
+  const warehouse = {
+    ...newCommon(ctx),
+    branchId: null,
+    name: 'main',
+    kind: 'main' as const,
+    legacyLocationId: null,
+  };
+  await ctx.db.warehouses.put(warehouse);
+  const supplier: Supplier = {
+    ...newCommon(ctx),
+    name: 'مورد',
+    contactName: null,
+    phone: null,
+    address: null,
+    notes: null,
+    isExpenseSupplier: false,
+    active: true,
+    legacyPersonId: null,
+  };
+  await ctx.db.suppliers.put(supplier);
+  const safe = uuidv7();
+  const { pinHash, pinSalt } = await hashPin(PIN);
+  const manager: Worker = {
+    ...newCommon(ctx),
+    name: 'م',
+    role: 'manager',
+    pinHash,
+    pinSalt,
+    photoPath: null,
+    active: true,
+    legacyEmployeeId: null,
+  };
+  await ctx.db.workers.put(manager);
+  const p1 = s.products[0]!.id;
+  const buy = (
+    qtyMilli: number,
+    unitCost: number,
+    pays: { method: 'cash' | 'credit'; amount: number }[],
+    extra: Record<string, unknown> = {},
+  ) =>
+    postPurchase(ctx, {
+      supplierId: supplier.id,
+      warehouseId: warehouse.id,
+      lines: [{ productId: p1, qtyMilli, unitCost }],
+      payments: pays.map((p) => ({ ...p, cashAccountId: p.method === 'cash' ? safe : null })),
+      ...extra,
+    });
+  const stock = async () =>
+    (await ctx.db.stockBalances.toArray()).filter((b) => b.productId === p1).reduce((a, b) => a + b.qty, 0);
+  const owed = async () => (await ctx.db.partyBalances.get(['supplier', supplier.id]))?.amount ?? 0;
+  return { ctx, s, warehouse, supplier, safe, manager, p1, buy, stock, owed };
+}
+
+describe('purchase', () => {
+  it('stock up, supplier owed the credit part, cash out of the safe, outbox bundle queued', async () => {
+    const t = await setup();
+    const before = await t.stock();
+    const r = await t.buy(10000, 500, [
+      { method: 'cash', amount: 2000 },
+      { method: 'credit', amount: 3000 },
+    ]);
+    expect(r).toMatchObject({ ok: true, total: 5000 });
+    expect((await t.stock()) - before).toBe(10000);
+    expect(await t.owed()).toBe(-3000);
+    expect(
+      (await t.ctx.db.cashMovements.toArray())
+        .filter((m) => m.docType === 'purchase_invoice')
+        .map((m) => m.amount),
+    ).toEqual([-2000]);
+    expect((await t.ctx.db.outbox.toArray()).filter((o) => o.table === 'purchaseInvoices')).toHaveLength(1);
+  });
+
+  it('payments must add up to the total', async () => {
+    const t = await setup();
+    expect(await t.buy(1000, 500, [{ method: 'cash', amount: 400 }])).toMatchObject({
+      ok: false,
+      code: 'PAYMENT_MISMATCH',
+    });
+  });
+
+  it('a cashier cannot receive goods; a storekeeper cannot change a sale price', async () => {
+    const c = await setup('cashier');
+    expect(await c.buy(1000, 500, [{ method: 'credit', amount: 500 }])).toMatchObject({
+      ok: false,
+      code: 'E_FORBIDDEN',
+    });
+    const k = await setup('storekeeper');
+    expect(
+      await k.buy(1000, 500, [{ method: 'credit', amount: 500 }], {
+        lines: [{ productId: k.p1, qtyMilli: 1000, unitCost: 500, newSalePrice: 900 }],
+      }),
+    ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect((await k.buy(1000, 500, [{ method: 'credit', amount: 500 }])).ok).toBe(true);
+  });
+
+  it('a manager can set the sale price while receiving', async () => {
+    const t = await setup();
+    const r = await t.buy(1000, 500, [{ method: 'credit', amount: 500 }], {
+      lines: [{ productId: t.p1, qtyMilli: 1000, unitCost: 500, newSalePrice: 1300 }],
+    });
+    expect(r.ok).toBe(true);
+    expect((await t.ctx.db.products.get(t.p1))?.price).toBe(1300);
+  });
+
+  it('a pack of 12 bought as 2 packs adds 24 pieces at the per-piece cost', async () => {
+    const t = await setup();
+    const before = await t.stock();
+    await postPurchase(t.ctx, {
+      supplierId: t.supplier.id,
+      warehouseId: t.warehouse.id,
+      lines: [{ productId: t.p1, qtyMilli: 2000, unitFactorMilli: 12000, unitCost: 6000 }],
+      payments: [{ method: 'credit', amount: 12000 }],
+    });
+    expect((await t.stock()) - before).toBe(24000);
+    const m = (await t.ctx.db.stockMovements.toArray()).find((x) => x.docType === 'purchase_invoice')!;
+    expect(m.unitCost).toBe(500);
+  });
+});
+
+describe('purchase return', () => {
+  it('goes out at the invoice cost, lowers what we owe, and cannot exceed bought − returned', async () => {
+    const t = await setup();
+    const bought = await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }]);
+    if (!bought.ok) throw new Error(bought.code);
+    const line = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(bought.id).first())!;
+    const ret = (qty: number) =>
+      postPurchaseReturn(t.ctx, {
+        supplierId: t.supplier.id,
+        originalInvoiceId: bought.id,
+        warehouseId: t.warehouse.id,
+        lines: [{ originalLineId: line.id, qtyMilli: qty }],
+      });
+    const r = await ret(4000);
+    expect(r).toMatchObject({ ok: true, total: 2000 });
+    expect(await t.owed()).toBe(-3000);
+    expect(
+      (await t.ctx.db.stockMovements.toArray()).find((m) => m.docType === 'purchase_return')?.unitCost,
+    ).toBe(500);
+    expect(await ret(7000)).toMatchObject({ ok: false, code: 'RETURN_EXCEEDS_SOLD' });
+  });
+
+  it('without an invoice it is for the manager only', async () => {
+    const k = await setup('storekeeper');
+    const r = await postPurchaseReturn(k.ctx, {
+      supplierId: k.supplier.id,
+      originalInvoiceId: null,
+      warehouseId: k.warehouse.id,
+      lines: [{ originalLineId: null, productId: k.p1, qtyMilli: 1000, netAmount: 500 }],
+    });
+    expect(r).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+  });
+});
+
+describe('supplier payment', () => {
+  it('manager only; lowers what we owe and takes the cash from the chosen account', async () => {
+    const t = await setup();
+    await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }]);
+    const r = await postSupplierPayment(t.ctx, {
+      supplierId: t.supplier.id,
+      amount: 2000,
+      method: 'cash',
+      cashAccountId: t.safe,
+    });
+    expect(r).toMatchObject({ ok: true, balanceAfter: -3000 });
+    const k = await setup('storekeeper');
+    expect(
+      await postSupplierPayment(k.ctx, {
+        supplierId: k.supplier.id,
+        amount: 100,
+        method: 'cash',
+        cashAccountId: k.safe,
+      }),
+    ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+  });
+});
+
+describe('stock adjustment', () => {
+  it('a storekeeper adjusts a small value alone, a big one needs the manager PIN', async () => {
+    const t = await setup('storekeeper');
+    // seeded cost is 600 per piece: 1 piece = 6.00, 200 pieces = 1200.00 (limit 500.00)
+    const adj = (qty: number, tokens: string[] = []) =>
+      postStockAdjustment(t.ctx, {
+        warehouseId: t.warehouse.id,
+        reason: 'count',
+        lines: [{ productId: t.p1, qtyDeltaMilli: qty }],
+        approvalTokens: tokens,
+      });
+    expect((await adj(1000)).ok).toBe(true);
+    expect(await adj(200000)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
+    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'stockAdjustment');
+    if (!a.ok) throw new Error(a.code);
+    expect((await adj(200000, [a.value.token])).ok).toBe(true);
+    const row = (await t.ctx.db.stockAdjustments.toArray()).find((x) => x.approvedBy);
+    expect(row?.approvedBy).toBe(t.manager.id);
+  });
+
+  it('lost cannot add stock', async () => {
+    const t = await setup('storekeeper');
+    expect(
+      await postStockAdjustment(t.ctx, {
+        warehouseId: t.warehouse.id,
+        reason: 'lost',
+        lines: [{ productId: t.p1, qtyDeltaMilli: 1000 }],
+      }),
+    ).toMatchObject({ ok: false, code: 'E_VALIDATION' });
+  });
+});

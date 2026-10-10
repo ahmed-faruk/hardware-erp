@@ -152,5 +152,9 @@ export class HanafyDB extends Dexie {
       customers: 'id, phone, name',
       suppliers: 'id, name',
     });
+    // v3: purchase returns point at the purchase line they send back (cap per line, like sales returns)
+    this.version(3).stores({
+      purchaseReturnLines: 'id, returnId, originalLineId',
+    });
   }
 }

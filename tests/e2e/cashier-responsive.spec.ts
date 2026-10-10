@@ -80,6 +80,10 @@ test('the sale and pay screens at every width: no horizontal scroll, tap targets
 
 test('return and collection dialogs fit every width with 56 px targets', async ({ page }, info) => {
   const f = newCashierFixture();
+  // the sale prints its receipt: swallow print() so Firefox does not open a real print dialog
+  await page.addInitScript(() => {
+    if (window !== window.top) window.print = () => undefined;
+  });
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/');
   await page.getByTestId('activation-code').fill(f.code);
@@ -115,11 +119,13 @@ test('return and collection dialogs fit every width with 56 px targets', async (
     problems.push(...(await check(page, `${width}x${height} return`)));
     await page.screenshot({ path: info.outputPath(`return-${width}x${height}.png`) });
     await page.locator('dialog[open] > header button').last().click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
     await page.getByTestId('collect').click();
     await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
     problems.push(...(await check(page, `${width}x${height} collect`)));
     await page.screenshot({ path: info.outputPath(`collect-${width}x${height}.png`) });
     await page.locator('dialog[open] > header button').last().click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
   }
   expect(problems).toEqual([]);
 });
