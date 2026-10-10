@@ -93,7 +93,8 @@ Open with counted float. Close: cashier enters counted cash by denomination BEFO
 | Void, return without invoice, cash adjustment | ✗ | ✗ | ✓ |
 | Receive purchases, stock adjustment, edit product data (no prices) | ✗ | ✓ | ✓ |
 | Customer receipt | ✓ | ✗ | ✓ |
-| Supplier payment, expenses over cashier limit, prices, settings, users | ✗ | ✗ | ✓ |
+| Record an expense from his own drawer, cash to the safe (owner decision: no limit) | ✓ | ✗ | ✓ |
+| Supplier payment, prices, settings, users | ✗ | ✗ | ✓ |
 `can(role, action)` lives in `src/domain/permissions.ts`; UI and server use the same table.
 
 ## 12. Invariants every test suite should assert

@@ -57,7 +57,7 @@ Response:
 `worker_id` (outer field) is the worker who performed the action; the server checks it against `workers`, the device's `max_role` and
 the permission matrix (`role_can`, a SQL copy of `permissions.ts`). A sales invoice is ONE record with its children embedded
 (`lines`, `payments`, `stock_movements`, `party_ledger`, `cash_movements`); the server checks that totals, payments and ledger rows
-agree and that the number starts with the device prefix, then inserts everything atomically. Returns (`sales_returns`: lines, payments and the three ledgers embedded), voids (`voids`: the reversing ledger rows embedded) and customer receipts are bundles in the same way: the server re-computes the refund share of every returned line from the invoice, caps the quantity at sold − already returned, copies `unit_cost` from the original line, and checks that a void's rows are exactly the negation of the invoice's. Tables not yet pushable
+agree and that the number starts with the device prefix, then inserts everything atomically. Returns (`sales_returns`: lines, payments and the three ledgers embedded), voids (`voids`: the reversing ledger rows embedded) and customer receipts are bundles in the same way: the server re-computes the refund share of every returned line from the invoice, caps the quantity at sold − already returned, copies `unit_cost` from the original line, and checks that a void's rows are exactly the negation of the invoice's. A shift is pushed twice (open, then closed): the server updates the open row exactly once on close, recomputes the expected cash from the shift's own movements on its drawer, and refuses a count/variance that does not match or a big difference without a manager's approval and note. Expenses and cash transfers are bundles with their cash movements embedded (a cashier may only use his device's drawer, and only move it to the safe). Tables not yet pushable
 (`sync_tables.push_action` is null) are added with their command.
 Workers: `sync_tables.push_action = manageUsers` (managers only), and a manager login on a device below the manager level is refused.
 `pin_hash` and `pin_salt` reach every device so workers can log in offline (docs/SECURITY.md §2).
@@ -111,8 +111,11 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | `postPurchaseReturn` | supplierId, originalInvoiceId?, warehouseId, lines[{originalLineId, qtyMilli}], refundTo (`credit`\|`cash`), cashAccountId? | `{ ok, id, number, total }`; goes out at the invoice cost, capped at bought − returned; no invoice = manager only |
 | `postSupplierPayment` | supplierId, amount, method, reference?, cashAccountId? | `{ ok, id, number, balanceAfter }` manager only; cash leaves the chosen account |
 | `postStockAdjustment` | warehouseId, reason (`count`\|`damaged`\|`lost`\|`found`\|`other`), lines[{productId, qtyDeltaMilli}], approvalTokens[] | `{ ok, id, number, total }`; above `stock.approvalAbove` a non-manager needs a `stockAdjustment` token; the server re-checks with the real cost |
-| `postExpense` | categoryId, amount, notes | `{ ok, id, number }` |
-| `openShift` / `closeShift` | float / counted breakdown | `{ ok, id, variance? }` |
+| `postExpense` | categoryId, amount, cashAccountId, shiftId? | `{ ok, id, number }`; one cash movement −amount; a cashier only from his own drawer and within what it holds (`DRAWER_SHORT`) |
+| `postCashTransfer` | fromAccountId, toAccountId, amount, shiftId? | `{ ok, id, number }`; two cash rows that cancel out; a cashier only drawer → safe |
+| `saveExpenseCategory` | name, icon?, id?, baseVersion? | manager only |
+| `openShift` | cashAccountId, openingFloat | `{ ok, id, number }` |
+| `previewClose` / `closeShift` | shiftId, counted[{value,count}], note?, approvalToken? | blind close: the cashier counts first, then sees expected / counted / variance; above `shift.varianceAbove` a manager's `cashAdjustment` PIN token and a note are required (`APPROVAL_REQUIRED`, `NOTE_REQUIRED`); the shift row is updated and re-queued |
 | `saveProduct` | fields, `barcodes[]`, `packUnit` (one), `baseVersion` | `{ ok, id, version }` (one transaction: product, units, barcodes, search words) |
 | `saveCategory` / `saveCustomer` / `saveSupplier` | fields + `baseVersion` | `{ ok, id, version }` |
 | `approveWithPin` | managerId, pin, action | single-use token (2 min, one action); the sale spends it and the audit row records `approved_by` |

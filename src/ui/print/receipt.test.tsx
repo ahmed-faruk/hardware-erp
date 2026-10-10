@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { strings } from '../strings.ar';
 
 import { formatMoney } from '@/domain/money';
 import { buildReceipt, type ReceiptInput } from '@/domain/receipt';
 
-import { renderCollectionHtml, renderNoSaleHtml, renderReceiptHtml, renderStatementHtml } from './render';
+import {
+  renderCollectionHtml,
+  renderNoSaleHtml,
+  renderReceiptHtml,
+  renderShiftHtml,
+  renderStatementHtml,
+} from './render';
 
 const base: ReceiptInput = {
   shop: { name: 'مركز حنفي للتلوين', phone: '0100 000 0000', address: 'القاهرة', footer: 'شكرًا لتعاملكم' },
@@ -167,5 +174,45 @@ describe('return, collection and statement paper', () => {
     });
     expect(html).toContain('size: A4');
     expect(html).toContain('K1-INV-000001');
+  });
+});
+
+describe('shift slip', () => {
+  const data = {
+    shopName: 'مركز حنفي',
+    number: 'K1-SHF-000001',
+    workerName: 'عبدالله',
+    openedAt: '2026-10-10T06:00:00.000Z',
+    closedAt: '2026-10-10T20:00:00.000Z',
+    closed: true,
+    note: null,
+    report: {
+      openingFloat: 10000,
+      salesByMethod: { cash: 1500, card: 500 },
+      salesTotal: 2000,
+      returnsTotal: 0,
+      returnsCount: 0,
+      voidsCount: 0,
+      noSaleCount: 1,
+      collectionsByMethod: {},
+      expenses: 500,
+      transfersOut: 0,
+      expected: 11000,
+      counted: 10900,
+      variance: -100,
+    },
+  };
+  it('Z shows expected, counted and the variance; X has no count', () => {
+    const z = renderShiftHtml(data, 'latn', '80');
+    expect(z).toContain(strings.shift.z);
+    expect(z).toContain('-1.00');
+    expect(z).toMatchSnapshot();
+    const x = renderShiftHtml(
+      { ...data, closed: false, closedAt: null, report: { ...data.report, counted: null, variance: null } },
+      'latn',
+      '80',
+    );
+    expect(x).toContain(strings.shift.x);
+    expect(x).not.toContain(strings.shift.counted);
   });
 });

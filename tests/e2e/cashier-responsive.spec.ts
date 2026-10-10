@@ -129,3 +129,37 @@ test('return and collection dialogs fit every width with 56 px targets', async (
   }
   expect(problems).toEqual([]);
 });
+
+test('shift menu and the counting screen fit every width with 56 px targets', async ({ page }, info) => {
+  const f = newCashierFixture();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/');
+  await page.getByTestId('activation-code').fill(f.code);
+  await page.getByTestId('activate').click();
+  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
+  await page.keyboard.type(f.cashierPin);
+  await page.keyboard.press('Enter');
+  await page.getByTestId('open-shift').click();
+  await page.keyboard.type('100');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('sell-search')).toBeVisible();
+
+  const problems: string[] = [];
+  for (const [width, height] of [
+    [320, 568],
+    [390, 844],
+    [1024, 768],
+    [1366, 768],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.getByTestId('shift-menu').click();
+    problems.push(...(await check(page, `${width}x${height} shift menu`)));
+    await page.getByTestId('shift-close').click();
+    await page.getByTestId('denom-10000-plus').click();
+    problems.push(...(await check(page, `${width}x${height} count`)));
+    await page.screenshot({ path: info.outputPath(`count-${width}x${height}.png`) });
+    await page.locator('dialog[open] > header button').last().click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+  }
+  expect(problems).toEqual([]);
+});

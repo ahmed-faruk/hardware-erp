@@ -37,6 +37,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [footer, setFooter] = useState(initial.footer);
   const [returnDays, setReturnDays] = useState(String(initial.returnPeriodDays));
   const [stockLimit, setStockLimit] = useState<number | null>(initial.stockApprovalAbove);
+  const [varianceLimit, setVarianceLimit] = useState<number | null>(initial.shiftVarianceAbove);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -50,6 +51,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
       phone,
       address,
       footer,
+      shiftVarianceAbove: varianceLimit ?? DEFAULT_SETTINGS.shiftVarianceAbove,
       stockApprovalAbove: stockLimit ?? DEFAULT_SETTINGS.stockApprovalAbove,
       returnPeriodDays: /^\d{1,4}$/.test(returnDays) ? Number(returnDays) : DEFAULT_SETTINGS.returnPeriodDays,
     };
@@ -114,6 +116,14 @@ function SettingsForm({ initial }: { initial: Settings }) {
             label={strings.settings.stockApprovalAbove}
             value={stockLimit}
             onChange={setStockLimit}
+            parse={toPiasters}
+            format={formatMoney}
+            required
+          />
+          <NumberField
+            label={strings.settings.shiftVarianceAbove}
+            value={varianceLimit}
+            onChange={setVarianceLimit}
             parse={toPiasters}
             format={formatMoney}
             required

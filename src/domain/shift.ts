@@ -17,3 +17,7 @@ export function shiftVariance(s: {
   const expected = s.openingFloat + s.cashIn - s.cashOut;
   return { expected, variance: s.countedCash - expected };
 }
+
+/** FIN-03: a drawer difference above the limit (either way) needs the manager's PIN and a note. */
+export const requiresVarianceApproval = (variance: Piasters, limit: Piasters): boolean =>
+  Math.abs(variance) > limit;

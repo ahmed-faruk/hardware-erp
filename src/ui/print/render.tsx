@@ -1,11 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import type { ShiftReportData } from '@/db/shift-report';
 import type { PurchaseDocumentData } from '@/db/purchase-document';
 import type { CollectionSlipData, NoSaleSlipData } from '@/db/commands/receipts';
 import type { DigitStyle } from '@/domain/digits';
 import type { ReceiptData } from '@/domain/receipt';
 
 import { CollectionSlip } from './CollectionSlip';
+import { MoneySlip, ShiftSlip } from './ShiftSlip';
 import { PurchaseDocument } from './PurchaseDocument';
 import { a4Css, StatementDocument } from './StatementDocument';
 import { NoSaleSlip } from './NoSaleSlip';
@@ -43,3 +45,16 @@ export const renderStatementHtml = (props: Parameters<typeof StatementDocument>[
 
 export const renderPurchaseHtml = (doc: PurchaseDocumentData, fontFaces = ''): string =>
   `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title></title><style>${a4Css(fontFaces)}</style></head><body>${renderToStaticMarkup(<PurchaseDocument doc={doc} />)}</body></html>`;
+
+export const renderShiftHtml = (
+  data: ShiftReportData,
+  digits: DigitStyle,
+  paper: Paper,
+  fontFaces = '',
+): string => page(renderToStaticMarkup(<ShiftSlip data={data} digits={digits} />), paper, fontFaces);
+
+export const renderMoneySlipHtml = (
+  props: Parameters<typeof MoneySlip>[0],
+  paper: Paper,
+  fontFaces = '',
+): string => page(renderToStaticMarkup(<MoneySlip {...props} />), paper, fontFaces);

@@ -15,6 +15,8 @@ export interface Settings {
   returnPeriodDays: number;
   /** a stock adjustment worth more than this (piasters) needs the manager's PIN */
   stockApprovalAbove: number;
+  /** a drawer difference above this (piasters, either way) needs the manager at shift close */
+  shiftVarianceAbove: number;
 }
 
 export const SETTING_KEYS = {
@@ -26,6 +28,7 @@ export const SETTING_KEYS = {
   footer: 'receipt.footer',
   returnPeriodDays: 'return.periodDays',
   stockApprovalAbove: 'stock.approvalAbove',
+  shiftVarianceAbove: 'shift.varianceAbove',
 } as const satisfies Record<keyof Settings, string>;
 
 /** Safe defaults: the cashier may not discount or change prices until the manager allows it. */
@@ -38,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   footer: '',
   returnPeriodDays: 30,
   stockApprovalAbove: 50000,
+  shiftVarianceAbove: 2000,
 };
 
 export function parseSettings(rows: { key: string; value: unknown }[]): Settings {
@@ -51,6 +55,7 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
     return typeof v === 'string' ? v : (DEFAULT_SETTINGS[name] as string);
   };
   const limit = byKey.get(SETTING_KEYS.cashierDiscountLimitBp);
+  const varianceLimit = byKey.get(SETTING_KEYS.shiftVarianceAbove);
   const stockLimit = byKey.get(SETTING_KEYS.stockApprovalAbove);
   const days = byKey.get(SETTING_KEYS.returnPeriodDays);
   return {
@@ -71,6 +76,10 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
       typeof stockLimit === 'number' && Number.isInteger(stockLimit) && stockLimit >= 0
         ? stockLimit
         : DEFAULT_SETTINGS.stockApprovalAbove,
+    shiftVarianceAbove:
+      typeof varianceLimit === 'number' && Number.isInteger(varianceLimit) && varianceLimit >= 0
+        ? varianceLimit
+        : DEFAULT_SETTINGS.shiftVarianceAbove,
   };
 }
 

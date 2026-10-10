@@ -1,5 +1,6 @@
 import {
   ClipboardList,
+  Wallet,
   Package,
   PackagePlus,
   Settings,
@@ -31,6 +32,7 @@ import { navigate, useRoute } from './router';
 import { SellScreen } from './cashier/SellScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ComingSoonScreen } from './screens/ComingSoonScreen';
+import { ExpensesScreen } from './screens/ExpensesScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { CustomersScreen, SuppliersScreen } from './screens/PartyScreens';
 import { ProductFormScreen } from './screens/ProductFormScreen';
@@ -113,6 +115,7 @@ const NAV: (NavItem & { action: Action })[] = [
   { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'editProductData' },
   { path: 'purchases', label: strings.nav.purchases, icon: PackagePlus, action: 'receivePurchase' },
   { path: 'stock', label: strings.nav.stock, icon: ClipboardList, action: 'stockAdjustment' },
+  { path: 'expenses', label: strings.nav.expenses, icon: Wallet, action: 'settings' },
   { path: 'customers', label: strings.nav.customers, icon: Users, action: 'settings' },
   { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'settings' },
   { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'manageUsers' },
@@ -166,6 +169,7 @@ function Shell() {
     else if (section === 'categories') screen = <CategoriesScreen />;
     else if (section === 'purchases') screen = <PurchasesScreen />;
     else if (section === 'stock') screen = <StockScreen />;
+    else if (section === 'expenses') screen = <ExpensesScreen />;
     else if (section === 'customers') screen = <CustomersScreen />;
     else if (section === 'suppliers') screen = <SuppliersScreen />;
     else if (section === 'workers') screen = <WorkersScreen />;
