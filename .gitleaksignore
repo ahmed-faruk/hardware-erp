@@ -1,0 +1,2 @@
+# false positive: a "mockToken" placeholder in a third-party skill example (not a secret)
+01bfa0dab397a2d6040460a898e856d7d0acee4a:.claude/skills/playwright-best-practices/advanced/authentication-flows.md:generic-api-key:54
