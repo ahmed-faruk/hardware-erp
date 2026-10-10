@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { validateAllocations } from '../allocations';
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
@@ -541,6 +542,7 @@ const supplierPaymentInput = z.object({
   method: z.enum(['cash', 'card', 'instapay', 'wallet', 'other']),
   reference: z.string().max(60).nullable().default(null),
   cashAccountId: id.nullable().default(null),
+  allocations: z.array(z.object({ invoice_id: id, amount: z.number().int().positive() })).default([]),
 });
 
 /** We pay a supplier (manager only): what we owe goes down; cash leaves the chosen account. */
@@ -557,6 +559,8 @@ export async function postSupplierPayment(
   const { db } = ctx;
   const supplier = await db.suppliers.get(input.supplierId);
   if (!supplier || supplier.deletedAt) return err('NOT_FOUND', 'مورد غير موجود');
+  if (!(await validateAllocations(db, 'supplier', supplier.id, input.amount, input.allocations)))
+    return err('E_VALIDATION', 'تخصيص غير صحيح');
   const paymentId = uuidv7();
   const at = nowIso();
   const ledger: PartyLedgerRow = {
@@ -613,6 +617,7 @@ export async function postSupplierPayment(
         amount: input.amount,
         method: input.method,
         reference: input.reference,
+        allocations: input.allocations.length ? input.allocations : null,
       };
       const audit = auditRow(
         ctx,

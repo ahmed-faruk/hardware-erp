@@ -435,3 +435,40 @@ describe('negative stock policy (INV-11)', () => {
     expect((await m.sell({ lines: line(m), payments: [{ method: 'cash', amount: 1000 }] })).ok).toBe(true);
   });
 });
+
+describe('collections against invoices (FIN-06)', () => {
+  it('a collection names the invoice it settles; more than is open, or for another customer, is refused', async () => {
+    const m = await setup();
+    const sold = await m.sell({
+      lines: [{ productId: m.s.products[0]!.id, qtyMilli: 2000, unitPrice: 1000 }],
+      payments: [{ method: 'credit', amount: 2000 }],
+      customerId: m.s.customer.id,
+    });
+    if (!sold.ok) throw new Error(sold.code);
+    const { postCustomerReceipt } = await import('@/db/commands/returns');
+    const { openCreditInvoices } = await import('@/db/allocations');
+    const open = await openCreditInvoices(m.ctx.db, 'customer', m.s.customer.id);
+    expect(open).toMatchObject([{ invoiceId: sold.id, open: 2000 }]);
+    const pay = (amount: number, alloc: { invoice_id: string; amount: number }[]) =>
+      postCustomerReceipt(m.ctx, {
+        customerId: m.s.customer.id,
+        amount,
+        method: 'cash',
+        shiftId: m.s.shiftId,
+        cashAccountId: m.s.cashAccountId,
+        allocations: alloc,
+      });
+    expect((await pay(1500, [{ invoice_id: sold.id, amount: 1500 }])).ok).toBe(true);
+    expect(await pay(600, [{ invoice_id: sold.id, amount: 600 }])).toMatchObject({
+      ok: false,
+      code: 'E_VALIDATION',
+    });
+    expect(await pay(100, [{ invoice_id: sold.id, amount: 150 }])).toMatchObject({
+      ok: false,
+      code: 'E_VALIDATION',
+    });
+    expect((await openCreditInvoices(m.ctx.db, 'customer', m.s.customer.id))[0]?.open).toBe(500);
+    const receipt = (await m.ctx.db.customerReceipts.toArray())[0]!;
+    expect(receipt.allocations).toEqual([{ invoice_id: sold.id, amount: 1500 }]);
+  });
+});

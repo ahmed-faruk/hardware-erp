@@ -151,6 +151,8 @@ export interface CollectionSlipData {
   method: string;
   balanceAfter: number;
   workerName: string;
+  /** the invoices this collection settled (numbers and amounts) */
+  allocations: { number: string; amount: number }[];
 }
 
 export async function loadCollectionSlip(
@@ -181,6 +183,14 @@ export async function loadCollectionSlip(
     method: r.method as string,
     balanceAfter,
     workerName: worker?.name ?? '',
+    allocations: await Promise.all(
+      ((r.allocations as { invoice_id: string; amount: number }[] | null | undefined) ?? []).map(
+        async (a) => ({
+          number: (await db.salesInvoices.get(a.invoice_id))?.number ?? '',
+          amount: a.amount,
+        }),
+      ),
+    ),
   });
 }
 

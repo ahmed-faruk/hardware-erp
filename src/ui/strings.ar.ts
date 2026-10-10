@@ -563,6 +563,8 @@ export const strings = {
     method: 'طريقة الدفع',
     reference: 'رقم العملية',
     save: 'سجّل التحصيل',
+    onInvoices: 'على فواتير',
+    open: 'المتبقي',
     done: 'تم التحصيل',
     balanceAfter: 'الباقي عليه',
     failed: 'التحصيل ماتسجلش',

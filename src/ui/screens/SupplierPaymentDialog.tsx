@@ -2,11 +2,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { openCreditInvoices } from '@/db/allocations';
+import { allocateInOrder } from '@/domain/allocations';
 import { postSupplierPayment } from '@/db/commands/purchasing';
 import { formatMoney, toPiasters } from '@/domain/money';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
+import { InvoiceAllocations } from '../components/InvoiceAllocations';
 import { Dialog } from '../components/Dialog';
 import { FormField } from '../components/FormField';
 import { NumberField } from '../components/NumberField';
@@ -48,6 +51,11 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
   const [accountId, setAccountId] = useState('');
   const [reference, setReference] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string[]>([]);
+  const openInvoices =
+    useLiveQuery(() => openCreditInvoices(db, 'supplier', supplier.id), [db, supplier.id]) ?? [];
+  const allocations = amount ? allocateInOrder(amount, checked, openInvoices) : [];
+  const allocatedBy = new Map(allocations.map((a) => [a.invoice_id, a.amount]));
   const account = accountId || (accounts?.find((a) => a.kind === 'safe')?.id ?? '');
 
   const save = async (): Promise<void> => {
@@ -58,6 +66,7 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
       method,
       reference: method === 'cash' ? null : reference || null,
       cashAccountId: method === 'cash' ? account : null,
+      allocations,
     });
     if (r.ok) onDone();
     else setError(strings.supplierPay.failed);
@@ -75,6 +84,12 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
           parse={toPiasters}
           format={formatMoney}
           required
+        />
+        <InvoiceAllocations
+          open={openInvoices}
+          checked={checked}
+          allocated={allocatedBy}
+          onToggle={(id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))}
         />
         <FormField label={strings.supplierPay.method}>
           {(id) => (

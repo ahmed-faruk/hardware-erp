@@ -28,6 +28,17 @@ export function CollectionSlip({ slip, digits }: { slip: CollectionSlipData; dig
         <span>{strings.receipt.method}</span>
         <span>{method}</span>
       </div>
+      {slip.allocations.length > 0 && (
+        <>
+          <div className="name">{strings.collection.onInvoices}</div>
+          {slip.allocations.map((a) => (
+            <div className="row small" key={a.number}>
+              <span className="num">{d(a.number)}</span>
+              <span className="num">{d(formatMoney(a.amount))}</span>
+            </div>
+          ))}
+        </>
+      )}
       <div className="row total">
         <span>{strings.receipt.amountPaid}</span>
         <span className="num">{d(formatMoney(slip.amount))}</span>

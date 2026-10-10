@@ -144,11 +144,13 @@ describe('return, collection and statement paper', () => {
         method: 'cash',
         balanceAfter: 120000,
         workerName: 'عبدالله',
+        allocations: [{ number: 'K1-INV-000123', amount: 30000 }],
       },
       'latn',
       '80',
     );
     expect(html).toContain('سند تحصيل');
+    expect(html).toContain('K1-INV-000123');
     expect(html).toMatchSnapshot();
   });
   it('A4 statement is an A4 page with the aging table', () => {
