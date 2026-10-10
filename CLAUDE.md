@@ -12,6 +12,13 @@
 - `ospos-migration` — OpenSourcePOS browser export → import → validation report.
 - `ci-cd-deploy` — GitHub Actions, Cloudflare Pages, Supabase migrations, backups, rollback.
 
+## Third-party skills (installed from skills.sh, vetted; scripts and agents removed — never run them)
+- `frontend-design`, `impeccable` (read only `reference/` critique, audit, polish, distill, quieter, layout, typeset), `web-design-guidelines` — UI redesign work.
+- `accessibility`, `web-quality-audit` — accessibility and performance checks.
+- `supabase-postgres-best-practices` — migrations and RLS review.
+- `playwright-best-practices`, `webapp-testing` (read only) — tests.
+Project rules (AGENTS.md, DESIGN_SYSTEM.md, `pos-ui-low-literacy`) win over any of them.
+
 ## Cost habits
 - Default model Sonnet; Opus only for data-model/sync design and bugs Sonnet failed twice.
 - `/clear` between tasks; `/usage` at the end of each session; lower `/effort` for small edits.
