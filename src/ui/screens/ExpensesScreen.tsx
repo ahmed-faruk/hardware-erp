@@ -75,7 +75,7 @@ export function ExpensesScreen() {
       <div className={styles.section}>
         <h2>{strings.cash.categories}</h2>
         <p data-testid="categories">
-          {data.categories.map((c) => c.name).join('، ') || strings.cash.noCategories}
+          {data.categories.map((c) => c.name).join(strings.cash.listSeparator) || strings.cash.noCategories}
         </p>
         <div className={styles.row}>
           <FormField label={strings.cash.newCategory}>

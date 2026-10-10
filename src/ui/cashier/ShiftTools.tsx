@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowRightLeft, ClipboardList, Lock, Minus, Plus, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import {
@@ -89,7 +89,10 @@ export function ExpenseDialog({
   );
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // the category dialog also reports `close` right after a pick; that must not cancel the expense
+  const chose = useRef(false);
   const close = (): void => {
+    chose.current = false;
     setCategoryId(null);
     setError(null);
     onClose();
@@ -97,6 +100,7 @@ export function ExpenseDialog({
   const save = async (text: string): Promise<void> => {
     const amount = toPiasters(text);
     const category = categoryId;
+    chose.current = false;
     setCategoryId(null);
     if (!context || !category || !amount.ok || amount.value <= 0) return;
     const r = await postExpense(context, {
@@ -116,7 +120,11 @@ export function ExpenseDialog({
   void digits;
   return (
     <>
-      <Dialog title={strings.cash.expenseTitle} open={open && categoryId === null} onClose={close}>
+      <Dialog
+        title={strings.cash.expenseTitle}
+        open={open && categoryId === null}
+        onClose={() => !chose.current && close()}
+      >
         {error && <BigAlert tone="danger" word={error} sound={false} />}
         {categories && categories.length === 0 ? (
           <EmptyState icon={Wallet} word={strings.cash.noCategories} />
@@ -129,7 +137,10 @@ export function ExpenseDialog({
                   key={c.id}
                   type="button"
                   className={styles.reason}
-                  onClick={() => setCategoryId(c.id)}
+                  onClick={() => {
+                    chose.current = true;
+                    setCategoryId(c.id);
+                  }}
                   data-testid={`expense-cat-${c.name}`}
                 >
                   <Wallet size={32} aria-hidden="true" />

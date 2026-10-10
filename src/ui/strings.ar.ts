@@ -341,6 +341,7 @@ export const strings = {
     transferTitle: 'توريد فلوس للخزنة',
     drawerShort: 'الدرج مفيهوش فلوس كفاية',
     noCategories: 'مفيش أنواع مصروفات، المدير يضيفها',
+    listSeparator: '، ',
     noSafe: 'مفيش خزنة',
     newCategory: 'نوع جديد',
     categories: 'أنواع المصروفات',
