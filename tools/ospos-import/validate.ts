@@ -170,6 +170,30 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
       ' — the owner compares these with the OSPOS report for the same months',
   });
 
+  // 3b. the manager's server report (report_sales_summary_core, by Cairo day) gives the same month totals as the OSPOS export
+  {
+    const bad: string[] = [];
+    const lines: string[] = [];
+    for (const k of picks) {
+      const [y, mo] = k.split('-').map(Number) as [number, number];
+      const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+      const { data: rep, error } = await db.rpc('report_sales_summary_core', {
+        p_company: cid,
+        p_from: `${k}-01`,
+        p_to: `${k}-${String(last).padStart(2, '0')}`,
+      });
+      const net = error ? NaN : Number((rep as { total: { net: number } }).total.net);
+      lines.push(`${k}: ${error ? error.message : egp(net)} EGP`);
+      if (net !== result.stats.salesTotalByMonth[k]) bad.push(k);
+    }
+    add(
+      'Report totals = export (report_sales_summary_core, 3 months)',
+      picks.length > 0 && bad.length === 0,
+      true,
+      bad.length ? `differs in ${bad.join(', ')} · ${lines.join(' · ')}` : lines.join(' · '),
+    );
+  }
+
   // 4. stock
   const opening = await fetchAll(db, 'stock_movements', 'product_id,qty', cid, { doc_type: 'opening' });
   const dbStock = new Map(opening.map((r) => [String(r.product_id), Number(r.qty)]));

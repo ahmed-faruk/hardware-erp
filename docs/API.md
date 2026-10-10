@@ -82,9 +82,14 @@ its own Supabase Auth user (random password kept on the device), then calls this
 ### `revoke_device(device_id uuid)` — manager only
 Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
 
-### `report_sales_summary(from date, to date)` / `report_stock_valuation(at date)` / `report_party_statement(party_type text, party_id uuid, from date, to date)` — manager only
-Server-side versions of the reports that need legacy archive data or all devices. Same numbers as local reports for
-synced data.
+### `report_sales_summary(p_from date, p_to date)` / `report_profit(p_from, p_to)` / `report_exceptions(p_from, p_to)` / `report_devices()` — manager devices only
+Each returns `{ ok, data, generated_at }`; a cashier device gets `E_FORBIDDEN`, a period over 400 days `E_VALIDATION`. Days are Cairo calendar days.
+Every report is also a `report_*_core(company, …)` function (service role only) so the import validator can compare it with OpenSourcePOS.
+- Sales: per day invoices / gross / returns / net, totals, payments by method, by cashier, count of legacy (OSPOS) invoices; voided invoices are out.
+- Profit: lines sold (after their share of the invoice discount) − cost (`unit_cost` per base unit × qty × factor), returns take both back; approximate by design.
+- Exceptions: voids, reprints, no-sale opens (with approver), discounts on new invoices, stock adjustments with approver, shift variances.
+- Devices: last seen, app version, open shift, client errors in the last 24 h.
+Customer and supplier statements are computed on the device from the ledgers (`src/db/statement.ts`); stock on hand also comes from the device.
 
 ### `import_batch(kind text, rows jsonb)` — service role only
 Used by `tools/ospos-import`. `kind` is a synced table name, `rows` ≤ 1000 full records (all rows share the same keys, `company_id` included).
