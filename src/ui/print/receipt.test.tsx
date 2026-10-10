@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatMoney } from '@/domain/money';
 import { buildReceipt, type ReceiptInput } from '@/domain/receipt';
 
 import { renderNoSaleHtml, renderReceiptHtml } from './render';
@@ -76,7 +77,7 @@ describe('Receipt HTML', () => {
       '58',
     );
     expect(html.match(/class="line"/g)).toHaveLength(30);
-    expect(html).toContain(`${(total / 100).toFixed(2)}`);
+    expect(html).toContain(formatMoney(total));
     expect(html).toContain('overflow-wrap: anywhere');
   });
   it('embeds the invoice number as a barcode and as text, and is black only', () => {

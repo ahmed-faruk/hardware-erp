@@ -7,12 +7,11 @@ import { strings } from '../strings.ar';
 export function Barcode({ value }: { value: string }) {
   const code = code128B(value);
   const quiet = 10;
-  let x = quiet;
-  const bars = code.bars.map((bar) => {
-    const at = x;
-    x += bar.width;
-    return bar.black ? <rect key={at} x={at} y={0} width={bar.width} height={1} fill="#000" /> : null;
-  });
+  // x position of each bar = quiet zone + widths of everything before it (computed without reassigning during render)
+  const starts = code.bars.map((_, i) => quiet + code.bars.slice(0, i).reduce((sum, b) => sum + b.width, 0));
+  const bars = code.bars.map((bar, i) =>
+    bar.black ? <rect key={starts[i]} x={starts[i]} y={0} width={bar.width} height={1} fill="#000" /> : null,
+  );
   return (
     <svg
       className="barcode"
