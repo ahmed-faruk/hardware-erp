@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 import { useServices, useSession, type CurrentWorker } from '@/app/session';
 
@@ -13,7 +13,8 @@ import styles from './entry.module.css';
 
 /** Pick a worker, type the PIN. No usernames, no passwords; checked on the device so it works offline. */
 export function LoginScreen() {
-  const { db } = useServices();
+  const { db, runner } = useServices();
+  const sync = useSyncExternalStore(runner.subscribe, runner.getSnapshot);
   const { login } = useSession();
   const workers = useLiveQuery(
     async () =>
@@ -28,8 +29,11 @@ export function LoginScreen() {
     <main className={styles.page}>
       <div className={styles.card}>
         <h1>{strings.login.title}</h1>
-        {!workers ? (
-          <Skeleton rows={2} />
+        {!workers || (workers.length === 0 && (sync.syncing || sync.lastSyncAt === null)) ? (
+          <>
+            <Skeleton rows={2} />
+            {workers && <p>{strings.setup.pulling}</p>}
+          </>
         ) : workers.length === 0 ? (
           <BigAlert tone="warn" word={strings.login.noWorkers} />
         ) : (
