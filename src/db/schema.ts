@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 
 import type * as T from './types';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Dexie names (camelCase) -> server table names (snake_case). */
 export const SERVER_TABLE: Record<string, string> = {
@@ -145,6 +145,12 @@ export class HanafyDB extends Dexie {
       partyBalances: '[partyType+partyId]',
       deviceSettings: 'key',
       searchIndex: 'token',
+    });
+    // v2: name indexes for the manager's sorted lists
+    this.version(2).stores({
+      products: 'id, sku, categoryId, updatedAt, name',
+      customers: 'id, phone, name',
+      suppliers: 'id, name',
     });
   }
 }

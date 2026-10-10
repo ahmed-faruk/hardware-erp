@@ -1,4 +1,5 @@
 import { rebuildPartyBalances, rebuildStockBalances } from '@/db/balances';
+import { patchIndex, tokensOf } from '@/db/search';
 import type { HanafyDB } from '@/db/schema';
 import { LOCAL_TABLE } from '@/db/schema';
 
@@ -24,7 +25,14 @@ export async function lastServerSeq(db: HanafyDB): Promise<number> {
 export async function applyPage(db: HanafyDB, page: PullPage): Promise<void> {
   const stockKeys = new Map<string, [string, string]>();
   const partyKeys = new Map<string, [string, string]>();
+  const touched = new Set<string>();
   await db.transaction('rw', db.tables, async () => {
+    for (const { table, record } of page.rows) {
+      if (table === 'products') touched.add(String(record.id));
+      if (table === 'barcodes') touched.add(String(record.product_id));
+    }
+    const before = new Map<string, Set<string>>();
+    for (const id of touched) before.set(id, await tokensOf(db, id));
     for (const { table, record } of page.rows) {
       const local = LOCAL_TABLE[table];
       if (!local) continue;
@@ -48,6 +56,7 @@ export async function applyPage(db: HanafyDB, page: PullPage): Promise<void> {
       if (local === 'partyLedger')
         partyKeys.set(`${row.partyType}|${row.partyId}`, [String(row.partyType), String(row.partyId)]);
     }
+    for (const [id, tokens] of before) await patchIndex(db, id, tokens);
     await db.syncState.put({ key: 'lastServerSeq', value: page.last_seq });
     await rebuildStockBalances(db, [...stockKeys.values()]);
     await rebuildPartyBalances(db, [...partyKeys.values()]);

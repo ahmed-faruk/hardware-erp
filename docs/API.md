@@ -59,6 +59,8 @@ the permission matrix (`role_can`, a SQL copy of `permissions.ts`). A sales invo
 (`lines`, `payments`, `stock_movements`, `party_ledger`, `cash_movements`); the server checks that totals, payments and ledger rows
 agree and that the number starts with the device prefix, then inserts everything atomically. Tables not yet pushable
 (`sync_tables.push_action` is null) are added with their command.
+Workers: `sync_tables.push_action = manageUsers` (managers only), and a manager login on a device below the manager level is refused.
+`pin_hash` and `pin_salt` reach every device so workers can log in offline (docs/SECURITY.md §2).
 Rules: documents/ledgers `insert … on conflict (id) do nothing`; master data field-merge with `base_version`;
 allow-listed tables only; role check per action uses the same matrix as `src/domain/permissions.ts`.
 
@@ -109,7 +111,9 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | `postStockAdjustment` | warehouseId, lines[{productId, qtyDelta}], reasonCode, approval? | `{ ok, id, number }` |
 | `postExpense` | categoryId, amount, notes | `{ ok, id, number }` |
 | `openShift` / `closeShift` | float / counted breakdown | `{ ok, id, variance? }` |
-| `saveProduct` / `saveCustomer` / `saveSupplier` | fields + `baseVersion` | `{ ok, id, version }` |
+| `saveProduct` | fields, `barcodes[]`, `packUnit` (one), `baseVersion` | `{ ok, id, version }` (one transaction: product, units, barcodes, search words) |
+| `saveCategory` / `saveCustomer` / `saveSupplier` | fields + `baseVersion` | `{ ok, id, version }` |
+| `saveWorker` | name, role, active, `pin` (hashed, never stored) + `baseVersion` | `{ ok, id, version }` (managers only; `manageUsers`) |
 | `approveWithPin` | action, managerPin | `{ ok, approvalToken }` (single use, expires in 2 min) |
 
 ## 7. Rate limiting and abuse
