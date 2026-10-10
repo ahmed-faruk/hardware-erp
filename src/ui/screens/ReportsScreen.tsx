@@ -19,6 +19,7 @@ import { callRpc } from '@/sync/errors';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { FormField } from '../components/FormField';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
@@ -141,23 +142,23 @@ export function ReportsScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.reports.title}</h1>
-      <div className={styles.actions} role="tablist">
-        {TABS.map((x) => (
-          <ActionButton
-            key={x}
-            label={strings.reports.tabs[x]}
-            variant={tab === x ? 'primary' : 'ghost'}
-            onClick={() => setTab(x)}
-            testId={`report-tab-${x}`}
+      <div className={styles.toolbar}>
+        <div className={styles.fixed}>
+          <SegmentedControl
+            label={strings.reports.title}
+            options={TABS.map((x) => ({ key: x, label: strings.reports.tabs[x] }))}
+            value={tab}
+            onChange={setTab}
+            testIdPrefix="report-tab-"
           />
-        ))}
+        </div>
       </div>
       {tab !== 'stock' && tab !== 'devices' && (
         <div className={styles.toolbar}>
           <div className={styles.fixed}>
             <ActionButton
               label={strings.reports.today}
-              variant="ghost"
+              variant="soft"
               onClick={() => preset(today, today)}
               testId="period-today"
             />
@@ -165,7 +166,7 @@ export function ReportsScreen() {
           <div className={styles.fixed}>
             <ActionButton
               label={strings.reports.yesterday}
-              variant="ghost"
+              variant="soft"
               onClick={() => preset(cairoDay(-1), cairoDay(-1))}
               testId="period-yesterday"
             />
@@ -173,7 +174,7 @@ export function ReportsScreen() {
           <div className={styles.fixed}>
             <ActionButton
               label={strings.reports.thisMonth}
-              variant="ghost"
+              variant="soft"
               onClick={() => preset(monthStart(today), today)}
               testId="period-month"
             />
@@ -181,7 +182,7 @@ export function ReportsScreen() {
           <div className={styles.fixed}>
             <ActionButton
               label={strings.reports.lastMonth}
-              variant="ghost"
+              variant="soft"
               onClick={() => {
                 const last = cairoDay(-1, new Date(`${monthStart(today)}T12:00:00Z`));
                 preset(monthStart(last), last);
@@ -244,18 +245,11 @@ export function ReportsScreen() {
                 <p>{strings.reports.none}</p>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table className={styles.reportTable}>
                     <thead>
                       <tr>
-                        {t.headers.map((h) => (
-                          <th
-                            key={h}
-                            style={{
-                              textAlign: 'start',
-                              padding: 6,
-                              borderBottom: '1px solid var(--border)',
-                            }}
-                          >
+                        {t.headers.map((h, hi) => (
+                          <th key={h} className={hi > 0 ? styles.num : undefined}>
                             {h}
                           </th>
                         ))}
@@ -268,11 +262,7 @@ export function ReportsScreen() {
                             <td
                               key={ci}
                               dir={ci > 0 ? 'ltr' : undefined}
-                              style={{
-                                padding: 6,
-                                borderBottom: '1px solid var(--border)',
-                                textAlign: ci > 0 ? 'end' : 'start',
-                              }}
+                              className={ci > 0 ? styles.num : undefined}
                             >
                               {c}
                             </td>
@@ -280,12 +270,12 @@ export function ReportsScreen() {
                         </tr>
                       ))}
                       {t.totals && (
-                        <tr data-testid={`report-totals-${i}`} style={{ fontWeight: 700 }}>
+                        <tr data-testid={`report-totals-${i}`} className={styles.totalRow}>
                           {t.totals.map((c, ci) => (
                             <td
                               key={ci}
                               dir={ci > 0 ? 'ltr' : undefined}
-                              style={{ padding: 6, textAlign: ci > 0 ? 'end' : 'start' }}
+                              className={ci > 0 ? styles.num : undefined}
                             >
                               {c}
                             </td>
