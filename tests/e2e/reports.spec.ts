@@ -53,6 +53,7 @@ test.describe('manager reports', () => {
       .toBe('1');
 
     await page.getByRole('button', { name: strings.nav.reports }).click();
+    await page.getByTestId('report-tab-sales').click();
     await page.getByTestId('period-today').click();
     await expect(page.getByTestId('report-table-0')).toBeVisible();
     await expect
