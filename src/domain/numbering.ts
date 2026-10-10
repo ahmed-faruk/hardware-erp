@@ -1,4 +1,16 @@
-export const DOC_TYPES = ['INV', 'RET', 'RCV', 'PUR', 'PRT', 'PAY', 'ADJ', 'EXP', 'VOID', 'SHF'] as const;
+export const DOC_TYPES = [
+  'INV',
+  'RET',
+  'RCV',
+  'PUR',
+  'PRT',
+  'PAY',
+  'ADJ',
+  'EXP',
+  'VOID',
+  'SHF',
+  'XFR',
+] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
 const PREFIX = /^[A-Z0-9]{1,4}$/;

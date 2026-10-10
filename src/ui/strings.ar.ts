@@ -476,6 +476,7 @@ export const strings = {
     discountLimit: 'أقصى خصم للكاشير %',
     mayChangePrice: 'الكاشير يقدر يغيّر السعر',
     returnDays: 'مدة المرتجع بالأيام (بعدها محتاج المدير)',
+    shiftVarianceAbove: 'عجز أو زيادة في الدرج فوق (ج) يحتاج المدير',
     stockRules: 'المخزون',
     stockApprovalAbove: 'تسوية مخزون فوق قيمة (ج) تحتاج المدير',
     receipt: 'الإيصال',
