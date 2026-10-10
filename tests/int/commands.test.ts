@@ -31,8 +31,9 @@ describe('postSale', () => {
     expect(await db.partyLedger.count()).toBe(0);
     expect((await db.stockBalances.get([s.products[0]!.id, s.warehouseId]))?.qty).toBe(-2000);
     const pending = await db.outbox.where('status').equals('pending').toArray();
-    expect(pending.map((o) => o.table)).toEqual(['shifts', 'salesInvoices', 'auditLog']);
-    expect(pending.map((o) => o.deviceSeq)).toEqual([1, 2, 3]);
+    // the product has no stock in this fixture, so the sale also leaves a negative_stock_sale audit row (before the invoice)
+    expect(pending.map((o) => o.table)).toEqual(['shifts', 'auditLog', 'salesInvoices', 'auditLog']);
+    expect(pending.map((o) => o.deviceSeq)).toEqual([1, 2, 3, 4]);
   });
 
   it('credit sale writes the customer ledger and updates the balance', async () => {
