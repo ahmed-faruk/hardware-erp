@@ -472,3 +472,35 @@ describe('collections against invoices (FIN-06)', () => {
     expect(receipt.allocations).toEqual([{ invoice_id: sold.id, amount: 1500 }]);
   });
 });
+
+describe('price lists (POS-10)', () => {
+  it('a wholesale customer buys at the wholesale price with no approval; others need approval for it', async () => {
+    const m = await setup();
+    const p = m.s.products[0]!;
+    await m.ctx.db.products.update(p.id, { priceWholesale: 800 });
+    await m.ctx.db.customers.update(m.s.customer.id, { priceList: 'wholesale' });
+    const line = [{ productId: p.id, qtyMilli: 1000, unitPrice: 800 }];
+    expect(
+      await m.sell({ lines: line, payments: [{ method: 'cash', amount: 800 }], customerId: m.s.customer.id }),
+    ).toMatchObject({ ok: true });
+    expect(await m.sell({ lines: line, payments: [{ method: 'cash', amount: 800 }] })).toMatchObject({
+      ok: false,
+      code: 'APPROVAL_REQUIRED',
+      message: 'priceOverride',
+    });
+  });
+
+  it('repricing on a customer change moves list-price lines and keeps a hand-typed price', async () => {
+    const m = await setup();
+    const { addItem, EMPTY_CART, productToItem } = await import('@/domain/cart');
+    const { repriceForCustomer } = await import('@/db/pricing');
+    const [a, b] = m.s.products;
+    await m.ctx.db.products.update(a!.id, { priceWholesale: 800 });
+    await m.ctx.db.products.update(b!.id, { priceWholesale: 1500 });
+    await m.ctx.db.customers.update(m.s.customer.id, { priceList: 'wholesale' });
+    let cart = addItem(EMPTY_CART, productToItem((await m.ctx.db.products.get(a!.id))!, null));
+    cart = addItem(cart, { ...productToItem((await m.ctx.db.products.get(b!.id))!, null), unitPrice: 1900 });
+    const next = await repriceForCustomer(m.ctx.db, cart, m.s.customer.id);
+    expect(next.lines.map((l) => l.unitPrice)).toEqual([800, 1900]);
+  });
+});

@@ -247,3 +247,20 @@ test('with the negative-stock policy on block, selling a product with no stock i
     sql(`delete from settings where key = 'stock.negativePolicy'`);
   }
 });
+
+test('a wholesale customer changes the price of the lines already in the cart', async ({ page }) => {
+  sql(`update products set price_wholesale = 1500 where id = '${productId(3)}'`); // retail 17.50
+  sql(`update customers set price_list = 'wholesale' where id = 'a0000000-0000-7000-8000-000000000c01'`);
+  try {
+    await start(page);
+    await tap(page, 3);
+    await expect(vis(page, 'total')).toHaveText('17.50');
+    await vis(page, 'pay').click();
+    await page.getByTestId('choose-customer').click();
+    await page.getByTestId('customer-a0000000-0000-7000-8000-000000000c01').click();
+    await expect(page.getByTestId('pay-total')).toHaveText('15.00');
+  } finally {
+    sql(`update products set price_wholesale = null where id = '${productId(3)}'`);
+    sql(`update customers set price_list = 'retail' where id = 'a0000000-0000-7000-8000-000000000c01'`);
+  }
+});

@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(12);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -65,6 +65,10 @@ select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f1', '0',
   jsonb_build_object('id', 'a0000000-0000-7000-8000-000000000c01', 'name', 'Renamed', 'created_by', 'a0000000-0000-7000-8000-0000000000d1'), '["name"]'::jsonb)))), 'E_FORBIDDEN', 'and cannot edit an existing customer');
 select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f1', '0', jsonb_build_array(pg_temp.master('customers', 'a0000000-0000-7000-8000-0000000000d3',
   jsonb_build_object('id', 'a0000000-0000-7000-8000-000000000c01', 'name', 'Renamed by manager', 'created_by', 'a0000000-0000-7000-8000-0000000000d3'), '["name"]'::jsonb)))), null, 'a manager can');
+select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f1', '0', jsonb_build_array(pg_temp.master('customers', 'a0000000-0000-7000-8000-0000000000d1',
+  jsonb_build_object('id', gen_random_uuid(), 'name', 'Wholesale wannabe', 'price_list', 'wholesale', 'created_by', 'a0000000-0000-7000-8000-0000000000d1'))))), 'E_FORBIDDEN', 'a cashier cannot create a customer on a price list');
+select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f1', '0', jsonb_build_array(pg_temp.master('customers', 'a0000000-0000-7000-8000-0000000000d3',
+  jsonb_build_object('id', gen_random_uuid(), 'name', 'Wholesale buyer', 'price_list', 'wholesale', 'created_by', 'a0000000-0000-7000-8000-0000000000d3'))))), null, 'a manager can');
 reset role;
 
 select * from finish();

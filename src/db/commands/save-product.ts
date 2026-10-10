@@ -27,7 +27,14 @@ export async function saveProduct(ctx: DeviceContext, input: SaveProductInput): 
   if (!fields.success || (codes && !codes.success) || (unit && !unit.success))
     return err('E_VALIDATION', 'بيانات الصنف غير صحيحة');
   if (can(ctx.role, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
-  if (('price' in fields.data || 'unitCost' in fields.data) && can(ctx.role, 'editPrices') !== 'yes') {
+  if (
+    ('price' in fields.data ||
+      'unitCost' in fields.data ||
+      'priceWholesale' in fields.data ||
+      'priceCraftsman' in fields.data ||
+      'priceContractor' in fields.data) &&
+    can(ctx.role, 'editPrices') !== 'yes'
+  ) {
     return err('E_FORBIDDEN', 'الأسعار للمدير فقط');
   }
   const wanted = codes?.success ? [...new Set(codes.data)] : undefined;

@@ -1,6 +1,8 @@
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
+import { customerPriceList } from '../pricing';
+import { priceFor } from '@/domain/pricing';
 import { auditRow } from './audit';
 import { negativeAfterSale } from '@/domain/stock';
 import { nextNumber } from '../numbering';
@@ -17,7 +19,6 @@ import type {
   StockMovement,
 } from '../types';
 import { baseQty } from '@/domain/costing';
-import { mulDivRound } from '@/domain/money';
 import { discountNeedsApproval, priceNeedsApproval } from '@/domain/settings';
 import type { Action } from '@/domain/permissions';
 import { checkCredit } from '@/domain/credit';
@@ -90,6 +91,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     const first = products.find((p) => p?.id === negatives[0]!.productId);
     return err('NEGATIVE_STOCK', first?.name ?? '');
   }
+  const customerList = await customerPriceList(db, input.customerId);
   const needs = new Set<Action>();
   // AUD-02: what the manager's PIN allowed on this sale, written next to it
   const overrides: { action: string; approves: Action; after: unknown }[] = [];
@@ -103,7 +105,16 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
         after: { target: 'line', productId: l.productId, discount: l.discount },
       });
     }
-    const listPrice = units[i]?.price ?? mulDivRound(products[i]!.price, l.unitFactorMilli, 1000);
+    const u = units[i];
+    const listPrice = priceFor(
+      products[i]!,
+      u
+        ? { factor: u.factor, price: u.price }
+        : l.unitFactorMilli !== 1000
+          ? { factor: l.unitFactorMilli, price: null }
+          : null,
+      customerList,
+    );
     if (priceNeedsApproval(settings, ctx.role, l.unitPrice, listPrice)) {
       needs.add('priceOverride');
       overrides.push({
