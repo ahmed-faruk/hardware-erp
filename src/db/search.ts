@@ -34,6 +34,29 @@ export async function patchIndex(db: HanafyDB, productId: string, before: Set<st
   for (const token of after) if (!before.has(token)) await mutate(db, token, productId, true);
 }
 
+/**
+ * Same as `patchIndex` for many products at once (a pulled page): every word's row is read and written once, not once per product.
+ * A word that all products share ("دهان") would otherwise be rewritten 20,000 times with a 20,000-id list on the first sync.
+ */
+export async function patchIndexMany(db: HanafyDB, before: Map<string, Set<string>>): Promise<void> {
+  const changes = new Map<string, { add: Set<string>; remove: Set<string> }>();
+  const slot = (token: string): { add: Set<string>; remove: Set<string> } =>
+    changes.get(token) ?? changes.set(token, { add: new Set(), remove: new Set() }).get(token)!;
+  for (const [productId, was] of before) {
+    const now = await tokensOf(db, productId);
+    for (const token of was) if (!now.has(token)) slot(token).remove.add(productId);
+    for (const token of now) if (!was.has(token)) slot(token).add.add(productId);
+  }
+  for (const [token, { add, remove }] of changes) {
+    const row = await db.searchIndex.get(token);
+    const ids = new Set(row?.productIds ?? []);
+    for (const id of remove) ids.delete(id);
+    for (const id of add) ids.add(id);
+    if (ids.size === 0) await db.searchIndex.delete(token);
+    else await db.searchIndex.put({ token, productIds: [...ids] });
+  }
+}
+
 /** Full rebuild (first run, or after a restore). */
 export async function rebuildSearchIndex(db: HanafyDB): Promise<void> {
   const index = new Map<string, Set<string>>();

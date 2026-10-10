@@ -1,5 +1,5 @@
 import { rebuildPartyBalances, rebuildStockBalances } from '@/db/balances';
-import { patchIndex, tokensOf } from '@/db/search';
+import { patchIndexMany, tokensOf } from '@/db/search';
 import type { HanafyDB } from '@/db/schema';
 import { LOCAL_TABLE } from '@/db/schema';
 
@@ -56,7 +56,7 @@ export async function applyPage(db: HanafyDB, page: PullPage): Promise<void> {
       if (local === 'partyLedger')
         partyKeys.set(`${row.partyType}|${row.partyId}`, [String(row.partyType), String(row.partyId)]);
     }
-    for (const [id, tokens] of before) await patchIndex(db, id, tokens);
+    await patchIndexMany(db, before);
     await db.syncState.put({ key: 'lastServerSeq', value: page.last_seq });
     await rebuildStockBalances(db, [...stockKeys.values()]);
     await rebuildPartyBalances(db, [...partyKeys.values()]);

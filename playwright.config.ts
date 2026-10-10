@@ -40,5 +40,9 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    // `npm run perf` only: heavy (20,000 products), never part of the normal e2e runs
+    ...(process.env.PERF
+      ? [{ name: 'perf', testDir: 'tests/perf', use: { ...devices['Desktop Chrome'] } }]
+      : []),
   ],
 });

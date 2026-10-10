@@ -40,7 +40,12 @@ export function ProductPicker({
             type="search"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && found[0] && (e.preventDefault(), pick(found[0]))}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              // ask the index again instead of trusting the list on screen, which may still be one keystroke behind
+              void searchProducts(db, text, { limit: 1 }).then(([first]) => first && pick(first));
+            }}
             data-testid="product-picker"
           />
         )}

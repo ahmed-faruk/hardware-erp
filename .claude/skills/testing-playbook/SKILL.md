@@ -57,9 +57,10 @@ Visual: `expect(page).toHaveScreenshot()` per viewport for cashier, payment, rec
 | Save sale → print starts | same | ≤ 1 s |
 | Cold start offline | same | ≤ 5 s |
 | Cashier route JS | `size-limit` | ≤ 300 KB gzip |
-| Lighthouse mobile | `@lhci/cli` on preview build | performance ≥ 85, a11y ≥ 95 |
-| Ingest burst | k6 → local Supabase: 5 devices × 300 invoices | no errors, p95 RPC ≤ 1 s |
-Data: `tests/fixtures/generate.ts` (seeded faker): 20k products, 500 customers, 50k sales. Never real shop data.
+| Lighthouse mobile | `@lhci/cli` on preview build (`.lighthouserc.json`) | performance ≥ 70, a11y ≥ 95. 70, not 85, because Lighthouse always measures a first visit, which creates the local database once (~0.3 s on a slow phone); the warm start is covered by the cold-start test above (owner decision, phase 9) |
+| Ingest burst | k6 → local Supabase: the 3 seeded devices × 500 invoices (`tests/perf/ingest.k6.js`) | no errors, p95 RPC ≤ 1 s |
+| First sync of 20,000 products | `tests/int/pull-perf.test.ts` | < 60 s in fake-indexeddb (was a memory blow-up before the batched search-index patch) |
+Run the browser checks with `npm run perf` (Chromium project `perf`, seeds 20,000 fake products into the local database and removes them afterwards). Never real shop data.
 
 ## 7. Security
 | Check | Tool | When | Gate |
