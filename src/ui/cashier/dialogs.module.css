@@ -1,0 +1,119 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-block-size: var(--target-cashier);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.item strong {
+  font-size: var(--fs-price);
+}
+
+.reasons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.reason {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: 96px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-weight: 700;
+  font-size: var(--fs-label);
+  cursor: pointer;
+}
+
+.avatars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-block-size: 40dvh;
+  overflow: auto;
+}
+
+.avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  inline-size: 100%;
+  min-block-size: 112px;
+  padding: var(--space-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.initial {
+  display: grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: var(--radius-round);
+  color: #fff;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+}
+
+.phone {
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-control);
+  text-align: end;
+  font-size: var(--fs-price);
+  font-weight: 700;
+  min-block-size: 48px;
+}
+
+.info {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  text-align: center;
+  font-size: var(--fs-small);
+}
+
+.info strong {
+  display: block;
+  font-size: var(--fs-price);
+}

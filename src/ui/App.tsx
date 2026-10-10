@@ -1,4 +1,4 @@
-import { Package, Tags, Truck, UserCog, Users } from 'lucide-react';
+import { Package, Settings, ShoppingCart, Tags, Truck, UserCog, Users } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { activateDevice, loadIdentity, signInDevice } from '@/app/device-setup';
@@ -18,12 +18,14 @@ import { Skeleton } from './components/Skeleton';
 import { SyncStatus } from './components/SyncStatus';
 import { UpdateBanner } from './components/UpdateBanner';
 import { navigate, useRoute } from './router';
+import { SellScreen } from './cashier/SellScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ComingSoonScreen } from './screens/ComingSoonScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { CustomersScreen, SuppliersScreen } from './screens/PartyScreens';
 import { ProductFormScreen } from './screens/ProductFormScreen';
 import { ProductsScreen } from './screens/ProductsScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { SetupScreen } from './screens/SetupScreen';
 import { WorkersScreen } from './screens/WorkersScreen';
 import { strings } from './strings.ar';
@@ -94,11 +96,13 @@ export function App() {
 }
 
 const NAV: (NavItem & { action: Action })[] = [
+  { path: 'sell', label: strings.nav.sell, icon: ShoppingCart, action: 'sell' },
   { path: 'products', label: strings.nav.products, icon: Package, action: 'editProductData' },
   { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'editProductData' },
   { path: 'customers', label: strings.nav.customers, icon: Users, action: 'settings' },
   { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'settings' },
   { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'manageUsers' },
+  { path: 'settings', label: strings.nav.settings, icon: Settings, action: 'settings' },
 ];
 
 function Gate() {
@@ -135,17 +139,21 @@ function Shell() {
   const allowed = nav.some((n) => n.path === section);
 
   useEffect(() => {
-    const first = nav[0];
+    // a manager lands on the manager screens, a cashier on the sale screen
+    const first = role === 'manager' ? (nav.find((n) => n.path === 'products') ?? nav[0]) : nav[0];
     if (first && !allowed) navigate(first.path);
-  }, [allowed, nav]);
+  }, [allowed, nav, role]);
 
   let screen = <ComingSoonScreen />;
   if (allowed) {
-    if (section === 'products') screen = route[1] ? <ProductFormScreen id={route[1]} /> : <ProductsScreen />;
+    if (section === 'sell') screen = <SellScreen />;
+    else if (section === 'products')
+      screen = route[1] ? <ProductFormScreen id={route[1]} /> : <ProductsScreen />;
     else if (section === 'categories') screen = <CategoriesScreen />;
     else if (section === 'customers') screen = <CustomersScreen />;
     else if (section === 'suppliers') screen = <SuppliersScreen />;
     else if (section === 'workers') screen = <WorkersScreen />;
+    else if (section === 'settings') screen = <SettingsScreen />;
   }
   return (
     <AppShell

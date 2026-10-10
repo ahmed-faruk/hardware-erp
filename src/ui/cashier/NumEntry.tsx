@@ -9,7 +9,7 @@ export interface NumEntryProps {
   title: string;
   open: boolean;
   /** 0 = whole numbers, 2 = money or percent, 3 = quantities */
-  decimals: 0 | 2 | 3;
+  decimals: number;
   initial?: string;
   hint?: ReactNode;
   /** extra buttons next to the pad (for example "the whole remaining amount") */

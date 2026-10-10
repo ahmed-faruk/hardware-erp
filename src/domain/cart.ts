@@ -12,6 +12,8 @@ export interface CartItem {
   unitPrice: Piasters;
   /** the product's list price when it was added, so approval rules can tell a changed price */
   listPrice: Piasters;
+  /** decimals the product's quantity allows (0 = whole units only); the quantity pad shows a dot key only when > 0 */
+  qtyDecimals?: number;
 }
 
 export interface CartLine extends CartItem {
@@ -96,7 +98,7 @@ export function toSaleLines(cart: Cart) {
 
 /** A tapped or scanned product becomes a cart item; a pack unit uses its own price, or the base price times its factor. */
 export function productToItem(
-  product: { id: string; name: string; price: Piasters },
+  product: { id: string; name: string; price: Piasters; qtyDecimals?: number },
   unit?: { id: string; factor: Milli; price: Piasters | null } | null,
   qtyMilli: Milli = 1000,
 ): CartItem {
@@ -109,5 +111,6 @@ export function productToItem(
     qtyMilli,
     unitPrice: price,
     listPrice: price,
+    qtyDecimals: product.qtyDecimals ?? 0,
   };
 }

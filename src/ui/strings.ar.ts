@@ -2,6 +2,8 @@
 export const strings = {
   appName: 'مركز حنفي للتلوين',
   nav: {
+    sell: 'البيع',
+    settings: 'الإعدادات',
     products: 'الأصناف',
     categories: 'التصنيفات',
     customers: 'العملاء',
@@ -97,6 +99,7 @@ export const strings = {
     typeService: 'خدمة',
     moreRows: 'اعرض أكتر',
     noCost: 'التكلفة للمدير بس',
+    pinQuick: 'ثبّت في الأصناف السريعة على الجهاز ده',
   },
   categories: {
     title: 'التصنيفات',

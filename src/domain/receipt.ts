@@ -46,7 +46,8 @@ export interface ReceiptData {
   copy: boolean;
 }
 
-const cairoTime = (iso: string): string =>
+/** Cairo wall-clock time as `dd/mm/yyyy hh:mm`. */
+export const cairoTime = (iso: string): string =>
   new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Africa/Cairo',
     day: '2-digit',
