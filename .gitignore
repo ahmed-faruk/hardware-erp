@@ -13,3 +13,7 @@ tools/ospos-import/.env.local
 *.sql.zip
 ospos-*.zip
 .claude/scheduled_tasks.lock
+
+# tester-army: keep the recorded steps (CI replays them), drop everything else
+.e2e/*
+!.e2e/cache/

@@ -50,6 +50,13 @@ both go online, assert identical stock and customer balances on both and in Supa
 Selectors: `getByRole` with Arabic accessible names or `data-testid`; never CSS classes.
 Visual: `expect(page).toHaveScreenshot()` per viewport for cashier, payment, receipt preview.
 
+## 5b. Agent suite (tester-army/e2e, tests/agent)
+- Nine PRD flows in `tests/agent/*.e2e.ts`. Login, PINs and every check are plain locators / SQL; only the business steps use `agent.act`.
+- Recording uses the owner's own Anthropic key on his Mac: `export ANTHROPIC_API_KEY=...`, `supabase start`, `npm run test:agent:record`. The recorded steps live in `.e2e/cache/` and are committed.
+- CI (`nightly.yml` job `agent-replay`) and local runs replay with `npm run test:agent` (`--strict-cache`): no key, no model. A missing recording fails with `MODEL_UNAVAILABLE`.
+- When a UI change breaks replay (`REPLAY_STALE`), re-record on the Mac with the owner's key and commit the cache. Never put the key in CI or in the repo.
+- The 55+ Playwright tests in `tests/e2e` stay; the agent suite does not replace them.
+
 ## 6. Performance (tests/perf, nightly; bundle check every push)
 | Check | Tool | Budget |
 | --- | --- | --- |
