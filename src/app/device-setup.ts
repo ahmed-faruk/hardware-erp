@@ -50,7 +50,10 @@ export async function activateDevice(
     prefix: string;
     max_role: DeviceIdentity['maxRole'];
   }>(client, 'claim_device_activation', { p_code: clean });
-  if (!claim.ok) return err(claim.network ? 'NO_NET' : 'BAD_CODE', claim.message);
+  if (!claim.ok) {
+    await client.auth.signOut({ scope: 'local' });
+    return err(claim.network ? 'NO_NET' : 'BAD_CODE', claim.message);
+  }
   const identity: DeviceIdentity = {
     deviceId: claim.data.device_id,
     companyId: claim.data.company_id,
@@ -65,10 +68,15 @@ export async function activateDevice(
   return ok(identity);
 }
 
-/** Restores the device login when the stored session expired (needs a connection; selling does not). */
+/**
+ * Makes sure the Supabase session is THIS device's own login. A failed or repeated activation can leave the session of another,
+ * never-claimed user in the browser: every RPC would then be refused as an inactive device, so it is dropped and replaced.
+ * Needs a connection only when the session has to be replaced; selling never needs it.
+ */
 export async function signInDevice(client: SupabaseClient, identity: DeviceIdentity): Promise<boolean> {
   const { data } = await client.auth.getSession();
-  if (data.session) return true;
+  if (data.session?.user.email === identity.authEmail) return true;
+  if (data.session) await client.auth.signOut({ scope: 'local' });
   const { error } = await client.auth.signInWithPassword({
     email: identity.authEmail,
     password: identity.authPassword,
