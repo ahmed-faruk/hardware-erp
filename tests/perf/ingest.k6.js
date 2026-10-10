@@ -1,3 +1,4 @@
+/* global __ENV, __ITER */
 // Ingest burst (docs: skill testing-playbook §6): the three seeded devices push 500 sales invoices each, ten per ingest_batch call.
 // Budget: nothing rejected, p95 of the RPC <= 1 s. Run: k6 run tests/perf/ingest.k6.js (needs `supabase start`; reads the local URL and anon key).
 import http from 'k6/http';
