@@ -28,6 +28,7 @@ import { AppShell, type NavItem } from './components/AppShell';
 import { BigAlert } from './components/BigAlert';
 import { Skeleton } from './components/Skeleton';
 import { SyncStatus } from './components/SyncStatus';
+import { HealthBanner } from './components/HealthBanner';
 import { UpdateBanner } from './components/UpdateBanner';
 import { navigate, useRoute } from './router';
 import { ComingSoonScreen } from './screens/ComingSoonScreen';
@@ -210,7 +211,12 @@ function Shell() {
       status={<SyncStatus online={sync.online} pending={sync.pending} lastSyncAt={sync.lastSyncAt} />}
       workerName={worker?.name ?? ''}
       onLock={lock}
-      banner={<UpdateBanner />}
+      banner={
+        <>
+          <UpdateBanner />
+          <HealthBanner />
+        </>
+      }
     >
       <Suspense fallback={<Skeleton rows={3} />}>{screen}</Suspense>
     </AppShell>
