@@ -2,6 +2,7 @@ import {
   ClipboardList,
   BarChart3,
   Wallet,
+  Banknote,
   Package,
   PackagePlus,
   Settings,
@@ -61,6 +62,9 @@ const PurchasesScreen = lazy(() =>
 );
 const ReportsScreen = lazy(() =>
   import('./screens/ReportsScreen').then((m) => ({ default: m.ReportsScreen })),
+);
+const PayrollScreen = lazy(() =>
+  import('./screens/PayrollScreen').then((m) => ({ default: m.PayrollScreen })),
 );
 const SettingsScreen = lazy(() =>
   import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })),
@@ -145,6 +149,7 @@ const NAV: (NavItem & { action: Action })[] = [
   { path: 'reports', label: strings.nav.reports, icon: BarChart3, action: 'view.reports' },
   { path: 'customers', label: strings.nav.customers, icon: Users, action: 'view.customers' },
   { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'view.suppliers' },
+  { path: 'payroll', label: strings.nav.payroll, icon: Banknote, action: 'view.payroll' },
   { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'view.workers' },
   { path: 'settings', label: strings.nav.settings, icon: Settings, action: 'view.settings' },
 ];
@@ -200,6 +205,7 @@ function Shell() {
     else if (section === 'reports') screen = <ReportsScreen />;
     else if (section === 'customers') screen = <CustomersScreen />;
     else if (section === 'suppliers') screen = <SuppliersScreen />;
+    else if (section === 'payroll') screen = <PayrollScreen />;
     else if (section === 'workers') screen = <WorkersScreen />;
     else if (section === 'settings') screen = <SettingsScreen />;
   }

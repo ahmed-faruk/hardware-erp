@@ -65,6 +65,8 @@ export interface Worker extends Common {
   legacyEmployeeId: number | null;
   /** permission group; null/absent = the role's defaults */
   groupId?: string | null;
+  /** fixed monthly salary in piasters; only manager devices receive it */
+  monthlySalary?: number | null;
 }
 export interface PermissionGroup extends Common {
   name: string;

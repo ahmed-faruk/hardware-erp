@@ -11,6 +11,9 @@ export const DOC_TYPES = [
   'SHF',
   'XFR',
   'CAJ',
+  'ADV',
+  'DED',
+  'SAL',
 ] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 

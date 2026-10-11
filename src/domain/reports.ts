@@ -290,6 +290,8 @@ interface ExpensesData {
     note: string | null;
   }[];
   legacy_count: number;
+  /** net salaries paid in the period (advances are not expenses) */
+  payroll?: { count: number; amount: number };
 }
 
 /** Whole percent of `part` in `whole`, rounded half up; 0 when there is nothing. */
@@ -316,6 +318,16 @@ export function expensesTables(
       totals: [t.total!, String(d.total.count), m(all), all > 0 ? '100%' : '0%'],
       note: d.legacy_count > 0 ? `${t.legacy}: ${d.legacy_count}` : undefined,
     },
+    ...(d.payroll && d.payroll.amount > 0
+      ? [
+          {
+            title: t.payrollTitle!,
+            headers: [t.count!, t.amount!],
+            rows: [[String(d.payroll.count), m(d.payroll.amount)]],
+            note: t.payrollNote,
+          },
+        ]
+      : []),
     {
       title: t.byAccount!,
       headers: [t.account!, t.count!, t.amount!],
@@ -336,6 +348,61 @@ export function expensesTables(
         r.account ?? t.noAccount!,
         m(r.amount),
       ]),
+    },
+  ];
+}
+
+interface PayrollReportData {
+  total: { advances: number; deductions: number; salary: number; net_paid: number; entries: number };
+  by_worker: {
+    employee: string;
+    advances: number;
+    deductions: number;
+    salary: number;
+    net_paid: number;
+    carry_out: number;
+    entries: number;
+  }[];
+  entries: {
+    number: string;
+    at: string;
+    employee: string;
+    kind: string;
+    month: string;
+    amount: number;
+    net: number | null;
+    carry_out: number | null;
+    note: string | null;
+  }[];
+}
+
+/** Payroll: per worker what was advanced, deducted and paid in the period, and every entry. */
+export function payrollTables(
+  d: PayrollReportData,
+  t: ReportLabels,
+  time: (iso: string) => string,
+  kindName: (k: string) => string,
+): ReportTable[] {
+  const x = d.total;
+  return [
+    {
+      title: t.title ?? '',
+      headers: [t.employeeCol!, t.salaryCol!, t.advancesCol!, t.deductionsCol!, t.netPaid!, t.carryCol!],
+      rows: d.by_worker.map((r) => [
+        r.employee,
+        m(r.salary),
+        m(r.advances),
+        m(r.deductions),
+        m(r.net_paid),
+        m(r.carry_out),
+      ]),
+      totals: [t.total!, m(x.salary), m(x.advances), m(x.deductions), m(x.net_paid), ''],
+      note: t.payrollNote,
+    },
+    {
+      title: t.list!,
+      headers: [t.number!, t.time!, t.employeeCol!, t.kindCol!, t.monthCol!, t.amount!],
+      rows: d.entries.map((r) => [r.number, time(r.at), r.employee, kindName(r.kind), r.month, m(r.amount)]),
     },
   ];
 }

@@ -8,6 +8,7 @@ import {
   devicesTable,
   exceptionsTables,
   expensesTables,
+  payrollTables,
   profitTable,
   purchasesTables,
   salesTables,
@@ -38,6 +39,7 @@ type Tab =
   | 'purchases'
   | 'expenses'
   | 'categories'
+  | 'payroll'
   | 'productHistory'
   | 'exceptions'
   | 'devices'
@@ -49,6 +51,7 @@ const TABS: Tab[] = [
   'purchases',
   'expenses',
   'categories',
+  'payroll',
   'productHistory',
   'exceptions',
   'devices',
@@ -91,6 +94,7 @@ export function ReportsScreen() {
       profit: 'report_profit',
       purchases: 'report_purchases',
       expenses: 'report_expenses',
+      payroll: 'report_payroll',
       exceptions: 'report_exceptions',
       devices: 'report_devices',
     }[tab];
@@ -109,9 +113,16 @@ export function ReportsScreen() {
               ? purchasesTables(d, t)
               : tab === 'expenses'
                 ? expensesTables(d, t, time)
-                : tab === 'exceptions'
-                  ? exceptionsTables(d, t, time, reasonName)
-                  : [devicesTable(d, t, time)];
+                : tab === 'payroll'
+                  ? payrollTables(
+                      d,
+                      t,
+                      time,
+                      (k) => (strings.payroll.kinds as Record<string, string>)[k] ?? k,
+                    )
+                  : tab === 'exceptions'
+                    ? exceptionsTables(d, t, time, reasonName)
+                    : [devicesTable(d, t, time)];
       setLoaded({ key, tables, error: null });
     });
     return () => {
