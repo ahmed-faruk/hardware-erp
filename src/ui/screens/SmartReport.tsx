@@ -55,6 +55,7 @@ export function SmartReport() {
     [t.kpiStock, formatMoney(k.stockValue)],
     [t.kpiReceivables, formatMoney(k.receivables), k.receivables > 0],
     [t.kpiPayables, formatMoney(k.payables)],
+    [t.kpiExpenses, formatMoney(k.monthExpenses)],
   ];
 
   return (

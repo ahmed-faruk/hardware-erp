@@ -88,7 +88,28 @@ describe('loadInsights', () => {
       line('l3', 'too-old', 50_000),
     ] as never);
 
+    const exp = (id: string, daysAgo: number, amount: number, status = 'posted') => ({
+      ...stamp,
+      id,
+      number: id,
+      issuedAt: at(daysAgo),
+      workerId: null,
+      shiftId: null,
+      status,
+      voidedBy: null,
+      notes: null,
+      isLegacy: false,
+      legacy: null,
+      categoryId: 'c',
+      amount,
+      cashAccountId: null,
+      supplierId: null,
+    });
+    // today is 10 Oct: the 5 Oct expense counts, a voided one and a September one do not
+    await db.expenses.bulkAdd([exp('e1', 5, 4000), exp('e2', 5, 999, 'voided'), exp('e3', 20, 777)] as never);
+
     const d = await loadInsights(db, NOW);
+    expect(d.kpis.monthExpenses).toBe(4000);
     expect(d.kpis.todayNet).toBe(185_000);
     expect(d.kpis.todayInvoices).toBe(1);
     expect(d.kpis.stockValue).toBe(24 * 72_000);

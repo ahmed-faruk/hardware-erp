@@ -108,6 +108,10 @@ its own Supabase Auth user (random password kept on the device), then calls this
 
 Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
 
+### `report_expenses(p_from date, p_to date)` — manager devices only
+
+Posted expenses of the period (imported ones included): `total`, `by_category`, `by_account` (null = imported, no cash account), `by_day` and the newest 500 in `list`.
+
 ### `report_product_history(p_product uuid, p_from date, p_to date, p_offset int)` — manager devices only
 
 Every movement of one product (period ≤ 3660 days, 500 rows per page, newest first): `{at, doc_type, number, party, in_qty, out_qty, balance, legacy}`. Device movements come from `stock_movements`; imported OpenSourcePOS lines (which never produced movements) are listed with `legacy: true`. Balances run backwards from today's balance, and imported rows continue backwards from the opening quantity.
