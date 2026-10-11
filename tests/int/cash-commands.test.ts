@@ -116,7 +116,7 @@ describe('close shift', () => {
     expect(
       await closeShift(t.ctx, { shiftId: t.s.shiftId, counted: t.count(7000), note: 'نقص' }),
     ).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'cashAdjustment');
+    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'shiftVarianceApprove');
     if (!a.ok) throw new Error(a.code);
     const r = await closeShift(t.ctx, {
       shiftId: t.s.shiftId,
