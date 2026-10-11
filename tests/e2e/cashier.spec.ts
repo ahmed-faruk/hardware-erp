@@ -284,3 +284,21 @@ test('scanning a scale label adds the product with the weight on it', async ({ p
     sql(`delete from settings where key = 'scale.enabled'`);
   }
 });
+
+test('every stocked tile prints the quantity on hand, and it drops after a sale', async ({ page }) => {
+  await start(page);
+  const stockOf = () =>
+    sql(`select coalesce(sum(qty), 0) from stock_movements where product_id = '${productId(2)}'`);
+  const shown = (qty: string) => `${strings.sell.stockOnHand} ${Number(qty) / 1000}`;
+  const before = stockOf();
+  await expect(page.getByTestId(`stock-${productId(2)}`)).toHaveText(shown(before));
+  await tap(page, 2);
+  await vis(page, 'pay').click();
+  await page.getByTestId('pay-cash').click();
+  await page.keyboard.type('20');
+  await page.keyboard.press('Enter');
+  await page.getByTestId('finish').click();
+  await expect(page.getByTestId('done')).toBeVisible();
+  await page.getByTestId('new-sale').click();
+  await expect(page.getByTestId(`stock-${productId(2)}`)).toHaveText(shown(String(Number(before) - 1000)));
+});

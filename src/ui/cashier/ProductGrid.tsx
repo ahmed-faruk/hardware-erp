@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useServices } from '@/app/session';
 import type { HanafyDB } from '@/db/schema';
 import { searchProducts } from '@/db/search';
+import { tileStockText } from '@/domain/stock';
 import type { Product, ProductUnit } from '@/db/types';
 
 import { EmptyState } from '../components/EmptyState';
@@ -80,6 +81,7 @@ export function ProductGrid({ searchText, digits, onAdd }: GridProps) {
           price: p.price,
           iconKey: (p.extraFields as { icon?: string } | null)?.icon ?? cat?.icon ?? null,
           color: cat?.colorToken ?? 'cat-8',
+          stockText: p.type === 'stock' ? tileStockText(qty) : null,
           stockState: qty <= 0 ? 'out' : p.reorderLevel > 0 && qty <= p.reorderLevel ? 'low' : 'ok',
           packName: unit?.name ?? null,
         },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { negativeAfterSale } from './stock';
+import { negativeAfterSale, tileStockText } from './stock';
 
 describe('negativeAfterSale', () => {
   it('lists only the products that would go below zero', () => {
@@ -20,5 +20,14 @@ describe('negativeAfterSale', () => {
       { productId: 'a', before: 3000, sold: 2000 },
     ]);
     expect(r).toEqual([{ productId: 'a', before: 3000, sold: 4000 }]);
+  });
+});
+
+describe('tileStockText', () => {
+  it('shows whole units without decimals, fractions as they are and the minus sign of negative stock', () => {
+    expect(tileStockText(24_000)).toBe('24');
+    expect(tileStockText(2_500)).toBe('2.5');
+    expect(tileStockText(0)).toBe('0');
+    expect(tileStockText(-2_500)).toBe('-2.5');
   });
 });

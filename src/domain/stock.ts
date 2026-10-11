@@ -1,4 +1,4 @@
-import type { Milli } from './money';
+import { formatQty, type Milli } from './money';
 
 export interface StockLine {
   productId: string;
@@ -17,3 +17,6 @@ export function negativeAfterSale(lines: StockLine[]): StockLine[] {
   }
   return [...byProduct.values()].filter((l) => l.before - l.sold < 0);
 }
+
+/** The quantity on a sale-screen tile: whole units without decimals, fractions as they are (2.5), negative with its minus sign. */
+export const tileStockText = (qtyMilli: Milli): string => formatQty(qtyMilli);
