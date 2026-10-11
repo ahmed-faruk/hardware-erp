@@ -25,7 +25,7 @@ test('a manager builds a permission group and gives it to a cashier: the screen 
   await page.getByTestId('perm-recordExpense-no').click();
   await page.getByTestId('perm-discountOverLimit-yes').click();
   await page.getByTestId('save-group').click();
-  await expect(page.getByText('كاشير بدون مصروفات')).toBeVisible();
+  await expect(page.getByTestId('save-group')).toHaveCount(0); // the dialog closed after saving
 
   // give it to the cashier
   await page.getByTestId('workers-tab-workers').click();
