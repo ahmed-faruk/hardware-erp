@@ -54,6 +54,8 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 | Reports | Daily sales, profit (manager), stock on hand + low stock, customer/supplier statements, shift X/Z, exceptions, device sync status | §15 |
 | Migration | Full OSPOS export → validated import, archive of history, approved opening balances | §20, `docs/DATABASE.md` §9 |
 
+> **Added by the owner on 2026-10-11 (outside the original MVP list, approved by him):** available quantity on sale tiles; permission groups for every screen and button; purchases paid from the safe and/or the owner's pocket; item movement history (imported history included); expenses report; category KPIs and charts; payroll (salary, advances, deductions) with reports; smart overview report.
+
 ## 7. User flows (each is an e2e test)
 1. **Cash sale:** scan or tap photos → adjust qty → pay (cash) → change shown as notes → receipt prints → drawer opens.
 2. **Credit sale + collection:** pick customer by photo/phone → credit or split → receipt shows old/new balance →

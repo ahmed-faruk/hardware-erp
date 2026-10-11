@@ -22,6 +22,7 @@ const SCREENS = [
   { hash: 'customers', title: strings.customers.title },
   { hash: 'suppliers', title: strings.suppliers.title },
   { hash: 'workers', title: strings.workers.title },
+  { hash: 'payroll', title: strings.payroll.title },
   { hash: 'purchases', title: strings.purchases.title },
   { hash: 'stock', title: strings.stock.title },
   { hash: 'expenses', title: strings.cash.expenses },
@@ -90,6 +91,54 @@ test('responsive: no horizontal scroll, tap targets >= 44 px, side rail from 900
       await page.screenshot({
         path: info.outputPath(`${screen.hash.replace('/', '-')}-${width}x${height}.png`),
       });
+    }
+  }
+  expect(problems).toEqual([]);
+});
+
+test('responsive: every report tab fits every width (no horizontal scroll, targets >= 44 px)', async ({
+  page,
+}) => {
+  const f = newFixture();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await activateAndLogin(page, f);
+  await page.evaluate(() => (window.location.hash = '#/reports'));
+  await expect(page.getByRole('heading', { name: strings.reports.title })).toBeVisible();
+  const problems: string[] = [];
+  for (const [width, height] of VIEWPORTS) {
+    await page.setViewportSize({ width, height });
+    for (const tab of [
+      'smart',
+      'sales',
+      'profit',
+      'purchases',
+      'expenses',
+      'categories',
+      'payroll',
+      'productHistory',
+      'exceptions',
+      'devices',
+      'stock',
+    ]) {
+      await page.getByTestId(`report-tab-${tab}`).click();
+      await expect(page.getByTestId(`report-tab-${tab}`)).toHaveAttribute('aria-selected', 'true');
+      await page.waitForTimeout(150);
+      const scrolls = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      if (scrolls) problems.push(`${width}px report tab ${tab}: horizontal scroll`);
+      const small = await page.evaluate(() =>
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            'main button, main select, main input:not([type=checkbox]):not([type=hidden])',
+          ),
+        ]
+          .filter(
+            (el) =>
+              el.getBoundingClientRect().width > 0 &&
+              (el.getBoundingClientRect().height < 43.5 || el.getBoundingClientRect().width < 43.5),
+          )
+          .map((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 20)),
+      );
+      for (const x of small) problems.push(`${width}px report tab ${tab}: small target "${x}"`);
     }
   }
   expect(problems).toEqual([]);
