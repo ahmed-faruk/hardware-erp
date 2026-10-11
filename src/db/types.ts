@@ -195,7 +195,8 @@ export interface SalesInvoiceLine extends Common {
 export interface Payment extends Common {
   documentType: string;
   documentId: string;
-  method: 'cash' | 'credit' | 'card' | 'instapay' | 'wallet' | 'other';
+  /** `owner` = paid from the owner's pocket: no cash account moves and nobody is owed (purchases only) */
+  method: 'cash' | 'credit' | 'card' | 'instapay' | 'wallet' | 'other' | 'owner';
   amount: number;
   reference: string | null;
   cashAccountId: string | null;

@@ -60,7 +60,7 @@ async function setup(role: DeviceContext['role'] = 'manager') {
   const buy = (
     qtyMilli: number,
     unitCost: number,
-    pays: { method: 'cash' | 'credit'; amount: number }[],
+    pays: { method: 'cash' | 'credit' | 'owner'; amount: number }[],
     extra: Record<string, unknown> = {},
   ) =>
     postPurchase(ctx, {
@@ -139,6 +139,43 @@ describe('purchase', () => {
     expect((await t.stock()) - before).toBe(24000);
     const m = (await t.ctx.db.stockMovements.toArray()).find((x) => x.docType === 'purchase_invoice')!;
     expect(m.unitCost).toBe(500);
+  });
+});
+
+describe('paid from the owner pocket', () => {
+  it('moves no cash and creates no debt to the owner: only the credit part is owed', async () => {
+    const t = await setup();
+    const r = await t.buy(10000, 1000, [
+      { method: 'cash', amount: 4000 },
+      { method: 'owner', amount: 3000 },
+      { method: 'credit', amount: 3000 },
+    ]);
+    expect(r).toMatchObject({ ok: true, total: 10000 });
+    expect(
+      (await t.ctx.db.cashMovements.toArray())
+        .filter((m) => m.docType === 'purchase_invoice')
+        .map((m) => m.amount),
+    ).toEqual([-4000]);
+    expect(await t.owed()).toBe(-3000);
+    const pays = (await t.ctx.db.payments.toArray()).map((p) => [p.method, p.amount]);
+    expect(pays).toEqual(expect.arrayContaining([['owner', 3000]]));
+  });
+
+  it('needs the payFromOwner right: a storekeeper (or a group without it) is refused, nothing is written', async () => {
+    const t = await setup('storekeeper');
+    const r = await t.buy(1000, 500, [{ method: 'owner', amount: 500 }]);
+    expect(r).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect(await t.ctx.db.purchaseInvoices.count()).toBe(0);
+  });
+
+  it('a supplier payment from the owner pocket lowers what we owe without touching a cash account', async () => {
+    const t = await setup();
+    await t.buy(10000, 1000, [{ method: 'credit', amount: 10000 }]);
+    const r = await postSupplierPayment(t.ctx, { supplierId: t.supplier.id, amount: 4000, method: 'owner' });
+    expect(r).toMatchObject({ ok: true, balanceAfter: -6000 });
+    expect(
+      (await t.ctx.db.cashMovements.toArray()).filter((m) => m.docType === 'supplier_payment'),
+    ).toHaveLength(0);
   });
 });
 

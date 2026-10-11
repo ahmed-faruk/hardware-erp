@@ -47,6 +47,59 @@ export function salesTables(d: SalesData, t: ReportLabels, methodName: (k: strin
   ];
 }
 
+interface PurchasesTotals {
+  invoices: number;
+  total: number;
+  safe: number;
+  owner: number;
+  other: number;
+  credit: number;
+  returns: number;
+  later_owner: number;
+  later_other: number;
+}
+interface PurchasesData {
+  total: PurchasesTotals;
+  by_supplier: (PurchasesTotals & { supplier: string })[];
+  legacy_invoices: number;
+}
+
+/** Purchases: where the money came from (safe / the owner's pocket / bank / still owed), in total and per supplier. */
+export function purchasesTables(d: PurchasesData, t: ReportLabels): ReportTable[] {
+  const x = d.total;
+  return [
+    {
+      title: t.title ?? '',
+      headers: [t.item!, t.amount!],
+      rows: [
+        [t.invoices!, String(x.invoices)],
+        [t.purchTotal!, m(x.total)],
+        [t.fromSafe!, m(x.safe)],
+        [t.fromOwner!, m(x.owner)],
+        [t.otherPay!, m(x.other)],
+        [t.onCredit!, m(x.credit)],
+        [t.returns!, m(x.returns)],
+        [t.laterOwner!, m(x.later_owner)],
+        [t.laterOther!, m(x.later_other)],
+      ],
+      note: d.legacy_invoices > 0 ? `${t.legacy}: ${d.legacy_invoices}` : undefined,
+    },
+    {
+      title: t.bySupplier!,
+      headers: [t.supplier!, t.purchTotal!, t.fromSafe!, t.fromOwner!, t.onCredit!, t.returns!],
+      rows: d.by_supplier.map((r) => [
+        r.supplier,
+        m(r.total),
+        m(r.safe),
+        m(r.owner),
+        m(r.credit),
+        m(r.returns),
+      ]),
+      totals: [t.total!, m(x.total), m(x.safe), m(x.owner), m(x.credit), m(x.returns)],
+    },
+  ];
+}
+
 interface ProfitData {
   days: { day: string; revenue: number; cost: number; profit: number }[];
   total: { revenue: number; cost: number; profit: number };

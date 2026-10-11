@@ -85,7 +85,7 @@ Every document has: `number`, `issued_at`, `worker_id`, `shift_id` (cashier docu
 | `purchase_invoice_lines` | invoice_id, line_no, product_id null, product_unit_id, unit_factor, qty, unit_cost, discount, net_amount, legacy_text |
 | `purchase_returns` / `purchase_return_lines` | same shape as purchase, `original_invoice_id` null; each line may carry `original_line_id` (the purchase line it sends back, quantity capped at bought − returned) |
 | `customer_receipts` | customer_id, amount, method, reference |
-| `supplier_payments` | supplier_id, amount, method, reference |
+| `supplier_payments` | supplier_id, amount, method (`cash`, `card`, `instapay`, `wallet`, `other`, `owner`), reference | `owner` = paid from the owner's pocket: no cash movement, no debt to the owner (needs `payFromOwner`) |
 | `stock_adjustments` | warehouse_id, reason_code, approved_by |
 | `stock_adjustment_lines` | adjustment_id, product_id, qty_delta, unit_cost |
 | `expenses` | category_id, amount, cash_account_id, supplier_id null |
