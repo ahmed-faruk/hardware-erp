@@ -44,3 +44,16 @@
 
 ## الفجوات الثمانية اتقفلت
 سجل التدقيق + قفل الشاشة، النسخة الاحتياطية، البيع بالسالب، سند تسوية الخزنة، التحصيل/السداد على فواتير، قوائم الأسعار، باركود الميزان: كلها مبنية ومختبرة (انظر PR الخطوة 4).
+
+## إضافات المالك (خطة التعديل الثانية، ١١ أكتوبر ٢٠٢٦)
+| البند | الحالة | الدليل |
+|---|---|---|
+| الكمية المتاحة على كارت الصنف في شاشة البيع | ✅ | `tests/e2e/cashier.spec.ts` (tile stock) |
+| صلاحيات بمجموعات لكل شاشة وزرار | ✅ | `supabase/tests/permissions.test.sql`, `tests/int/permissions.test.ts`, `tests/e2e/permissions.spec.ts` |
+| الدفع لفواتير المشتريات من الخزنة / من خارج الخزنة | ✅ | `supabase/tests/owner_paid.test.sql`, `tests/e2e/owner-paid.spec.ts` |
+| سجل حركات الصنف (بما فيها النظام القديم) | ✅ | `supabase/tests/item_history.test.sql`, `tests/e2e/item-history.spec.ts` |
+| تقارير المصروفات | ✅ | `supabase/tests/expense_report.test.sql`, `tests/e2e/expense-report.spec.ts` |
+| KPIs ورسم بياني للمبيعات حسب التصنيف | ✅ | `supabase/tests/category_report.test.sql`, `tests/e2e/category-report.spec.ts` |
+| المرتبات والسلف والخصومات وتقاريرها | ✅ | `supabase/tests/payroll.test.sql`, `tests/int/payroll-commands.test.ts`, `tests/e2e/payroll.spec.ts` |
+| مسارات tester-army 10–14 | ✅ | `tests/agent/10..14-*.e2e.ts` |
+

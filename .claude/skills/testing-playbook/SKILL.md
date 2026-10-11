@@ -51,7 +51,7 @@ Selectors: `getByRole` with Arabic accessible names or `data-testid`; never CSS 
 Visual: `expect(page).toHaveScreenshot()` per viewport for cashier, payment, receipt preview.
 
 ## 5b. tester-army suite (tests/agent)
-- Nine PRD flows in `tests/agent/*.e2e.ts`, run by `npm run test:agent` (needs `supabase start`; it builds and serves the app on :4174).
+- The nine PRD flows plus five owner-requested ones (owner-paid purchase, payroll, permission groups, category report, item history) in `tests/agent/*.e2e.ts`, run by `npm run test:agent` (needs `supabase start`; it builds and serves the app on :4174).
 - Every step is an exact locator action (`screen.getByTestId(...)`), every check is `expect` or SQL. No `agent.act`, so no model, no API key, no recording, no cost. Do not add agent steps without asking the owner (they need a paid key).
 - PINs are typed key by key from the fixture. Helpers live in `tests/agent/helpers.ts`.
 - CI runs the same command in `nightly.yml` job `agent-replay`. The Playwright tests in `tests/e2e` stay; this suite does not replace them.
