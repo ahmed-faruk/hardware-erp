@@ -4,6 +4,7 @@ import {
   devicesTable,
   expensesTables,
   historyTable,
+  payrollTables,
   percentOf,
   profitTable,
   purchasesTables,
@@ -213,5 +214,61 @@ describe('expenses report', () => {
     expect(percentOf(1, 3)).toBe(33);
     expect(percentOf(2, 3)).toBe(67);
     expect(percentOf(0, 0)).toBe(0);
+  });
+});
+
+describe('payroll report', () => {
+  it('lists per worker what was advanced, deducted and paid, and every entry', () => {
+    const r = payrollTables(
+      {
+        total: { advances: 50000, deductions: 10000, salary: 300000, net_paid: 240000, entries: 3 },
+        by_worker: [
+          {
+            employee: 'علاء',
+            advances: 50000,
+            deductions: 10000,
+            salary: 300000,
+            net_paid: 240000,
+            carry_out: 0,
+            entries: 3,
+          },
+        ],
+        entries: [
+          {
+            number: 'K1-SAL-000001',
+            at: '2026-10-31T10:00:00Z',
+            employee: 'علاء',
+            kind: 'salary',
+            month: '2026-10',
+            amount: 240000,
+            net: 240000,
+            carry_out: 0,
+            note: null,
+          },
+        ],
+      },
+      t,
+      (iso) => iso.slice(0, 10),
+      (k) => k.toUpperCase(),
+    );
+    expect(r[0]!.rows).toEqual([['علاء', '3000.00', '500.00', '100.00', '2400.00', '0.00']]);
+    expect(r[0]!.totals).toEqual(['total', '3000.00', '500.00', '100.00', '2400.00', '']);
+    expect(r[1]!.rows[0]).toEqual(['K1-SAL-000001', '2026-10-31', 'علاء', 'SALARY', '2026-10', '2400.00']);
+  });
+  it('the expenses report shows the net salaries as their own line', () => {
+    const base = {
+      total: { count: 0, amount: 0 },
+      by_category: [],
+      by_account: [],
+      by_day: [],
+      list: [],
+      legacy_count: 0,
+    };
+    expect(
+      expensesTables({ ...base, payroll: { count: 2, amount: 480000 } }, t, (i) => i).map((x) => x.title),
+    ).toContain('payrollTitle');
+    expect(
+      expensesTables({ ...base, payroll: { count: 0, amount: 0 } }, t, (i) => i).map((x) => x.title),
+    ).not.toContain('payrollTitle');
   });
 });

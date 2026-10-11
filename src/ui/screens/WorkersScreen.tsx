@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { saveWorker } from '@/db/commands/save-master';
+import { formatMoney, toPiasters } from '@/domain/money';
 import type { Worker } from '@/db/types';
 
 import { PermissionGroups } from './PermissionGroups';
@@ -14,6 +15,7 @@ import { type Column, DataTable } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
 import { FormField } from '../components/FormField';
+import { NumberField } from '../components/NumberField';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
@@ -105,6 +107,7 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
   const [role, setRole] = useState<Worker['role']>(worker?.role ?? 'cashier');
   const [active, setActive] = useState(worker?.active ?? true);
   const [groupId, setGroupId] = useState(worker?.groupId ?? '');
+  const [salary, setSalary] = useState<number | null>(worker?.monthlySalary ?? null);
   const groups = useLiveQuery(() => db.permissionGroups.filter((g) => !g.deletedAt).toArray(), [db]);
   const [changePin, setChangePin] = useState(!worker);
   const [pin, setPin] = useState('');
@@ -126,7 +129,14 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
           saveWorker(context, {
             id: worker?.id,
             baseVersion: worker?.version,
-            fields: { name, role, active, groupId: groupId || null, ...(changePin ? { pin } : {}) },
+            fields: {
+              name,
+              role,
+              active,
+              groupId: groupId || null,
+              monthlySalary: salary,
+              ...(changePin ? { pin } : {}),
+            },
           }),
         );
       }}
@@ -159,6 +169,13 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
           </select>
         )}
       </FormField>
+      <NumberField
+        label={strings.workers.monthlySalary}
+        value={salary}
+        onChange={setSalary}
+        parse={toPiasters}
+        format={formatMoney}
+      />
       <FormField label={strings.permissions.group}>
         {(id) => (
           <select

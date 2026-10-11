@@ -142,6 +142,7 @@ export const workerFieldsSchema = z
     active: z.boolean(),
     pin: z.string().regex(/^\d{6,12}$/),
     groupId: id.nullable(),
+    monthlySalary: z.number().int().min(0).max(100_000_000).nullable(),
   })
   .partial()
   .strict();

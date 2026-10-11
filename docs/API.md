@@ -112,6 +112,10 @@ Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
 
 Sales by product category for the period (imported history included): per category `qty`, `revenue` (after the invoice discount share, returns subtracted), `cost`, `profit`, `invoices`, plus the stock it ties up (`items`, `stock_value`), and `days` = revenue per day × category for the chart. A product's category is its current one; lines without a product count under category `null`.
 
+### `report_payroll(p_from date, p_to date)` — manager devices only
+
+Per worker what was advanced, deducted and paid in the period (`total`, `by_worker`, newest 1000 `entries`). `report_expenses` also returns `payroll` = net salaries paid (advances are not expenses).
+
 ### `report_expenses(p_from date, p_to date)` — manager devices only
 
 Posted expenses of the period (imported ones included): `total`, `by_category`, `by_account` (null = imported, no cash account), `by_day` and the newest 500 in `list`.
@@ -191,3 +195,7 @@ outbox + audit) → returns a result. Commands never throw for business errors; 
 | GitHub Actions                | CI/CD, nightly backup     | repo secrets (`docs/SECURITY.md` §3)                      | GitHub               | no deploys; app unaffected                |
 | OpenSourcePOS (until cutover) | data source for migration | none (browser session)                                    | `tools/ospos-export` | export waits                              |
 | ETA e-receipt                 | deferred                  | —                                                         | —                    | —                                         |
+
+## Payroll entries (push)
+
+`payroll_entries` (action `managePayroll`): `ingest_payroll_bundle` checks the number prefix (`ADV`/`DED`/`SAL`), the worker, the month, that an advance (and a salary with net > 0) embeds exactly one cash movement from a non-drawer account, that a deduction embeds none and is refused for an already paid month, and recomputes the salary slip on the server: net = max(0, salary − month deductions − advances since the last salary − carry in), carry out = the shortfall. A mismatching slip or a second salary for the month is `E_VALIDATION`.
