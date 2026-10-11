@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { validateAllocations } from '../allocations';
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
-import { newCommon, type DeviceContext } from './context';
+import { approvalRole, canCtx, newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
@@ -26,7 +26,6 @@ import {
 } from '@/domain/adjustment';
 import { baseQty, movingAverage } from '@/domain/costing';
 import { mulDivRound } from '@/domain/money';
-import { can } from '@/domain/permissions';
 import { computePurchase, costPerBase } from '@/domain/purchase';
 import { err, type Err } from '@/domain/result';
 import { computeReturnLine, type PriorReturn } from '@/domain/returns';
@@ -158,8 +157,8 @@ export async function postPurchase(
   const parsed = purchaseInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات الفاتورة غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
-  if (input.lines.some((l) => l.newSalePrice !== null) && can(ctx.role, 'editPrices') !== 'yes')
+  if (canCtx(ctx, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (input.lines.some((l) => l.newSalePrice !== null) && canCtx(ctx, 'editPrices') !== 'yes')
     return err('E_FORBIDDEN', 'السعر للمدير بس');
   const { db } = ctx;
   const supplier = await db.suppliers.get(input.supplierId);
@@ -352,7 +351,7 @@ export async function postPurchaseReturn(
   const parsed = purchaseReturnInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات المرتجع غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.originalInvoiceId === null && ctx.role !== 'manager')
     return err('E_FORBIDDEN', 'من غير فاتورة للمدير بس');
   const { db } = ctx;
@@ -553,7 +552,7 @@ export async function postSupplierPayment(
   const parsed = supplierPaymentInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات السداد غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'supplierPayment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'supplierPayment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.method === 'cash' && !input.cashAccountId) return err('E_VALIDATION', 'اختار الخزنة');
   if (input.method !== 'cash' && !input.reference) return err('E_VALIDATION', 'المرجع مطلوب');
   const { db } = ctx;
@@ -670,7 +669,7 @@ export async function postStockAdjustment(
   const parsed = adjustmentInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات التسوية غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'stockAdjustment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'stockAdjustment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.lines.some((l) => !reasonFitsDelta(input.reason, l.qtyDeltaMilli)))
     return err('E_VALIDATION', 'الكمية لا تناسب السبب');
   const { db } = ctx;
@@ -684,10 +683,12 @@ export async function postStockAdjustment(
   let approver: string | null = null;
   let token: string | null = null;
   // a device below manager level has no costs, so its value reads 0: the server decides there with the real cost and refuses
-  if (adjustmentNeedsApproval(settings.stockApprovalAbove, ctx.role, value)) {
-    token = input.approvalTokens.find((t) => peekApproval(t, 'stockAdjustment')) ?? null;
-    const approval = token ? peekApproval(token, 'stockAdjustment') : null;
-    if (!token || !approval) return err('APPROVAL_REQUIRED', 'stockAdjustment');
+  if (
+    adjustmentNeedsApproval(settings.stockApprovalAbove, approvalRole(ctx, 'stockAdjustmentOverLimit'), value)
+  ) {
+    token = input.approvalTokens.find((t) => peekApproval(t, 'stockAdjustmentOverLimit')) ?? null;
+    const approval = token ? peekApproval(token, 'stockAdjustmentOverLimit') : null;
+    if (!token || !approval) return err('APPROVAL_REQUIRED', 'stockAdjustmentOverLimit');
     approver = approval.approvedBy;
   }
   const adjId = uuidv7();

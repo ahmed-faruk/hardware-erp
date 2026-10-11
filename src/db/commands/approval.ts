@@ -1,4 +1,5 @@
 import { err, ok, type Result } from '@/domain/result';
+import { workerAccess } from '../permissions';
 import type { Action } from '@/domain/permissions';
 
 import type { DeviceContext } from './context';
@@ -26,7 +27,12 @@ export async function approveWithPin(
   nowMs: number = Date.now(),
 ): Promise<Result<Approval>> {
   const manager = await ctx.db.workers.get(managerId);
-  if (!manager || !manager.active || manager.deletedAt || manager.role !== 'manager')
+  if (
+    !manager ||
+    !manager.active ||
+    manager.deletedAt ||
+    (await workerAccess(ctx.db, manager, action)) !== 'yes'
+  )
     return err('E_FORBIDDEN', 'غير مسموح');
   const checked = await checkPin(ctx, managerId, pin, nowMs);
   if (!checked.ok) return checked;

@@ -18,7 +18,7 @@ import { SessionProvider, useServices, useSession, type Services } from '@/app/s
 import { APP_VERSION } from '@/app/version';
 import { HanafyDB } from '@/db/schema';
 import { rebuildSearchIndex } from '@/db/search';
-import { can, type Action } from '@/domain/permissions';
+import type { Action } from '@/domain/permissions';
 import { requestPersistence } from '@/sync/backup';
 import { SyncRunner } from '@/sync/runner';
 import { createAppSupabase } from '@/sync/supabase';
@@ -136,17 +136,17 @@ export function App() {
 }
 
 const NAV: (NavItem & { action: Action })[] = [
-  { path: 'sell', label: strings.nav.sell, icon: ShoppingCart, action: 'sell' },
-  { path: 'products', label: strings.nav.products, icon: Package, action: 'editProductData' },
-  { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'editProductData' },
-  { path: 'purchases', label: strings.nav.purchases, icon: PackagePlus, action: 'receivePurchase' },
-  { path: 'stock', label: strings.nav.stock, icon: ClipboardList, action: 'stockAdjustment' },
-  { path: 'expenses', label: strings.nav.expenses, icon: Wallet, action: 'settings' },
-  { path: 'reports', label: strings.nav.reports, icon: BarChart3, action: 'settings' },
-  { path: 'customers', label: strings.nav.customers, icon: Users, action: 'settings' },
-  { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'settings' },
-  { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'manageUsers' },
-  { path: 'settings', label: strings.nav.settings, icon: Settings, action: 'settings' },
+  { path: 'sell', label: strings.nav.sell, icon: ShoppingCart, action: 'view.sell' },
+  { path: 'products', label: strings.nav.products, icon: Package, action: 'view.products' },
+  { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'view.categories' },
+  { path: 'purchases', label: strings.nav.purchases, icon: PackagePlus, action: 'view.purchases' },
+  { path: 'stock', label: strings.nav.stock, icon: ClipboardList, action: 'view.stock' },
+  { path: 'expenses', label: strings.nav.expenses, icon: Wallet, action: 'view.expenses' },
+  { path: 'reports', label: strings.nav.reports, icon: BarChart3, action: 'view.reports' },
+  { path: 'customers', label: strings.nav.customers, icon: Users, action: 'view.customers' },
+  { path: 'suppliers', label: strings.nav.suppliers, icon: Truck, action: 'view.suppliers' },
+  { path: 'workers', label: strings.nav.workers, icon: UserCog, action: 'view.workers' },
+  { path: 'settings', label: strings.nav.settings, icon: Settings, action: 'view.settings' },
 ];
 
 function Gate() {
@@ -173,12 +173,12 @@ function Revoked() {
 }
 
 function Shell() {
-  const { worker, lock } = useSession();
+  const { worker, lock, can } = useSession();
   const { runner } = useServices();
   const sync = useSyncExternalStore(runner.subscribe, runner.getSnapshot);
   const route = useRoute();
   const role = worker?.role ?? 'cashier';
-  const nav = NAV.filter((n) => can(role, n.action) === 'yes');
+  const nav = NAV.filter((n) => can(n.action) === 'yes');
   const section = route[0] ?? '';
   const allowed = nav.some((n) => n.path === section);
 

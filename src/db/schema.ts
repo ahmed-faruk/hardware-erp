@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 
 import type * as T from './types';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Dexie names (camelCase) -> server table names (snake_case). */
 export const SERVER_TABLE: Record<string, string> = {
@@ -36,6 +36,7 @@ export const SERVER_TABLE: Record<string, string> = {
   expenses: 'expenses',
   cashTransfers: 'cash_transfers',
   cashAdjustments: 'cash_adjustments',
+  permissionGroups: 'permission_groups',
   voids: 'voids',
   openings: 'openings',
   payments: 'payments',
@@ -80,6 +81,7 @@ export class HanafyDB extends Dexie {
   expenses!: Table<T.DocRow, string>;
   cashTransfers!: Table<T.DocRow, string>;
   cashAdjustments!: Table<T.DocRow, string>;
+  permissionGroups!: Table<T.PermissionGroup, string>;
   voids!: Table<T.DocRow, string>;
   openings!: Table<T.DocRow, string>;
   payments!: Table<T.Payment, string>;
@@ -160,5 +162,7 @@ export class HanafyDB extends Dexie {
     });
     // v4: cash adjustment vouchers (FIN-11)
     this.version(4).stores({ cashAdjustments: 'id, &number, issuedAt' });
+    // v5: permission groups, a worker may belong to one
+    this.version(5).stores({ permissionGroups: 'id' });
   }
 }

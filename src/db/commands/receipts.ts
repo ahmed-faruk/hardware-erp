@@ -1,8 +1,7 @@
 import { buildReceipt, type ReceiptData, type ReceiptKind } from '@/domain/receipt';
-import { can } from '@/domain/permissions';
 import { err, ok, type Result } from '@/domain/result';
 
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso } from '../ids';
 import { enqueue } from '../outbox';
 import type { HanafyDB } from '../schema';
@@ -205,7 +204,7 @@ async function audit(
 
 /** POS-12: a reprint is allowed for whoever can sell, marked "copy" and written to the audit log. */
 export async function reprintInvoice(ctx: DeviceContext, invoiceId: string): Promise<Result<ReceiptData>> {
-  if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const receipt = await loadReceipt(ctx.db, invoiceId, true);
   if (!receipt.ok) return receipt;
   const { db } = ctx;
@@ -240,10 +239,10 @@ export async function noSale(
   approvalToken?: string,
 ): Promise<Result<NoSaleSlipData>> {
   if (!NO_SALE_REASONS.includes(reason)) return err('E_VALIDATION', 'سبب غير صحيح');
-  if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
-  const approval =
-    ctx.role === 'manager' ? null : approvalToken ? peekApproval(approvalToken, 'noSaleDrawer') : null;
-  if (ctx.role !== 'manager' && !approval) return err('APPROVAL_REQUIRED', 'noSaleDrawer');
+  if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
+  const free = canCtx(ctx, 'noSaleDrawer') === 'yes';
+  const approval = free ? null : approvalToken ? peekApproval(approvalToken, 'noSaleDrawer') : null;
+  if (!free && !approval) return err('APPROVAL_REQUIRED', 'noSaleDrawer');
   if (approvalToken && approval) spendApproval(approvalToken);
   const { db } = ctx;
   const at = nowIso();

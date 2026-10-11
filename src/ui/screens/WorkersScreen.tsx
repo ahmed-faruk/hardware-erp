@@ -6,6 +6,8 @@ import { useServices, useSession } from '@/app/session';
 import { saveWorker } from '@/db/commands/save-master';
 import type { Worker } from '@/db/types';
 
+import { PermissionGroups } from './PermissionGroups';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { type Column, DataTable } from '../components/DataTable';
@@ -20,6 +22,8 @@ import { useSaver } from './useSaver';
 
 export function WorkersScreen() {
   const { db } = useServices();
+  const { can } = useSession();
+  const [tab, setTab] = useState<'workers' | 'groups'>('workers');
   const [editing, setEditing] = useState<Worker | 'new' | null>(null);
   const workers = useLiveQuery(() => db.workers.filter((w) => !w.deletedAt).toArray(), [db]);
   const columns: Column<Worker>[] = [
@@ -34,30 +38,52 @@ export function WorkersScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.workers.title}</h1>
-      <div className={styles.toolbar}>
-        <div className={styles.fixed}>
-          <ActionButton
-            label={strings.workers.newWorker}
-            icon={Plus}
-            onClick={() => setEditing('new')}
-            testId="new-worker"
-          />
+      {can('manageGroups') === 'yes' && (
+        <div className={styles.toolbar}>
+          <div className={styles.fixed}>
+            <SegmentedControl
+              label={strings.workers.title}
+              options={[
+                { key: 'workers', label: strings.permissions.workersTab },
+                { key: 'groups', label: strings.permissions.groups },
+              ]}
+              value={tab}
+              onChange={setTab}
+              testIdPrefix="workers-tab-"
+            />
+          </div>
         </div>
-      </div>
-      {!workers ? (
-        <Skeleton />
-      ) : workers.length === 0 ? (
-        <EmptyState icon={UserCog} word={strings.workers.noWorkers} />
+      )}
+      {tab === 'groups' ? (
+        <PermissionGroups />
       ) : (
-        <DataTable
-          label={strings.workers.title}
-          rows={[...workers].sort(
-            (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'ar'),
+        <>
+          <div className={styles.toolbar}>
+            <div className={styles.fixed}>
+              <ActionButton
+                label={strings.workers.newWorker}
+                icon={Plus}
+                onClick={() => setEditing('new')}
+                testId="new-worker"
+              />
+            </div>
+          </div>
+          {!workers ? (
+            <Skeleton />
+          ) : workers.length === 0 ? (
+            <EmptyState icon={UserCog} word={strings.workers.noWorkers} />
+          ) : (
+            <DataTable
+              label={strings.workers.title}
+              rows={[...workers].sort(
+                (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'ar'),
+              )}
+              columns={columns}
+              rowKey={(w) => w.id}
+              onRowClick={setEditing}
+            />
           )}
-          columns={columns}
-          rowKey={(w) => w.id}
-          onRowClick={setEditing}
-        />
+        </>
       )}
       <Dialog
         title={editing === 'new' ? strings.workers.newWorker : strings.workers.editWorker}
@@ -73,10 +99,13 @@ export function WorkersScreen() {
 }
 
 function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => void }) {
+  const { db } = useServices();
   const { context } = useSession();
   const [name, setName] = useState(worker?.name ?? '');
   const [role, setRole] = useState<Worker['role']>(worker?.role ?? 'cashier');
   const [active, setActive] = useState(worker?.active ?? true);
+  const [groupId, setGroupId] = useState(worker?.groupId ?? '');
+  const groups = useLiveQuery(() => db.permissionGroups.filter((g) => !g.deletedAt).toArray(), [db]);
   const [changePin, setChangePin] = useState(!worker);
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
@@ -97,7 +126,7 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
           saveWorker(context, {
             id: worker?.id,
             baseVersion: worker?.version,
-            fields: { name, role, active, ...(changePin ? { pin } : {}) },
+            fields: { name, role, active, groupId: groupId || null, ...(changePin ? { pin } : {}) },
           }),
         );
       }}
@@ -125,6 +154,24 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
             {(['cashier', 'storekeeper', 'manager'] as const).map((r) => (
               <option key={r} value={r}>
                 {strings.roles[r]}
+              </option>
+            ))}
+          </select>
+        )}
+      </FormField>
+      <FormField label={strings.permissions.group}>
+        {(id) => (
+          <select
+            id={id}
+            className="control"
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
+            data-testid="worker-group"
+          >
+            <option value="">{strings.permissions.byRole}</option>
+            {(groups ?? []).map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
               </option>
             ))}
           </select>

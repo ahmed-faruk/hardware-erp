@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { validateAllocations } from '../allocations';
 import { drawerBalance } from '../cash';
@@ -11,7 +11,6 @@ import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
 import type { AuditRow, CashMovement, LooseRow, PartyLedgerRow, Payment, StockMovement } from '../types';
 import { mulDivRound } from '@/domain/money';
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import { allocateRefund, computeReturnLine, type PriorReturn } from '@/domain/returns';
 import { isWithinReturnPeriod } from '@/domain/returnWindow';
@@ -59,7 +58,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   if (!parsed.success) return err('E_VALIDATION', 'بيانات المرتجع غير صحيحة');
   const input = parsed.data;
   const byInvoice = input.originalInvoiceId !== null;
-  if (can(ctx.role, byInvoice ? 'returnWithInvoice' : 'returnWithoutInvoice') !== 'yes')
+  if (canCtx(ctx, byInvoice ? 'returnWithInvoice' : 'returnWithoutInvoice') !== 'yes')
     return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   const now = nowIso();
@@ -294,7 +293,7 @@ export async function voidInvoice(
   ctx: DeviceContext,
   input: { invoiceId: string; reason: (typeof VOID_REASONS)[number]; shiftId: string | null },
 ): Promise<{ ok: true; id: string; number: string } | Err> {
-  if (can(ctx.role, 'void') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'void') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (!VOID_REASONS.includes(input.reason)) return err('E_VALIDATION', 'السبب مطلوب');
   const { db } = ctx;
   const invoice = await db.salesInvoices.get(input.invoiceId);
@@ -425,7 +424,7 @@ export async function postCustomerReceipt(
   const parsed = receiptInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات التحصيل غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'customerReceipt') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'customerReceipt') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.method !== 'cash' && !input.reference) return err('E_VALIDATION', 'المرجع مطلوب');
   if (input.method === 'cash' && !input.cashAccountId) return err('E_VALIDATION', 'مفيش درج');
   const { db } = ctx;

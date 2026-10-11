@@ -1,8 +1,7 @@
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import { barcodesSchema, packUnitSchema, productFieldsSchema } from '@/domain/schemas';
 
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { upsertRow, type SaveResult } from './save-master';
 import { nowIso } from '../ids';
 import { enqueue } from '../outbox';
@@ -26,14 +25,14 @@ export async function saveProduct(ctx: DeviceContext, input: SaveProductInput): 
   const unit = input.packUnit ? packUnitSchema.safeParse(input.packUnit) : undefined;
   if (!fields.success || (codes && !codes.success) || (unit && !unit.success))
     return err('E_VALIDATION', 'بيانات الصنف غير صحيحة');
-  if (can(ctx.role, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (
     ('price' in fields.data ||
       'unitCost' in fields.data ||
       'priceWholesale' in fields.data ||
       'priceCraftsman' in fields.data ||
       'priceContractor' in fields.data) &&
-    can(ctx.role, 'editPrices') !== 'yes'
+    canCtx(ctx, 'editPrices') !== 'yes'
   ) {
     return err('E_FORBIDDEN', 'الأسعار للمدير فقط');
   }

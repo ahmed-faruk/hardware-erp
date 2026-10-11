@@ -7,7 +7,7 @@ import { postSalesReturn, type PostedDoc } from '@/db/commands/returns';
 import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
 import { formatMoney, toPiasters } from '@/domain/money';
-import { can, type Action } from '@/domain/permissions';
+import type { Action } from '@/domain/permissions';
 import { computeReturnLine, type PriorReturn } from '@/domain/returns';
 
 import { ActionButton } from '../components/ActionButton';
@@ -310,7 +310,8 @@ function FreeReturn({
   onBack,
 }: Pick<Props, 'shiftId' | 'cashAccountId' | 'digits' | 'onDone'> & { onBack: () => void }) {
   const { db } = useServices();
-  const { context } = useSession();
+  const session = useSession();
+  const { context } = session;
   const [text, setText] = useState('');
   const [found, setFound] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
@@ -322,7 +323,7 @@ function FreeReturn({
   useEffect(() => {
     void searchProducts(db, text, { limit: 8 }).then(setFound);
   }, [db, text]);
-  if (!can('manager', 'returnWithoutInvoice')) return null;
+  if (session.can('returnWithoutInvoice') !== 'yes') return null;
 
   if (!product)
     return (

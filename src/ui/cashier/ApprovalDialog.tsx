@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type ReactElement } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { approveWithPin } from '@/db/commands/approval';
+import { workerAccess } from '@/db/permissions';
 import type { Action } from '@/domain/permissions';
 
 import { BigAlert } from '../components/BigAlert';
@@ -16,13 +17,12 @@ import styles from './dialogs.module.css';
 function ApprovalBody({ action, onApproved }: { action: Action; onApproved: (token: string) => void }) {
   const { db } = useServices();
   const { context } = useSession();
-  const managers = useLiveQuery(
-    async () =>
-      (await db.workers.toArray()).filter(
-        (w) => w.role === 'manager' && w.active && !w.deletedAt && w.pinHash,
-      ),
-    [db],
-  );
+  // anyone whose own permissions give him this action outright can approve it, not only managers
+  const managers = useLiveQuery(async () => {
+    const all = (await db.workers.toArray()).filter((w) => w.active && !w.deletedAt && w.pinHash);
+    const allowed = await Promise.all(all.map(async (w) => (await workerAccess(db, w, action)) === 'yes'));
+    return all.filter((_, i) => allowed[i]);
+  }, [db, action]);
   const [selected, setSelected] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   return (

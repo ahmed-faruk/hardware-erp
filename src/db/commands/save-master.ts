@@ -1,18 +1,18 @@
 import { hashPin } from '../workers';
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import {
   categoryFieldsSchema,
   customerFieldsSchema,
+  permissionGroupFieldsSchema,
   supplierFieldsSchema,
   workerFieldsSchema,
 } from '@/domain/schemas';
 
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso } from '../ids';
 import { enqueue } from '../outbox';
 import type { HanafyDB } from '../schema';
-import type { Category, Customer, Supplier, Worker } from '../types';
+import type { Category, Customer, PermissionGroup, Supplier, Worker } from '../types';
 
 export interface SaveInput {
   id?: string;
@@ -78,7 +78,7 @@ const out = (s: Saved<Row>): SaveResult => (s.ok ? { ok: true, id: s.id, version
 export async function saveCustomer(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
   const parsed = customerFieldsSchema.safeParse(input.fields);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات العميل غير صحيحة');
-  if (can(ctx.role, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   return db.transaction('rw', [db.customers, db.outbox, db.syncState], async () =>
     out(
@@ -102,7 +102,7 @@ export async function saveCustomer(ctx: DeviceContext, input: SaveInput): Promis
 export async function saveSupplier(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
   const parsed = supplierFieldsSchema.safeParse(input.fields);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات المورد غير صحيحة');
-  if (can(ctx.role, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   return db.transaction('rw', [db.suppliers, db.outbox, db.syncState], async () =>
     out(
@@ -124,7 +124,7 @@ export async function saveSupplier(ctx: DeviceContext, input: SaveInput): Promis
 export async function saveCategory(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
   const parsed = categoryFieldsSchema.safeParse(input.fields);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات التصنيف غير صحيحة');
-  if (can(ctx.role, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   return db.transaction('rw', [db.categories, db.outbox, db.syncState], async () =>
     out(
@@ -144,7 +144,7 @@ export async function saveCategory(ctx: DeviceContext, input: SaveInput): Promis
 export async function saveWorker(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
   const parsed = workerFieldsSchema.safeParse(input.fields);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات العامل غير صحيحة');
-  if (can(ctx.role, 'manageUsers') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'manageUsers') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { pin, ...rest } = parsed.data;
   const fields: Record<string, unknown> = { ...rest };
   if (!input.id && (!pin || !rest.name || !rest.role))
@@ -167,6 +167,31 @@ export async function saveWorker(ctx: DeviceContext, input: SaveInput): Promise<
   );
 }
 
+/** Permission groups: who may do what. Only a worker with `manageGroups` (a manager always has it) can create, change or delete one. */
+export async function savePermissionGroup(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
+  const parsed = permissionGroupFieldsSchema.safeParse(input.fields);
+  if (!parsed.success) return err('E_VALIDATION', 'بيانات المجموعة غير صحيحة');
+  if (canCtx(ctx, 'manageGroups') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (!input.id && !parsed.data.name) return err('E_VALIDATION', 'المجموعة محتاجة اسم');
+  const { db } = ctx;
+  return db.transaction('rw', [db.permissionGroups, db.outbox, db.syncState], async () =>
+    out(
+      await upsertRow<PermissionGroup>(
+        ctx,
+        'permissionGroups',
+        db.permissionGroups,
+        input,
+        parsed.data,
+        () => ({
+          ...newCommon(ctx),
+          name: '',
+          permissions: {},
+        }),
+      ),
+    ),
+  );
+}
+
 /** A cashier adds a customer at the counter: name and phone only, credit limit 0 and no discount (the server enforces the same). */
 export async function addCustomer(
   ctx: DeviceContext,
@@ -176,7 +201,7 @@ export async function addCustomer(
     .pick({ name: true, phone: true })
     .safeParse({ name: input.name, phone: input.phone ?? null });
   if (!parsed.success || !parsed.data.name) return err('E_VALIDATION', 'بيانات العميل غير صحيحة');
-  if (can(ctx.role, 'addCustomer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'addCustomer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   return db.transaction('rw', [db.customers, db.outbox, db.syncState], async () =>
     out(

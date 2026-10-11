@@ -12,6 +12,7 @@ Rules every developer and AI agent follows in this project. If a requested chang
   A lost device is revoked (`revoke_device`) and wipes its local data on next start.
 - **Workers:** pick photo + PIN (≥ 6 digits). PIN stored as PBKDF2-SHA256 (≥ 210,000 iterations, per-worker salt),
   verified locally. 5 wrong tries → 5-minute lock + audit entry. Screen locks after idle time (setting).
+- **Permission groups:** every screen, report tab and button is an action in `src/domain/permissions.ts`. A manager builds groups (yes / pin / no per action) and gives one to a worker. The server enforces them with `worker_can(worker, action)` (migration `20261012100000_permission_groups.sql`) in `ingest_row` and in every bundle that used a hard-coded manager check; approvals (`approved_by`) need an approver whose own access to that action is `yes`. A manager always keeps `view.workers`, `manageUsers`, `manageGroups`, `view.settings`, `settings`. Limit: report RPCs are still "manager device only" on the server, so report tabs are gated per worker in the UI only.
 - **Authorization:** one permission matrix in `src/domain/permissions.ts` (roles: cashier, storekeeper, manager) used by
   the UI AND re-checked by `ingest_batch` on the server. Never trust a role or worker id sent by the client without
   checking it against the `workers` table and the device's `max_role`.

@@ -51,7 +51,8 @@ Types: `id` = uuid, `money` = bigint piasters, `qty` = bigint milli-units, `text
 | `branches` | name | one row in MVP |
 | `warehouses` | branch_id, name, kind (`main`,`showroom`,`scrap`), legacy_location_id | OSPOS location "stock" → main |
 | `devices` | branch_id, auth_user_id (uuid, unique), name, prefix (2–3 chars, unique per company), kind (`pc`,`mobile`), max_role, last_seen_at, app_version, revoked_at | one Supabase Auth user per device |
-| `workers` | name, role (`cashier`,`storekeeper`,`manager`), pin_hash, pin_salt, photo_path, active, legacy_employee_id | PIN checked locally (PBKDF2) |
+| `workers` | name, role (`cashier`,`storekeeper`,`manager`), pin_hash, pin_salt, photo_path, active, legacy_employee_id, group_id | PIN checked locally (PBKDF2) |
+| `permission_groups` | name, permissions jsonb (`{ action: 'yes'\|'pin'\|'no' }`) | master, pushed with `manageGroups`; a worker's `group_id` makes the group the whole truth, no group = role defaults |
 | `settings` | key (unique per company), value json | company-level only; per-device settings stay local. Keys: `sale.*`, `receipt.*`, `return.periodDays` (days a cashier may return alone, default 30), `stock.approvalAbove` (piasters; a bigger stock adjustment needs a manager, default 50000), `shift.varianceAbove` (piasters; a bigger drawer difference at close needs a manager, default 2000), `stock.negativePolicy` (`allow`/`warn`/`block`, default allow), `scale.enabled` / `scale.prefix` / `scale.mode` (scale labels, POS-04) |
 | `cash_accounts` | name, kind (`drawer`,`safe`,`bank`,`wallet`,`card_clearing`), owner_device_id null | one drawer per cashier device + main safe (`owner_device_id`, because `device_id` is the creating device) |
 | `expense_categories` | name, icon | |

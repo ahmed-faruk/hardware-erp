@@ -1,4 +1,5 @@
 import type { DocType } from '@/domain/numbering';
+import type { Permissions } from '@/domain/permissions';
 
 /** Columns every synced row carries (docs/DATABASE.md §3). Local ids are UUID v7; times are ISO strings. */
 export interface Common {
@@ -62,6 +63,12 @@ export interface Worker extends Common {
   photoPath: string | null;
   active: boolean;
   legacyEmployeeId: number | null;
+  /** permission group; null/absent = the role's defaults */
+  groupId?: string | null;
+}
+export interface PermissionGroup extends Common {
+  name: string;
+  permissions: Permissions;
 }
 export interface Setting extends Common {
   key: string;

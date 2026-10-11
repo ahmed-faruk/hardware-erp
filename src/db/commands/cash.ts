@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { drawerBalance, shiftDrawerMovements } from '../cash';
 import { nowIso, uuidv7 } from '../ids';
 import { nextNumber } from '../numbering';
@@ -9,7 +9,6 @@ import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
 import { upsertRow, type SaveResult } from './save-master';
 import type { AuditRow, CashMovement, ExpenseCategory } from '../types';
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import { countByDenomination, requiresVarianceApproval, shiftVariance } from '@/domain/shift';
 
@@ -76,7 +75,7 @@ export async function closeShift(
   ctx: DeviceContext,
   input: { shiftId: string; counted: z.input<typeof countedSchema>; note?: string; approvalToken?: string },
 ): Promise<{ ok: true; shiftId: string; preview: ClosePreview } | Err> {
-  if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const p = await previewClose(ctx, input.shiftId, input.counted);
   if (!p.ok) return p;
   const { db } = ctx;
@@ -84,10 +83,10 @@ export async function closeShift(
   let approver: string | null = null;
   if (p.preview.needsApproval) {
     if (!note) return err('NOTE_REQUIRED', 'اكتب تعليق');
-    if (ctx.role === 'manager') approver = ctx.workerId;
+    if (canCtx(ctx, 'shiftVarianceApprove') === 'yes') approver = ctx.workerId;
     else {
-      const approval = input.approvalToken ? peekApproval(input.approvalToken, 'cashAdjustment') : null;
-      if (!input.approvalToken || !approval) return err('APPROVAL_REQUIRED', 'cashAdjustment');
+      const approval = input.approvalToken ? peekApproval(input.approvalToken, 'shiftVarianceApprove') : null;
+      if (!input.approvalToken || !approval) return err('APPROVAL_REQUIRED', 'shiftVarianceApprove');
       approver = approval.approvedBy;
       spendApproval(input.approvalToken);
     }
@@ -141,7 +140,7 @@ export async function postExpense(
   const parsed = expenseInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات المصروف غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'recordExpense') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'recordExpense') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   const [category, account] = await Promise.all([
     db.expenseCategories.get(input.categoryId),
@@ -220,7 +219,7 @@ export async function postCashTransfer(
   const parsed = transferInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات التوريد غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'cashTransfer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'cashTransfer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.fromAccountId === input.toAccountId) return err('E_VALIDATION', 'نفس الحساب');
   const { db } = ctx;
   const [from, to] = await Promise.all([
@@ -301,7 +300,7 @@ export async function saveExpenseCategory(
   ctx: DeviceContext,
   input: { id?: string; name: string; icon?: string | null; baseVersion?: number },
 ): Promise<SaveResult> {
-  if (can(ctx.role, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const name = input.name.trim();
   if (!name || name.length > 60) return err('E_VALIDATION', 'الاسم مطلوب');
   const { db } = ctx;
@@ -339,7 +338,7 @@ export async function postCashAdjustment(
   const parsed = adjustInput.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات التسوية غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'cashAdjustment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'cashAdjustment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.reason === 'other' && !input.note) return err('NOTE_REQUIRED', 'اكتب ملاحظة');
   const { db } = ctx;
   const account = await db.cashAccounts.get(input.cashAccountId);

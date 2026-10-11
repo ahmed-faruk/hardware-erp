@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { can, type Action, type Role } from './permissions';
+import {
+  ACTIONS,
+  PERMISSION_SECTIONS,
+  can,
+  defaultsFor,
+  resolveAccess,
+  type Action,
+  type Permissions,
+  type Role,
+} from './permissions';
 
 describe('permissions', () => {
   it('cashier can sell but not void', () => {
@@ -23,7 +32,45 @@ describe('permissions', () => {
     expect(can('storekeeper', 'seeCost')).toBe('no');
   });
   it('manager can do everything', () => {
-    const roles: Role[] = ['manager'];
-    for (const r of roles) expect(can(r, 'returnWithoutInvoice')).toBe('yes');
+    for (const a of ACTIONS) expect(can('manager', a)).toBe('yes');
+  });
+  it('the screens each role saw before groups are unchanged', () => {
+    const views = ACTIONS.filter((a) => a.startsWith('view.'));
+    const seen = (r: Role) => views.filter((a) => can(r, a) === 'yes');
+    expect(seen('cashier')).toEqual(['view.sell']);
+    expect(seen('storekeeper')).toEqual(['view.products', 'view.categories', 'view.stock', 'view.purchases']);
+  });
+});
+
+describe('permission groups', () => {
+  const group: Permissions = { sell: 'yes', recordExpense: 'pin', 'view.expenses': 'yes' };
+
+  it('a worker without a group gets his role defaults', () => {
+    expect(resolveAccess('cashier', null, 'sell')).toBe('yes');
+    expect(resolveAccess('cashier', null, 'void')).toBe('no');
+  });
+  it('with a group the group is the whole truth: unlisted means no', () => {
+    expect(resolveAccess('cashier', group, 'recordExpense')).toBe('pin');
+    expect(resolveAccess('cashier', group, 'view.expenses')).toBe('yes');
+    expect(resolveAccess('cashier', group, 'holdCart')).toBe('no');
+  });
+  it('a group can give a cashier more than his role has', () => {
+    expect(resolveAccess('cashier', { void: 'yes' }, 'void')).toBe('yes');
+  });
+  it('a manager always keeps the screens that let him fix permissions', () => {
+    for (const a of ['view.workers', 'manageUsers', 'manageGroups', 'view.settings', 'settings'] as Action[])
+      expect(resolveAccess('manager', {}, a)).toBe('yes');
+    expect(resolveAccess('manager', {}, 'sell')).toBe('no');
+  });
+  it('defaultsFor gives a full explicit map for managers', () => {
+    expect(Object.keys(defaultsFor('manager'))).toHaveLength(ACTIONS.length);
+  });
+});
+
+describe('sections', () => {
+  it('list every action exactly once', () => {
+    const all = PERMISSION_SECTIONS.flatMap((s) => s.actions);
+    expect(new Set(all).size).toBe(all.length);
+    expect([...all].sort()).toEqual([...ACTIONS].sort());
   });
 });

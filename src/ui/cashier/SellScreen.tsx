@@ -88,8 +88,10 @@ interface Done {
 
 export function SellScreen() {
   const { db, identity } = useServices();
-  const { context, worker } = useSession();
+  const { context, worker, can } = useSession();
   const role = worker?.role ?? 'cashier';
+  const approverRole = (action: 'discountOverLimit' | 'priceOverride') =>
+    can(action) === 'yes' ? 'manager' : role === 'manager' ? 'cashier' : role;
   const settings = useLiveQuery(() => loadSettings(db), [db]) ?? DEFAULT_SETTINGS;
   const device = useLiveQuery(() => loadDeviceSettings(db), [db]) ?? DEVICE_DEFAULTS;
   const drawer = useLiveQuery(
@@ -390,7 +392,12 @@ export function SellScreen() {
       target === 'invoice'
         ? invoice.lines.reduce((a, l) => a + l.netAmount, 0)
         : (invoice.lines[lineIndex]?.grossAmount ?? 0);
-    if (!(await guardApproval(discountNeedsApproval(settings, role, discount, gross), 'discountOverLimit')))
+    if (
+      !(await guardApproval(
+        discountNeedsApproval(settings, approverRole('discountOverLimit'), discount, gross),
+        'discountOverLimit',
+      ))
+    )
       return;
     const next =
       target === 'invoice' ? setInvoiceDiscount(cart, discount) : setLineDiscount(cart, target.key, discount);
@@ -407,7 +414,10 @@ export function SellScreen() {
     const price = toPiasters(text);
     if (!line || !price.ok || price.value <= 0) return;
     if (
-      !(await guardApproval(priceNeedsApproval(settings, role, price.value, line.listPrice), 'priceOverride'))
+      !(await guardApproval(
+        priceNeedsApproval(settings, approverRole('priceOverride'), price.value, line.listPrice),
+        'priceOverride',
+      ))
     )
       return;
     setCart((c) => setLinePrice(c, key, price.value));
@@ -417,7 +427,7 @@ export function SellScreen() {
     setNoSaleOpen(false);
     if (!context) return;
     let token: string | undefined;
-    if (role !== 'manager') {
+    if (can('noSaleDrawer') !== 'yes') {
       const t = await ask('noSaleDrawer');
       if (!t) return;
       token = t;
@@ -580,22 +590,26 @@ export function SellScreen() {
               onClick={() => setRecentOpen(true)}
               testId="recent"
             />
-            <ActionButton
-              label={strings.returns.button}
-              icon={Undo2}
-              variant="soft"
-              layout="stack"
-              onClick={() => setReturnOpen(true)}
-              testId="return"
-            />
-            <ActionButton
-              label={strings.collection.button}
-              icon={HandCoins}
-              variant="soft"
-              layout="stack"
-              onClick={() => setCollectOpen(true)}
-              testId="collect"
-            />
+            {can('returnWithInvoice') !== 'no' && (
+              <ActionButton
+                label={strings.returns.button}
+                icon={Undo2}
+                variant="soft"
+                layout="stack"
+                onClick={() => setReturnOpen(true)}
+                testId="return"
+              />
+            )}
+            {can('customerReceipt') !== 'no' && (
+              <ActionButton
+                label={strings.collection.button}
+                icon={HandCoins}
+                variant="soft"
+                layout="stack"
+                onClick={() => setCollectOpen(true)}
+                testId="collect"
+              />
+            )}
             <ActionButton
               label={strings.sell.shiftOpen}
               icon={Clock}
@@ -604,14 +618,16 @@ export function SellScreen() {
               onClick={() => setShiftMenu(true)}
               testId="shift-menu"
             />
-            <ActionButton
-              label={strings.sell.noSale}
-              icon={Banknote}
-              variant="soft"
-              layout="stack"
-              onClick={() => setNoSaleOpen(true)}
-              testId="no-sale"
-            />
+            {can('noSaleDrawer') !== 'no' && (
+              <ActionButton
+                label={strings.sell.noSale}
+                icon={Banknote}
+                variant="soft"
+                layout="stack"
+                onClick={() => setNoSaleOpen(true)}
+                testId="no-sale"
+              />
+            )}
           </div>
         </div>
         {notice && <BigAlert tone="danger" word={notice} sound={false} />}
@@ -683,7 +699,7 @@ export function SellScreen() {
         digits={digits}
         onClose={() => setRecentOpen(false)}
         onReprint={(id) => void printInvoice(id, true)}
-        onVoid={role === 'manager' ? setVoidTarget : undefined}
+        onVoid={can('void') === 'yes' ? setVoidTarget : undefined}
       />
       <VoidReasonDialog
         open={voidTarget !== null}

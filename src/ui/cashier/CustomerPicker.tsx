@@ -6,7 +6,6 @@ import { useServices, useSession } from '@/app/session';
 import { addCustomer } from '@/db/commands/save-master';
 import type { Customer } from '@/db/types';
 import { formatMoney } from '@/domain/money';
-import { can } from '@/domain/permissions';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
@@ -45,7 +44,8 @@ export function CustomerBalances({ info, digits }: { info: CustomerInfo; digits:
 
 function PickerBody({ onPick }: { onPick: (id: string) => void }) {
   const { db } = useServices();
-  const { context, worker } = useSession();
+  const session = useSession();
+  const { context } = session;
   const [digitsTyped, setDigits] = useState('');
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -62,7 +62,7 @@ function PickerBody({ onPick }: { onPick: (id: string) => void }) {
   const shown = (customers ?? []).filter(
     (c) => !digitsTyped || (c.phone ?? '').replace(/\D/g, '').includes(digitsTyped),
   );
-  const canAdd = worker ? can(worker.role, 'addCustomer') === 'yes' : false;
+  const canAdd = session.can('addCustomer') === 'yes';
 
   if (adding) {
     return (
