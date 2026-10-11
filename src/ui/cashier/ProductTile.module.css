@@ -66,6 +66,25 @@
   min-block-size: 2.5em;
 }
 
+.stock {
+  padding-inline: var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  text-align: start;
+}
+
+.stock_ok {
+  color: var(--ok);
+}
+
+.stock_low {
+  color: var(--warn);
+}
+
+.stock_out {
+  color: var(--danger);
+}
+
 .price {
   padding: 0 var(--space-3) var(--space-3);
   font-size: 22px;

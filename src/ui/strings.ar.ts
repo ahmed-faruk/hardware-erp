@@ -728,6 +728,7 @@ export const strings = {
     failed: 'التحصيل ماتسجلش',
   },
   sell: {
+    stockOnHand: 'متاح',
     title: 'البيع',
     openShift: 'افتح الوردية',
     float: 'الفلوس اللي في الدرج',

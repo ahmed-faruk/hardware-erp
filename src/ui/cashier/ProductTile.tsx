@@ -2,6 +2,7 @@ import { IconView } from '../icons/IconView';
 import { formatMoney } from '@/domain/money';
 
 import { cx } from '../cx';
+import { strings } from '../strings.ar';
 
 import styles from './ProductTile.module.css';
 
@@ -14,6 +15,8 @@ export interface TileProduct {
   /** category color token: cat-1 .. cat-8 */
   color: string;
   stockState: 'ok' | 'low' | 'out';
+  /** quantity on hand to print on the tile; null for services (no stock) */
+  stockText: string | null;
   /** name of the pack unit when the product has one (carton, roll...) */
   packName: string | null;
 }
@@ -42,6 +45,14 @@ export function ProductTile({
           {product.sku && <span className={styles.code}>{digits(product.sku.slice(-6))}</span>}
         </span>
         <span className={styles.name}>{product.name}</span>
+        {product.stockText !== null && (
+          <span
+            className={cx(styles.stock, styles[`stock_${product.stockState}`])}
+            data-testid={`stock-${product.id}`}
+          >
+            {`${strings.sell.stockOnHand} ${digits(product.stockText)}`}
+          </span>
+        )}
         <span className={styles.price}>{digits(formatMoney(product.price))}</span>
         <span className={cx(styles.dot, styles[product.stockState])} aria-hidden="true" />
       </button>
