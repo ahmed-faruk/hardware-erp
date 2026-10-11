@@ -240,3 +240,37 @@ export function stockTable(rows: StockRow[], t: ReportLabels): ReportTable {
     note: t.stockNote,
   };
 }
+
+export interface HistoryRow {
+  at: string;
+  doc_type: string;
+  number: string | null;
+  party: string | null;
+  in_qty: number;
+  out_qty: number;
+  balance: number;
+  legacy: boolean;
+}
+
+/** One product's movements: what came in, what went out and the balance after each row; imported rows say «قديم». */
+export function historyTable(
+  rows: HistoryRow[],
+  t: ReportLabels,
+  time: (iso: string) => string,
+  docName: (docType: string) => string,
+): ReportTable {
+  return {
+    title: t.title ?? '',
+    headers: [t.time!, t.document!, t.number!, t.party!, t.qtyIn!, t.qtyOut!, t.balance!],
+    rows: rows.map((r) => [
+      time(r.at),
+      `${docName(r.doc_type)}${r.legacy ? ` (${t.legacyTag})` : ''}`,
+      r.number ?? '',
+      r.party ?? '',
+      r.in_qty ? formatQty(r.in_qty) : '',
+      r.out_qty ? formatQty(r.out_qty) : '',
+      formatQty(r.balance),
+    ]),
+    note: t.historyNote,
+  };
+}

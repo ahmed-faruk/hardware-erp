@@ -13,11 +13,13 @@ import { Dialog } from '../components/Dialog';
 import { FormField } from '../components/FormField';
 import { IconPicker } from '../components/IconPicker';
 import { NumberField } from '../components/NumberField';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { IconView } from '../icons/IconView';
 import { navigate } from '../router';
 import { strings } from '../strings.ar';
 
+import { ProductHistory } from './ProductHistory';
 import styles from './screens.module.css';
 import { useSaver } from './useSaver';
 
@@ -43,8 +45,9 @@ export function ProductFormScreen({ id }: { id: string }) {
 
 function ProductForm({ loaded }: { loaded: Loaded }) {
   const { db } = useServices();
-  const { context, worker } = useSession();
+  const { context, worker, can } = useSession();
   const { product } = loaded;
+  const [view, setView] = useState<'form' | 'history'>('form');
   const isManager = worker?.role === 'manager';
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).toArray(), [db]);
   const suppliers = useLiveQuery(() => db.suppliers.filter((s) => !s.deletedAt && s.active).toArray(), [db]);
@@ -130,277 +133,303 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   return (
     <section>
       <h1 className={styles.title}>{product ? strings.products.editProduct : strings.products.newProduct}</h1>
-      <form
-        className={styles.form}
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <FormField
-          label={strings.products.name}
-          error={missing && !name.trim() ? strings.common.required : null}
-        >
-          {(id, d) => (
-            <input
-              id={id}
-              className="control"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              aria-describedby={d}
-              data-testid="product-name"
-            />
-          )}
-        </FormField>
-        <FormField label={strings.products.category}>
-          {(id) => (
-            <select
-              id={id}
-              className="control"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              <option value="">{strings.common.none}</option>
-              {categories?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </FormField>
-        {isManager && (
-          <NumberField
-            label={strings.products.price}
-            suffix={strings.common.egp}
-            value={price}
-            onChange={setPrice}
-            parse={toPiasters}
-            format={formatMoney}
-            required
-          />
-        )}
-        <FormField label={strings.products.plu}>
-          {(id) => (
-            <input
-              id={id}
-              className="control"
-              dir="ltr"
-              inputMode="numeric"
-              maxLength={5}
-              value={plu}
-              onChange={(e) => setPlu(e.target.value.replace(/\D/g, ''))}
-              data-testid="product-plu"
-            />
-          )}
-        </FormField>
-        {isManager &&
-          (
-            [
-              [strings.products.wholesale, wholesale, setWholesale],
-              [strings.products.craftsman, craftsman, setCraftsman],
-              [strings.products.contractor, contractor, setContractor],
-            ] as const
-          ).map(([label, value, set]) => (
-            <NumberField
-              key={label}
-              label={`${strings.products.priceLists}: ${label}`}
-              suffix={strings.common.egp}
-              value={value}
-              onChange={set}
-              parse={toPiasters}
-              format={formatMoney}
-            />
-          ))}
-        {isManager && (
-          <NumberField
-            label={strings.products.cost}
-            suffix={strings.common.egp}
-            value={cost}
-            onChange={setCost}
-            parse={toPiasters}
-            format={formatMoney}
-          />
-        )}
-        <FormField label={strings.products.baseUnit}>
-          {(id) => (
-            <input
-              id={id}
-              className="control"
-              value={baseUnitName}
-              onChange={(e) => setBaseUnitName(e.target.value)}
-            />
-          )}
-        </FormField>
-        <FormField label={strings.products.decimals}>
-          {(id) => (
-            <select
-              id={id}
-              className="control"
-              value={decimals}
-              onChange={(e) => setDecimals(Number(e.target.value))}
-            >
-              {[0, 1, 2, 3].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          )}
-        </FormField>
-        <NumberField
-          label={strings.products.reorder}
-          value={reorder}
-          onChange={setReorder}
-          parse={toMilli}
-          format={formatQty}
-        />
-        <FormField label={strings.products.supplier}>
-          {(id) => (
-            <select
-              id={id}
-              className="control"
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-            >
-              <option value="">{strings.common.none}</option>
-              {suppliers?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </FormField>
-
-        <div className={styles.section}>
-          <h2>{strings.products.barcodes}</h2>
-          {codes.map((code, i) => (
-            <div key={i} className={styles.row}>
-              <FormField label={`${strings.products.barcode} ${i + 1}`}>
-                {(id) => (
-                  <input
-                    id={id}
-                    className="control"
-                    dir="ltr"
-                    value={code}
-                    onChange={(e) => setCodes(codes.map((c, j) => (j === i ? e.target.value : c)))}
-                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                    data-testid={`barcode-${i}`}
-                  />
-                )}
-              </FormField>
-              <ActionButton
-                label={strings.actions.remove}
-                icon={Trash2}
-                variant="ghost"
-                onClick={() => setCodes(codes.length > 1 ? codes.filter((_, j) => j !== i) : [''])}
-              />
-            </div>
-          ))}
-          <div>
-            <ActionButton
-              label={strings.products.addBarcode}
-              icon={Plus}
-              variant="ghost"
-              onClick={() => setCodes([...codes, ''])}
+      {product && can('viewProductHistory') !== 'no' && (
+        <div className={styles.toolbar}>
+          <div className={styles.fixed}>
+            <SegmentedControl
+              label={strings.reports.tabs.productHistory}
+              options={[
+                { key: 'form', label: strings.products.editProduct },
+                { key: 'history', label: strings.reports.tabs.productHistory },
+              ]}
+              value={view}
+              onChange={setView}
+              testIdPrefix="product-view-"
             />
           </div>
         </div>
-
-        <div className={styles.section}>
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={packOn}
-              onChange={(e) => setPackOn(e.target.checked)}
-              data-testid="pack-on"
-            />
-            {strings.products.packUnit}
-          </label>
-          {packOn && (
-            <>
-              <FormField
-                label={strings.products.packName}
-                error={missing && !packName.trim() ? strings.common.required : null}
-              >
-                {(id) => (
-                  <input
-                    id={id}
-                    className="control"
-                    value={packName}
-                    onChange={(e) => setPackName(e.target.value)}
-                  />
-                )}
-              </FormField>
+      )}
+      {product && view === 'history' ? (
+        <ProductHistory productId={product.id} />
+      ) : (
+        <>
+          <form
+            className={styles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+          >
+            <FormField
+              label={strings.products.name}
+              error={missing && !name.trim() ? strings.common.required : null}
+            >
+              {(id, d) => (
+                <input
+                  id={id}
+                  className="control"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  aria-describedby={d}
+                  data-testid="product-name"
+                />
+              )}
+            </FormField>
+            <FormField label={strings.products.category}>
+              {(id) => (
+                <select
+                  id={id}
+                  className="control"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                >
+                  <option value="">{strings.common.none}</option>
+                  {categories?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+            {isManager && (
               <NumberField
-                label={strings.products.packFactor}
-                value={packFactor}
-                onChange={setPackFactor}
-                parse={toMilli}
-                format={formatQty}
+                label={strings.products.price}
+                suffix={strings.common.egp}
+                value={price}
+                onChange={setPrice}
+                parse={toPiasters}
+                format={formatMoney}
                 required
               />
-              {isManager && (
+            )}
+            <FormField label={strings.products.plu}>
+              {(id) => (
+                <input
+                  id={id}
+                  className="control"
+                  dir="ltr"
+                  inputMode="numeric"
+                  maxLength={5}
+                  value={plu}
+                  onChange={(e) => setPlu(e.target.value.replace(/\D/g, ''))}
+                  data-testid="product-plu"
+                />
+              )}
+            </FormField>
+            {isManager &&
+              (
+                [
+                  [strings.products.wholesale, wholesale, setWholesale],
+                  [strings.products.craftsman, craftsman, setCraftsman],
+                  [strings.products.contractor, contractor, setContractor],
+                ] as const
+              ).map(([label, value, set]) => (
                 <NumberField
-                  label={strings.products.packPrice}
+                  key={label}
+                  label={`${strings.products.priceLists}: ${label}`}
                   suffix={strings.common.egp}
-                  value={packPrice}
-                  onChange={setPackPrice}
+                  value={value}
+                  onChange={set}
                   parse={toPiasters}
                   format={formatMoney}
                 />
+              ))}
+            {isManager && (
+              <NumberField
+                label={strings.products.cost}
+                suffix={strings.common.egp}
+                value={cost}
+                onChange={setCost}
+                parse={toPiasters}
+                format={formatMoney}
+              />
+            )}
+            <FormField label={strings.products.baseUnit}>
+              {(id) => (
+                <input
+                  id={id}
+                  className="control"
+                  value={baseUnitName}
+                  onChange={(e) => setBaseUnitName(e.target.value)}
+                />
               )}
-            </>
-          )}
-        </div>
-
-        <div className={styles.section}>
-          <h2>{strings.products.icon}</h2>
-          <div className={styles.row}>
-            <span className={styles.tile}>
-              <IconView iconKey={icon} size={24} aria-hidden="true" />
-            </span>
-            <ActionButton
-              label={strings.products.chooseIcon}
-              variant="ghost"
-              onClick={() => setPicking(true)}
-              testId="choose-icon"
+            </FormField>
+            <FormField label={strings.products.decimals}>
+              {(id) => (
+                <select
+                  id={id}
+                  className="control"
+                  value={decimals}
+                  onChange={(e) => setDecimals(Number(e.target.value))}
+                >
+                  {[0, 1, 2, 3].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+            <NumberField
+              label={strings.products.reorder}
+              value={reorder}
+              onChange={setReorder}
+              parse={toMilli}
+              format={formatQty}
             />
-          </div>
-        </div>
+            <FormField label={strings.products.supplier}>
+              {(id) => (
+                <select
+                  id={id}
+                  className="control"
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                >
+                  <option value="">{strings.common.none}</option>
+                  {suppliers?.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
 
-        <label className={styles.check}>
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          {strings.common.active}
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={isPinned}
-            onChange={(e) => setPinned(e.target.checked)}
-            data-testid="pin-quick"
-          />
-          {strings.products.pinQuick}
-        </label>
+            <div className={styles.section}>
+              <h2>{strings.products.barcodes}</h2>
+              {codes.map((code, i) => (
+                <div key={i} className={styles.row}>
+                  <FormField label={`${strings.products.barcode} ${i + 1}`}>
+                    {(id) => (
+                      <input
+                        id={id}
+                        className="control"
+                        dir="ltr"
+                        value={code}
+                        onChange={(e) => setCodes(codes.map((c, j) => (j === i ? e.target.value : c)))}
+                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                        data-testid={`barcode-${i}`}
+                      />
+                    )}
+                  </FormField>
+                  <ActionButton
+                    label={strings.actions.remove}
+                    icon={Trash2}
+                    variant="ghost"
+                    onClick={() => setCodes(codes.length > 1 ? codes.filter((_, j) => j !== i) : [''])}
+                  />
+                </div>
+              ))}
+              <div>
+                <ActionButton
+                  label={strings.products.addBarcode}
+                  icon={Plus}
+                  variant="ghost"
+                  onClick={() => setCodes([...codes, ''])}
+                />
+              </div>
+            </div>
 
-        {saver.error && (
-          <div className={styles.span}>
-            <BigAlert tone="danger" word={saver.error} />
-          </div>
-        )}
-        <div className={styles.actions}>
-          <ActionButton
-            label={strings.common.save}
-            icon={Save}
-            type="submit"
-            variant="ok"
-            loading={saver.busy}
-            testId="save-product"
-          />
-          <ActionButton label={strings.common.cancel} variant="ghost" onClick={() => navigate('products')} />
-        </div>
-      </form>
+            <div className={styles.section}>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={packOn}
+                  onChange={(e) => setPackOn(e.target.checked)}
+                  data-testid="pack-on"
+                />
+                {strings.products.packUnit}
+              </label>
+              {packOn && (
+                <>
+                  <FormField
+                    label={strings.products.packName}
+                    error={missing && !packName.trim() ? strings.common.required : null}
+                  >
+                    {(id) => (
+                      <input
+                        id={id}
+                        className="control"
+                        value={packName}
+                        onChange={(e) => setPackName(e.target.value)}
+                      />
+                    )}
+                  </FormField>
+                  <NumberField
+                    label={strings.products.packFactor}
+                    value={packFactor}
+                    onChange={setPackFactor}
+                    parse={toMilli}
+                    format={formatQty}
+                    required
+                  />
+                  {isManager && (
+                    <NumberField
+                      label={strings.products.packPrice}
+                      suffix={strings.common.egp}
+                      value={packPrice}
+                      onChange={setPackPrice}
+                      parse={toPiasters}
+                      format={formatMoney}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className={styles.section}>
+              <h2>{strings.products.icon}</h2>
+              <div className={styles.row}>
+                <span className={styles.tile}>
+                  <IconView iconKey={icon} size={24} aria-hidden="true" />
+                </span>
+                <ActionButton
+                  label={strings.products.chooseIcon}
+                  variant="ghost"
+                  onClick={() => setPicking(true)}
+                  testId="choose-icon"
+                />
+              </div>
+            </div>
+
+            <label className={styles.check}>
+              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+              {strings.common.active}
+            </label>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={isPinned}
+                onChange={(e) => setPinned(e.target.checked)}
+                data-testid="pin-quick"
+              />
+              {strings.products.pinQuick}
+            </label>
+
+            {saver.error && (
+              <div className={styles.span}>
+                <BigAlert tone="danger" word={saver.error} />
+              </div>
+            )}
+            <div className={styles.actions}>
+              <ActionButton
+                label={strings.common.save}
+                icon={Save}
+                type="submit"
+                variant="ok"
+                loading={saver.busy}
+                testId="save-product"
+              />
+              <ActionButton
+                label={strings.common.cancel}
+                variant="ghost"
+                onClick={() => navigate('products')}
+              />
+            </div>
+          </form>
+        </>
+      )}
       <Dialog title={strings.products.icon} open={picking} onClose={() => setPicking(false)}>
         <IconPicker
           value={icon}

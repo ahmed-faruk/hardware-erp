@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { devicesTable, profitTable, purchasesTables, salesTables, stockTable } from './reports';
+import { devicesTable, historyTable, profitTable, purchasesTables, salesTables, stockTable } from './reports';
 
 const t = new Proxy({}, { get: (_, k) => String(k) }) as Record<string, string>;
 
@@ -125,5 +125,41 @@ describe('purchases report', () => {
     ]);
     expect(tables[1]!.rows).toEqual([['مورد', '100.00', '40.00', '30.00', '30.00', '0.00']]);
     expect(tables[1]!.totals).toEqual(['total', '100.00', '40.00', '30.00', '30.00', '0.00']);
+  });
+});
+
+describe('item history report', () => {
+  it('shows what came in, what went out and the balance after, with a tag on imported rows', () => {
+    const r = historyTable(
+      [
+        {
+          at: '2026-10-06T10:00:00Z',
+          doc_type: 'purchase_invoice',
+          number: 'K1-PUR-000001',
+          party: 'مورد',
+          in_qty: 5000,
+          out_qty: 0,
+          balance: 13000,
+          legacy: false,
+        },
+        {
+          at: '2026-05-01T10:00:00Z',
+          doc_type: 'sales_invoice',
+          number: 'OSPOS-S1',
+          party: null,
+          in_qty: 0,
+          out_qty: 3000,
+          balance: 10000,
+          legacy: true,
+        },
+      ],
+      t,
+      (iso) => iso.slice(0, 10),
+      (k) => k.toUpperCase(),
+    );
+    expect(r.headers).toHaveLength(7);
+    expect(r.rows[0]).toEqual(['2026-10-06', 'PURCHASE_INVOICE', 'K1-PUR-000001', 'مورد', '5', '', '13']);
+    expect(r.rows[1]).toEqual(['2026-05-01', 'SALES_INVOICE (legacyTag)', 'OSPOS-S1', '', '', '3', '10']);
+    expect(r.note).toBe('historyNote');
   });
 });
