@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 
-import { anthropic } from '@ai-sdk/anthropic';
 import { web } from '@e2e-dev/web';
 import type { E2EConfig } from 'e2e';
 
@@ -14,15 +13,6 @@ export default {
   tests: ['tests/agent/**/*.e2e.ts'],
   timeout: 180_000,
   workers: 1,
-  agents: {
-    default: {
-      model: anthropic('claude-sonnet-5-5'),
-      context:
-        'The app is an Arabic right-to-left point of sale for a paint and hardware shop. Money is in Egyptian pounds with two decimals. ' +
-        'Buttons: "ادفع" = pay, "نقدي" = cash, "آجل" = on credit, "فيزا" = card, "تم الدفع" = finish payment, "مرتجع" = return, ' +
-        '"تحصيل" = collect a payment from a customer, "الوردية" = shift, "اختيار العميل" = choose customer.',
-    },
-  },
   cache: { dir: '.e2e/cache' },
   targets: [
     {

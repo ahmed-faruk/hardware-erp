@@ -37,7 +37,7 @@ jobs:
           version: 2.120.0
       - run: supabase start
       - run: npx e2e-web install chromium --with-deps
-      # replay only: no API key here; a missing recording fails with MODEL_UNAVAILABLE on purpose
+      # locator-only steps: no model and no API key anywhere
       - run: npm run test:agent
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

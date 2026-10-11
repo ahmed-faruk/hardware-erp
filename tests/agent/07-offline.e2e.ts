@@ -1,14 +1,13 @@
 import { describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-import { login, newCashierFixture, openShift, sql } from './helpers';
+import { addProduct, login, newCashierFixture, openShift, payCash, sql } from './helpers';
 
 describe('offline selling', () => {
   test('two sales while every server call is aborted, then they reach the server', async ({
     app,
     screen,
     browser,
-    agent,
   }) => {
     const f = newCashierFixture();
     await app.open('/');
@@ -17,13 +16,11 @@ describe('offline selling', () => {
     await browser.route('**/rest/v1/**', async (route) => {
       await route.abort();
     });
-    for (const product of ['Test product 1', 'Test product 2']) {
-      await agent.act(
-        'add {product} to the cart and pay the exact amount in cash, then finish the payment and start a new sale',
-        {
-          params: { product },
-        },
-      );
+    for (const n of [1, 2]) {
+      await addProduct(screen, n);
+      await payCash(screen, browser, '20');
+      await expect(screen.getByTestId('done')).toBeVisible();
+      await screen.getByTestId('new-sale').tap();
     }
     await browser.unroute('**/rest/v1/**');
     await expect
