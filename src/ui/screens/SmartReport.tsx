@@ -152,6 +152,29 @@ export function SmartReport() {
           </div>
         </section>
 
+        <section className={styles.block} data-testid="smart-categories">
+          <h2>
+            {t.catTitle} <small>{t.topHint}</small>
+          </h2>
+          <div className={styles.card}>
+            {data.topCategories.length === 0 && <span>{strings.reports.catNoSales}</span>}
+            {data.topCategories.map((c, i) => (
+              <div key={c.id ?? 'none'} className={styles.item}>
+                <span>{c.name || strings.reports.noCategory}</span>
+                <strong>{formatMoney(c.revenue)}</strong>
+                <div className={styles.bar}>
+                  <i
+                    style={{
+                      width: `${Math.round((c.revenue * 100) / data.topCategories[0]!.revenue)}%`,
+                      animationDelay: `${i * 90}ms`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className={styles.block} data-testid="smart-dead">
           <h2>
             {t.deadTitle} <small>{t.deadHint}</small>

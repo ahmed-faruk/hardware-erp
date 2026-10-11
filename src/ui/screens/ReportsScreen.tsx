@@ -17,9 +17,7 @@ import {
 import type { Action } from '@/domain/permissions';
 import { callRpc } from '@/sync/errors';
 
-import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
-import { FormField } from '../components/FormField';
 import { ProductPicker } from '../components/ProductPicker';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
@@ -27,6 +25,8 @@ import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
 import { cairoDay, monthStart } from './dates';
+import { CategoryReport } from './CategoryReport';
+import { PeriodBar } from './PeriodBar';
 import { ReportActions, ReportTableView } from './ReportParts';
 import { ProductHistory } from './ProductHistory';
 import { SmartReport } from './SmartReport';
@@ -37,6 +37,7 @@ type Tab =
   | 'profit'
   | 'purchases'
   | 'expenses'
+  | 'categories'
   | 'productHistory'
   | 'exceptions'
   | 'devices'
@@ -47,6 +48,7 @@ const TABS: Tab[] = [
   'profit',
   'purchases',
   'expenses',
+  'categories',
   'productHistory',
   'exceptions',
   'devices',
@@ -75,7 +77,6 @@ export function ReportsScreen() {
   const tabs = TABS.filter((x) => can(`report.${x}` as Action) !== 'no');
   const [chosen, setTab] = useState<Tab>('smart');
   const tab = tabs.includes(chosen) ? chosen : (tabs[0] ?? 'smart');
-  const [today] = useState(() => cairoDay());
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -83,7 +84,7 @@ export function ReportsScreen() {
 
   const key = `${tab}|${from}|${to}`;
   useEffect(() => {
-    if (tab === 'stock' || tab === 'smart' || tab === 'productHistory') return;
+    if (tab === 'stock' || tab === 'smart' || tab === 'productHistory' || tab === 'categories') return;
     let live = true;
     const name = {
       sales: 'report_sales_summary',
@@ -129,7 +130,11 @@ export function ReportsScreen() {
           ? loaded.tables
           : null;
   const error =
-    tab !== 'stock' && tab !== 'smart' && tab !== 'productHistory' && loaded?.key === key
+    tab !== 'stock' &&
+    tab !== 'smart' &&
+    tab !== 'productHistory' &&
+    tab !== 'categories' &&
+    loaded?.key === key
       ? loaded.error
       : null;
   const upTo = sync.lastSyncAt
@@ -160,71 +165,11 @@ export function ReportsScreen() {
         <SmartReport />
       ) : tab === 'productHistory' ? (
         <HistoryTab />
+      ) : tab === 'categories' ? (
+        <CategoryReport />
       ) : (
         <>
-          {tab !== 'stock' && tab !== 'devices' && (
-            <div className={styles.toolbar}>
-              <div className={styles.fixed}>
-                <ActionButton
-                  label={strings.reports.today}
-                  variant="soft"
-                  onClick={() => preset(today, today)}
-                  testId="period-today"
-                />
-              </div>
-              <div className={styles.fixed}>
-                <ActionButton
-                  label={strings.reports.yesterday}
-                  variant="soft"
-                  onClick={() => preset(cairoDay(-1), cairoDay(-1))}
-                  testId="period-yesterday"
-                />
-              </div>
-              <div className={styles.fixed}>
-                <ActionButton
-                  label={strings.reports.thisMonth}
-                  variant="soft"
-                  onClick={() => preset(monthStart(today), today)}
-                  testId="period-month"
-                />
-              </div>
-              <div className={styles.fixed}>
-                <ActionButton
-                  label={strings.reports.lastMonth}
-                  variant="soft"
-                  onClick={() => {
-                    const last = cairoDay(-1, new Date(`${monthStart(today)}T12:00:00Z`));
-                    preset(monthStart(last), last);
-                  }}
-                  testId="period-last-month"
-                />
-              </div>
-              <FormField label={strings.reports.from}>
-                {(id) => (
-                  <input
-                    id={id}
-                    className="control"
-                    type="date"
-                    value={from}
-                    onChange={(e) => e.target.value && setFrom(e.target.value)}
-                    data-testid="report-from"
-                  />
-                )}
-              </FormField>
-              <FormField label={strings.reports.to}>
-                {(id) => (
-                  <input
-                    id={id}
-                    className="control"
-                    type="date"
-                    value={to}
-                    onChange={(e) => e.target.value && setTo(e.target.value)}
-                    data-testid="report-to"
-                  />
-                )}
-              </FormField>
-            </div>
-          )}
+          {tab !== 'stock' && tab !== 'devices' && <PeriodBar from={from} to={to} onChange={preset} />}
           <p data-testid="report-up-to">{upTo}</p>
           {error === 'offline' && <BigAlert tone="warn" word={strings.reports.needsNet} sound={false} />}
           {error === 'failed' && <BigAlert tone="danger" word={strings.reports.failed} sound={false} />}

@@ -108,6 +108,10 @@ its own Supabase Auth user (random password kept on the device), then calls this
 
 Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
 
+### `report_categories(p_from date, p_to date)` — manager devices only
+
+Sales by product category for the period (imported history included): per category `qty`, `revenue` (after the invoice discount share, returns subtracted), `cost`, `profit`, `invoices`, plus the stock it ties up (`items`, `stock_value`), and `days` = revenue per day × category for the chart. A product's category is its current one; lines without a product count under category `null`.
+
 ### `report_expenses(p_from date, p_to date)` — manager devices only
 
 Posted expenses of the period (imported ones included): `total`, `by_category`, `by_account` (null = imported, no cash account), `by_day` and the newest 500 in `list`.
