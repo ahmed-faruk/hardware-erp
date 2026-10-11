@@ -17,7 +17,7 @@ import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
 
-type Method = 'cash' | 'instapay' | 'card' | 'other';
+type Method = 'cash' | 'instapay' | 'card' | 'other' | 'owner';
 
 export function SupplierPaymentDialog({
   open,
@@ -37,7 +37,7 @@ export function SupplierPaymentDialog({
 
 function Body({ supplier, onDone }: { supplier: { id: string; name: string }; onDone: () => void }) {
   const { db } = useServices();
-  const { context } = useSession();
+  const { context, can } = useSession();
   const accounts = useLiveQuery(
     async () => (await db.cashAccounts.toArray()).filter((a) => !a.deletedAt),
     [db],
@@ -64,7 +64,7 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
       supplierId: supplier.id,
       amount,
       method,
-      reference: method === 'cash' ? null : reference || null,
+      reference: method === 'cash' || method === 'owner' ? null : reference || null,
       cashAccountId: method === 'cash' ? account : null,
       allocations,
     });
@@ -104,6 +104,7 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
               <option value="instapay">{strings.receipt.pay.instapay}</option>
               <option value="card">{strings.receipt.pay.card}</option>
               <option value="other">{strings.receipt.pay.other}</option>
+              {can('payFromOwner') === 'yes' && <option value="owner">{strings.receipt.pay.owner}</option>}
             </select>
           )}
         </FormField>
@@ -125,7 +126,7 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
               </select>
             )}
           </FormField>
-        ) : (
+        ) : method === 'owner' ? null : (
           <FormField label={strings.supplierPay.reference}>
             {(id) => (
               <input

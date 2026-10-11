@@ -82,7 +82,8 @@ its own Supabase Auth user (random password kept on the device), then calls this
 ### `revoke_device(device_id uuid)` — manager only
 Sets `revoked_at`; that device's next call gets `E_DEVICE_REVOKED`.
 
-### `report_sales_summary(p_from date, p_to date)` / `report_profit(p_from, p_to)` / `report_exceptions(p_from, p_to)` / `report_devices()` — manager devices only
+### `report_sales_summary(p_from date, p_to date)` / `report_profit(p_from, p_to)` / `report_purchases(p_from, p_to)` / `report_exceptions(p_from, p_to)` / `report_devices()` — manager devices only
+`report_purchases` splits purchases by where the money came from: `safe` (cash method), `owner` (paid from the owner's pocket, payments method `owner`), `other` (card, instapay, wallet, other), `credit`, plus returns and later supplier payments, in total and per supplier.
 Each returns `{ ok, data, generated_at }`; a cashier device gets `E_FORBIDDEN`, a period over 400 days `E_VALIDATION`. Days are Cairo calendar days.
 Every report is also a `report_*_core(company, …)` function (service role only) so the import validator can compare it with OpenSourcePOS.
 - Sales: per day invoices / gross / returns / net, totals, payments by method, by cashier, count of legacy (OSPOS) invoices; voided invoices are out.

@@ -31,7 +31,7 @@ import { err, type Err } from '@/domain/result';
 import { computeReturnLine, type PriorReturn } from '@/domain/returns';
 
 const id = z.string().min(1);
-const PAY_METHODS = ['cash', 'credit', 'card', 'instapay', 'wallet', 'other'] as const;
+const PAY_METHODS = ['cash', 'credit', 'card', 'instapay', 'wallet', 'other', 'owner'] as const;
 const payment = z.object({
   method: z.enum(PAY_METHODS),
   amount: z.number().int().positive(),
@@ -160,6 +160,8 @@ export async function postPurchase(
   if (canCtx(ctx, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.lines.some((l) => l.newSalePrice !== null) && canCtx(ctx, 'editPrices') !== 'yes')
     return err('E_FORBIDDEN', 'السعر للمدير بس');
+  if (input.payments.some((p) => p.method === 'owner') && canCtx(ctx, 'payFromOwner') !== 'yes')
+    return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   const supplier = await db.suppliers.get(input.supplierId);
   if (!supplier || supplier.deletedAt) return err('NOT_FOUND', 'مورد غير موجود');
@@ -538,7 +540,7 @@ export async function postPurchaseReturn(
 const supplierPaymentInput = z.object({
   supplierId: id,
   amount: z.number().int().positive(),
-  method: z.enum(['cash', 'card', 'instapay', 'wallet', 'other']),
+  method: z.enum(['cash', 'card', 'instapay', 'wallet', 'other', 'owner']),
   reference: z.string().max(60).nullable().default(null),
   cashAccountId: id.nullable().default(null),
   allocations: z.array(z.object({ invoice_id: id, amount: z.number().int().positive() })).default([]),
@@ -554,7 +556,10 @@ export async function postSupplierPayment(
   const input = parsed.data;
   if (canCtx(ctx, 'supplierPayment') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   if (input.method === 'cash' && !input.cashAccountId) return err('E_VALIDATION', 'اختار الخزنة');
-  if (input.method !== 'cash' && !input.reference) return err('E_VALIDATION', 'المرجع مطلوب');
+  if (input.method !== 'cash' && input.method !== 'owner' && !input.reference)
+    return err('E_VALIDATION', 'المرجع مطلوب');
+  if (input.method === 'owner' && canCtx(ctx, 'payFromOwner') !== 'yes')
+    return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   const supplier = await db.suppliers.get(input.supplierId);
   if (!supplier || supplier.deletedAt) return err('NOT_FOUND', 'مورد غير موجود');

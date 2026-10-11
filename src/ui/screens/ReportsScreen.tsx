@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Printer } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-import { useServices } from '@/app/session';
+import { useServices, useSession } from '@/app/session';
 import { loadStockRows } from '@/db/stock-report';
 import { toCsv } from '@/domain/csv';
 import { cairoTime } from '@/domain/receipt';
@@ -10,10 +10,12 @@ import {
   devicesTable,
   exceptionsTables,
   profitTable,
+  purchasesTables,
   salesTables,
   stockTable,
   type ReportTable,
 } from '@/domain/reports';
+import type { Action } from '@/domain/permissions';
 import { callRpc } from '@/sync/errors';
 
 import { ActionButton } from '../components/ActionButton';
@@ -26,8 +28,8 @@ import { strings } from '../strings.ar';
 import styles from './screens.module.css';
 import { SmartReport } from './SmartReport';
 
-type Tab = 'smart' | 'sales' | 'profit' | 'exceptions' | 'devices' | 'stock';
-const TABS: Tab[] = ['smart', 'sales', 'profit', 'exceptions', 'devices', 'stock'];
+type Tab = 'smart' | 'sales' | 'profit' | 'purchases' | 'exceptions' | 'devices' | 'stock';
+const TABS: Tab[] = ['smart', 'sales', 'profit', 'purchases', 'exceptions', 'devices', 'stock'];
 
 const cairoDay = (offsetDays = 0, base = new Date()): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(
@@ -52,8 +54,11 @@ const methodName = (k: string): string => (strings.receipt.pay as Record<string,
 /** Manager reports: sales, profit, exceptions and devices come from the server (they include the old OpenSourcePOS history); stock comes from this device. */
 export function ReportsScreen() {
   const { db, client, runner } = useServices();
+  const { can } = useSession();
   const sync = useSyncExternalStore(runner.subscribe, runner.getSnapshot);
-  const [tab, setTab] = useState<Tab>('smart');
+  const tabs = TABS.filter((x) => can(`report.${x}` as Action) !== 'no');
+  const [chosen, setTab] = useState<Tab>('smart');
+  const tab = tabs.includes(chosen) ? chosen : (tabs[0] ?? 'smart');
   const [today] = useState(() => cairoDay());
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
@@ -67,6 +72,7 @@ export function ReportsScreen() {
     const name = {
       sales: 'report_sales_summary',
       profit: 'report_profit',
+      purchases: 'report_purchases',
       exceptions: 'report_exceptions',
       devices: 'report_devices',
     }[tab];
@@ -81,9 +87,11 @@ export function ReportsScreen() {
           ? salesTables(d, t, methodName)
           : tab === 'profit'
             ? [profitTable(d, t)]
-            : tab === 'exceptions'
-              ? exceptionsTables(d, t, time, reasonName)
-              : [devicesTable(d, t, time)];
+            : tab === 'purchases'
+              ? purchasesTables(d, t)
+              : tab === 'exceptions'
+                ? exceptionsTables(d, t, time, reasonName)
+                : [devicesTable(d, t, time)];
       setLoaded({ key, tables, error: null });
     });
     return () => {
@@ -149,7 +157,7 @@ export function ReportsScreen() {
         <div className={styles.fixed}>
           <SegmentedControl
             label={strings.reports.title}
-            options={TABS.map((x) => ({ key: x, label: strings.reports.tabs[x] }))}
+            options={tabs.map((x) => ({ key: x, label: strings.reports.tabs[x] }))}
             value={tab}
             onChange={setTab}
             testIdPrefix="report-tab-"
@@ -230,20 +238,24 @@ export function ReportsScreen() {
           {tables && (
             <>
               <div className={styles.actions}>
-                <ActionButton
-                  label={strings.reports.print}
-                  icon={Printer}
-                  variant="ghost"
-                  onClick={() => void print()}
-                  testId="report-print"
-                />
-                <ActionButton
-                  label={strings.reports.csv}
-                  icon={Download}
-                  variant="ghost"
-                  onClick={exportCsv}
-                  testId="report-csv"
-                />
+                {can('printReports') !== 'no' && (
+                  <ActionButton
+                    label={strings.reports.print}
+                    icon={Printer}
+                    variant="ghost"
+                    onClick={() => void print()}
+                    testId="report-print"
+                  />
+                )}
+                {can('exportCsv') !== 'no' && (
+                  <ActionButton
+                    label={strings.reports.csv}
+                    icon={Download}
+                    variant="ghost"
+                    onClick={exportCsv}
+                    testId="report-csv"
+                  />
+                )}
               </div>
               {tables.map((t, i) => (
                 <div key={i} className={styles.section} data-testid={`report-table-${i}`}>

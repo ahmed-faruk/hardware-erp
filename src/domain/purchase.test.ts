@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computePurchase, costPerBase } from './purchase';
+import { computePurchase, costPerBase, splitPurchasePayment } from './purchase';
 
 describe('computePurchase', () => {
   it('qty x cost per line, half-up, with line discount', () => {
@@ -25,5 +25,18 @@ describe('costPerBase', () => {
   it('rounds half up', () => {
     expect(costPerBase(1000, 3000)).toBe(333);
     expect(costPerBase(1001, 2000)).toBe(501); // 500.5
+  });
+});
+
+describe('splitPurchasePayment', () => {
+  it('leaves what neither the safe nor the owner paid on credit', () => {
+    expect(splitPurchasePayment(10000, 4000, 3000)).toEqual({ safe: 4000, owner: 3000, credit: 3000 });
+    expect(splitPurchasePayment(10000, 10000, 0)).toEqual({ safe: 10000, owner: 0, credit: 0 });
+    expect(splitPurchasePayment(10000, 0, 10000)).toEqual({ safe: 0, owner: 10000, credit: 0 });
+  });
+  it('refuses more than the invoice and negative parts', () => {
+    expect(splitPurchasePayment(10000, 6000, 5000)).toBeNull();
+    expect(splitPurchasePayment(10000, -1, 0)).toBeNull();
+    expect(splitPurchasePayment(10000, 0, -5)).toBeNull();
   });
 });

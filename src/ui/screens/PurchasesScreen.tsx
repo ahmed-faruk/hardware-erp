@@ -6,7 +6,7 @@ import { useServices, useSession } from '@/app/session';
 import { postPurchase, postPurchaseReturn } from '@/db/commands/purchasing';
 import type { Product, ProductUnit } from '@/db/types';
 import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
-import { computePurchase } from '@/domain/purchase';
+import { computePurchase, splitPurchasePayment } from '@/domain/purchase';
 import { cairoTime } from '@/domain/receipt';
 
 import { ActionButton } from '../components/ActionButton';
@@ -37,11 +37,18 @@ export function PurchasesScreen() {
   const [returnOpen, setReturnOpen] = useState(false);
   const rows = useLiveQuery(async () => {
     const suppliers = new Map((await db.suppliers.toArray()).map((s) => [s.id, s.name]));
+    const owner = new Map<string, number>();
+    for (const pay of await db.payments
+      .where('[documentType+documentId]')
+      .between(['purchase_invoice', ''], ['purchase_invoice', '\uffff'])
+      .toArray())
+      if (pay.method === 'owner') owner.set(pay.documentId, (owner.get(pay.documentId) ?? 0) + pay.amount);
     return (await db.purchaseInvoices.toArray())
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
       .slice(0, 100)
       .map((p) => ({
         ...p,
+        ownerPaid: owner.get(p.id) ?? 0,
         total: p.total as number,
         supplierId: p.supplierId as string,
         supplierName: suppliers.get(p.supplierId as string) ?? '',
@@ -69,6 +76,12 @@ export function PurchasesScreen() {
       header: strings.purchases.total,
       numeric: true,
       cell: (p) => formatMoney(p.total as number),
+    },
+    {
+      key: 'owner',
+      header: strings.purchases.paidOutside,
+      numeric: true,
+      cell: (p) => (p.ownerPaid ? formatMoney(p.ownerPaid) : '—'),
     },
     {
       key: 'print',
@@ -176,6 +189,7 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
   const [supplierId, setSupplierId] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [paid, setPaid] = useState<number | null>(null);
+  const [ownerPaid, setOwnerPaid] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (!basics) return <Skeleton />;
@@ -187,7 +201,11 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
       ? computePurchase(rows.map((r) => ({ qtyMilli: r.qty!, unitCost: r.cost!, discount: 0 })))
       : null;
   const total = totals?.total ?? 0;
-  const cashPaid = Math.min(paid ?? total, total);
+  const mayPayOwner = session.can('payFromOwner') === 'yes';
+  const ownerAmount = mayPayOwner ? (ownerPaid ?? 0) : 0;
+  // by default the whole invoice leaves the safe, minus what the owner paid from his pocket
+  const cashPaid = Math.min(paid ?? Math.max(0, total - ownerAmount), total);
+  const split = splitPurchasePayment(total, cashPaid, ownerAmount);
 
   const add = async (product: Product): Promise<void> => {
     const units = await db.productUnits.where('productId').equals(product.id).toArray();
@@ -203,13 +221,15 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
   const save = async (): Promise<void> => {
     if (!context || !supplierId || !totals) return;
     if (cashPaid > 0 && !basics.safe) return setError(strings.purchases.noSafe);
+    if (!split) return setError(strings.purchases.ownerTooMuch);
     setBusy(true);
     setError(null);
     const payments = [
       ...(cashPaid > 0
         ? [{ method: 'cash' as const, amount: cashPaid, cashAccountId: basics.safe!.id }]
         : []),
-      ...(total - cashPaid > 0 ? [{ method: 'credit' as const, amount: total - cashPaid }] : []),
+      ...(split.owner > 0 ? [{ method: 'owner' as const, amount: split.owner }] : []),
+      ...(split.credit > 0 ? [{ method: 'credit' as const, amount: split.credit }] : []),
     ];
     const r = await postPurchase(context, {
       supplierId,
@@ -285,7 +305,16 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
             parse={toPiasters}
             format={formatMoney}
           />
-          <p data-testid="purchase-credit">{`${strings.purchases.onCredit}: ${formatMoney(total - cashPaid)}`}</p>
+          {mayPayOwner && (
+            <NumberField
+              label={strings.purchases.paidOwner}
+              value={ownerPaid}
+              onChange={setOwnerPaid}
+              parse={toPiasters}
+              format={formatMoney}
+            />
+          )}
+          <p data-testid="purchase-credit">{`${strings.purchases.onCredit}: ${formatMoney(split?.credit ?? 0)}`}</p>
         </div>
       )}
       {error && <BigAlert tone="danger" word={error} />}

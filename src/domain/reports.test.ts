@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { devicesTable, profitTable, salesTables, stockTable } from './reports';
+import { devicesTable, profitTable, purchasesTables, salesTables, stockTable } from './reports';
 
 const t = new Proxy({}, { get: (_, k) => String(k) }) as Record<string, string>;
 
@@ -92,5 +92,38 @@ describe('exceptions report extras', () => {
       cartRemovals: '5',
     });
     expect(tables.find((x) => x.title === 'settingsChanges')?.rows[0]![0]).toBe('sale.cashierMayDiscount');
+  });
+});
+
+describe('purchases report', () => {
+  const totals = {
+    invoices: 1,
+    total: 10000,
+    safe: 4000,
+    owner: 3000,
+    other: 0,
+    credit: 3000,
+    returns: 0,
+    later_owner: 1000,
+    later_other: 0,
+  };
+  it('splits a purchase by where the money came from, in total and per supplier', () => {
+    const tables = purchasesTables(
+      { total: totals, by_supplier: [{ ...totals, supplier: 'مورد' }], legacy_invoices: 0 },
+      t,
+    );
+    expect(tables[0]!.rows).toEqual([
+      ['invoices', '1'],
+      ['purchTotal', '100.00'],
+      ['fromSafe', '40.00'],
+      ['fromOwner', '30.00'],
+      ['otherPay', '0.00'],
+      ['onCredit', '30.00'],
+      ['returns', '0.00'],
+      ['laterOwner', '10.00'],
+      ['laterOther', '0.00'],
+    ]);
+    expect(tables[1]!.rows).toEqual([['مورد', '100.00', '40.00', '30.00', '30.00', '0.00']]);
+    expect(tables[1]!.totals).toEqual(['total', '100.00', '40.00', '30.00', '30.00', '0.00']);
   });
 });

@@ -31,3 +31,18 @@ export function computePurchase(lines: PurchaseLineInput[]): PurchaseTotals {
 /** Cost of ONE base unit from what a line cost and how many base units (milli) it brought in; same maths as the server's `line_cost_per_base`. */
 export const costPerBase = (netAmount: Piasters, baseQtyMilli: Milli): Piasters =>
   mulDivRound(netAmount, 1000, baseQtyMilli);
+
+export interface PaymentSplit {
+  safe: Piasters;
+  owner: Piasters;
+  credit: Piasters;
+}
+
+/**
+ * How a purchase is paid: `safe` from a cash account, `owner` from the owner's pocket (no cash account moves, no debt to the owner),
+ * the rest stays owed to the supplier. Null when the two parts together are more than the invoice or either is negative.
+ */
+export function splitPurchasePayment(total: Piasters, safe: Piasters, owner: Piasters): PaymentSplit | null {
+  if (safe < 0 || owner < 0 || safe + owner > total) return null;
+  return { safe, owner, credit: total - safe - owner };
+}
