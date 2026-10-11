@@ -1,10 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, Printer } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { loadStockRows } from '@/db/stock-report';
-import { toCsv } from '@/domain/csv';
 import { cairoTime } from '@/domain/receipt';
 import {
   devicesTable,
@@ -21,21 +19,28 @@ import { callRpc } from '@/sync/errors';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { FormField } from '../components/FormField';
+import { ProductPicker } from '../components/ProductPicker';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
+import { cairoDay, monthStart } from './dates';
+import { ReportActions, ReportTableView } from './ReportParts';
+import { ProductHistory } from './ProductHistory';
 import { SmartReport } from './SmartReport';
 
-type Tab = 'smart' | 'sales' | 'profit' | 'purchases' | 'exceptions' | 'devices' | 'stock';
-const TABS: Tab[] = ['smart', 'sales', 'profit', 'purchases', 'exceptions', 'devices', 'stock'];
-
-const cairoDay = (offsetDays = 0, base = new Date()): string =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(
-    new Date(base.getTime() + offsetDays * 86_400_000),
-  );
-const monthStart = (day: string): string => `${day.slice(0, 8)}01`;
+type Tab = 'smart' | 'sales' | 'profit' | 'purchases' | 'productHistory' | 'exceptions' | 'devices' | 'stock';
+const TABS: Tab[] = [
+  'smart',
+  'sales',
+  'profit',
+  'purchases',
+  'productHistory',
+  'exceptions',
+  'devices',
+  'stock',
+];
 
 interface Loaded {
   key: string;
@@ -67,7 +72,7 @@ export function ReportsScreen() {
 
   const key = `${tab}|${from}|${to}`;
   useEffect(() => {
-    if (tab === 'stock' || tab === 'smart') return;
+    if (tab === 'stock' || tab === 'smart' || tab === 'productHistory') return;
     let live = true;
     const name = {
       sales: 'report_sales_summary',
@@ -109,7 +114,10 @@ export function ReportsScreen() {
         : loaded?.key === key
           ? loaded.tables
           : null;
-  const error = tab !== 'stock' && tab !== 'smart' && loaded?.key === key ? loaded.error : null;
+  const error =
+    tab !== 'stock' && tab !== 'smart' && tab !== 'productHistory' && loaded?.key === key
+      ? loaded.error
+      : null;
   const upTo = sync.lastSyncAt
     ? `${strings.reports.upTo}: ${cairoTime(new Date(sync.lastSyncAt).toISOString())}`
     : strings.reports.notSynced;
@@ -120,36 +128,6 @@ export function ReportsScreen() {
     setFrom(a);
     setTo(b);
   };
-  const exportCsv = (): void => {
-    if (!tables) return;
-    const rows: (string | number)[][] = [];
-    for (const t of tables) {
-      rows.push([t.title], t.headers, ...t.rows);
-      if (t.totals) rows.push(t.totals);
-      rows.push([]);
-    }
-    const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${tab}-${from}-${to}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  };
-  const print = async (): Promise<void> => {
-    if (!tables) return;
-    const [render, { printHtml, cairoFontFaces }, company] = await Promise.all([
-      import('../print/render'),
-      import('../print/printHtml'),
-      db.companies.toCollection().first(),
-    ]);
-    await printHtml(
-      render.renderReportHtml(
-        { shopName: company?.name ?? '', title: strings.reports.tabs[tab], subtitle, upTo, tables },
-        cairoFontFaces(),
-      ),
-    );
-  };
-
   return (
     <section>
       <h1 className={styles.title}>{strings.reports.title}</h1>
@@ -166,6 +144,8 @@ export function ReportsScreen() {
       </div>
       {tab === 'smart' ? (
         <SmartReport />
+      ) : tab === 'productHistory' ? (
+        <HistoryTab />
       ) : (
         <>
           {tab !== 'stock' && tab !== 'devices' && (
@@ -237,81 +217,33 @@ export function ReportsScreen() {
           {!tables && !error && <Skeleton />}
           {tables && (
             <>
-              <div className={styles.actions}>
-                {can('printReports') !== 'no' && (
-                  <ActionButton
-                    label={strings.reports.print}
-                    icon={Printer}
-                    variant="ghost"
-                    onClick={() => void print()}
-                    testId="report-print"
-                  />
-                )}
-                {can('exportCsv') !== 'no' && (
-                  <ActionButton
-                    label={strings.reports.csv}
-                    icon={Download}
-                    variant="ghost"
-                    onClick={exportCsv}
-                    testId="report-csv"
-                  />
-                )}
-              </div>
-              {tables.map((t, i) => (
-                <div key={i} className={styles.section} data-testid={`report-table-${i}`}>
-                  {i > 0 && <h2>{t.title}</h2>}
-                  {t.rows.length === 0 && !t.totals ? (
-                    <p>{strings.reports.none}</p>
-                  ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      <table className={styles.reportTable}>
-                        <thead>
-                          <tr>
-                            {t.headers.map((h, hi) => (
-                              <th key={h} className={hi > 0 ? styles.num : undefined}>
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {t.rows.map((r, ri) => (
-                            <tr key={ri}>
-                              {r.map((c, ci) => (
-                                <td
-                                  key={ci}
-                                  dir={ci > 0 ? 'ltr' : undefined}
-                                  className={ci > 0 ? styles.num : undefined}
-                                >
-                                  {c}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                          {t.totals && (
-                            <tr data-testid={`report-totals-${i}`} className={styles.totalRow}>
-                              {t.totals.map((c, ci) => (
-                                <td
-                                  key={ci}
-                                  dir={ci > 0 ? 'ltr' : undefined}
-                                  className={ci > 0 ? styles.num : undefined}
-                                >
-                                  {c}
-                                </td>
-                              ))}
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {t.note && <p>{t.note}</p>}
-                </div>
-              ))}
+              <ReportActions
+                tables={tables}
+                title={strings.reports.tabs[tab]}
+                subtitle={subtitle}
+                upTo={upTo}
+                filename={`${tab}-${from}-${to}`}
+              />
+              <ReportTableView tables={tables} />
             </>
           )}
         </>
       )}
     </section>
+  );
+}
+
+/** Pick a product, then see its movements. */
+function HistoryTab() {
+  const [product, setProduct] = useState<{ id: string; name: string } | null>(null);
+  return (
+    <div>
+      <ProductPicker
+        onPick={(p) => setProduct({ id: p.id, name: p.name })}
+        label={strings.reports.historyPick}
+      />
+      {product && <h2>{product.name}</h2>}
+      {product && <ProductHistory key={product.id} productId={product.id} />}
+    </div>
   );
 }
