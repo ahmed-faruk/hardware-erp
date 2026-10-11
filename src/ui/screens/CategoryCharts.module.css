@@ -1,0 +1,58 @@
+.chart {
+  /* the drawing is laid out with explicit coordinates (names on the right): anchors must not flip with the page direction */
+  direction: ltr;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 600px; /* below this the labels get too small: the drawing scrolls inside its card */
+  block-size: auto;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.label,
+.value,
+.axis {
+  fill: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.label {
+  fill: var(--text);
+  font-weight: 600;
+}
+
+.value {
+  font-weight: 700;
+  fill: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-small);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legend i {
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 3px;
+}

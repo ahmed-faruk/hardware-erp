@@ -20,6 +20,8 @@ export interface InsightsData {
   products: ProductFacts[];
   events: SaleEvent[];
   customerNames: Map<string, string>;
+  /** the three categories that sold most in the last 30 days, with their revenue */
+  topCategories: { id: string | null; name: string; revenue: Piasters }[];
 }
 
 const WEEKDAYS: Record<string, number> = { Sat: 0, Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6 };
@@ -44,15 +46,17 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
   const since = (days: number): string => new Date(now.getTime() - days * 86_400_000).toISOString();
   const cut30 = since(30);
   const monthFirst = `${today.slice(0, 8)}01`;
-  const [invoices, products, balances, suppliers, customers, parties, expenses] = await Promise.all([
-    db.salesInvoices.where('issuedAt').aboveOrEqual(since(90)).toArray(),
-    db.products.toArray(),
-    db.stockBalances.toArray(),
-    db.suppliers.toArray(),
-    db.customers.toArray(),
-    db.partyBalances.toArray(),
-    db.expenses.where('issuedAt').aboveOrEqual(`${monthFirst}T00:00:00`).toArray(),
-  ]);
+  const [invoices, products, balances, suppliers, customers, parties, expenses, categories] =
+    await Promise.all([
+      db.salesInvoices.where('issuedAt').aboveOrEqual(since(90)).toArray(),
+      db.products.toArray(),
+      db.stockBalances.toArray(),
+      db.suppliers.toArray(),
+      db.customers.toArray(),
+      db.partyBalances.toArray(),
+      db.expenses.where('issuedAt').aboveOrEqual(`${monthFirst}T00:00:00`).toArray(),
+      db.categories.toArray(),
+    ]);
   const posted = invoices.filter((i) => i.status === 'posted');
   const events: SaleEvent[] = posted.map((i) => ({
     customerId: i.customerId,
@@ -117,5 +121,28 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
     products: facts,
     events,
     customerNames: new Map(customers.map((c) => [c.id, c.name])),
+    topCategories: topCategories(
+      products.map((p) => ({ id: p.id, categoryId: p.categoryId })),
+      sold,
+      new Map(categories.map((c) => [c.id, c.name])),
+    ),
   };
+}
+
+function topCategories(
+  products: { id: string; categoryId: string | null }[],
+  sold: Map<string, { revenue: Piasters }>,
+  names: Map<string, string>,
+): InsightsData['topCategories'] {
+  const byProduct = new Map(products.map((p) => [p.id, p.categoryId]));
+  const sum = new Map<string | null, Piasters>();
+  for (const [productId, s] of sold) {
+    const cat = byProduct.get(productId) ?? null;
+    sum.set(cat, (sum.get(cat) ?? 0) + s.revenue);
+  }
+  return [...sum.entries()]
+    .filter(([, revenue]) => revenue > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id, revenue]) => ({ id, name: (id && names.get(id)) || '', revenue }));
 }
