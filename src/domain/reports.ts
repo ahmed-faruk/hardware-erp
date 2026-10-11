@@ -274,3 +274,68 @@ export function historyTable(
     note: t.historyNote,
   };
 }
+
+interface ExpensesData {
+  total: { count: number; amount: number };
+  by_category: { category: string; count: number; amount: number }[];
+  by_account: { account: string | null; count: number; amount: number }[];
+  by_day: { day: string; count: number; amount: number }[];
+  list: {
+    number: string;
+    at: string;
+    category: string;
+    account: string | null;
+    amount: number;
+    legacy: boolean;
+    note: string | null;
+  }[];
+  legacy_count: number;
+}
+
+/** Whole percent of `part` in `whole`, rounded half up; 0 when there is nothing. */
+export const percentOf = (part: number, whole: number): number =>
+  whole > 0 ? Math.floor((part * 100 + whole / 2) / whole) : 0;
+
+/** Expenses: by category (with each one's share), by cash account, by day and the list. */
+export function expensesTables(
+  d: ExpensesData,
+  t: ReportLabels,
+  time: (iso: string) => string,
+): ReportTable[] {
+  const all = d.total.amount;
+  return [
+    {
+      title: t.title ?? '',
+      headers: [t.category!, t.count!, t.amount!, t.share!],
+      rows: d.by_category.map((r) => [
+        r.category || t.noCategory!,
+        String(r.count),
+        m(r.amount),
+        `${percentOf(r.amount, all)}%`,
+      ]),
+      totals: [t.total!, String(d.total.count), m(all), all > 0 ? '100%' : '0%'],
+      note: d.legacy_count > 0 ? `${t.legacy}: ${d.legacy_count}` : undefined,
+    },
+    {
+      title: t.byAccount!,
+      headers: [t.account!, t.count!, t.amount!],
+      rows: d.by_account.map((r) => [r.account ?? t.noAccount!, String(r.count), m(r.amount)]),
+    },
+    {
+      title: t.byDay!,
+      headers: [t.day!, t.count!, t.amount!],
+      rows: d.by_day.map((r) => [r.day, String(r.count), m(r.amount)]),
+    },
+    {
+      title: t.list!,
+      headers: [t.number!, t.time!, t.category!, t.account!, t.amount!],
+      rows: d.list.map((r) => [
+        r.number,
+        time(r.at),
+        r.category || t.noCategory!,
+        r.account ?? t.noAccount!,
+        m(r.amount),
+      ]),
+    },
+  ];
+}

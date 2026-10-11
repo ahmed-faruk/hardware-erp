@@ -10,6 +10,8 @@ export interface Kpis {
   stockValue: Piasters;
   receivables: Piasters;
   payables: Piasters;
+  /** posted expenses since the 1st of this Cairo month */
+  monthExpenses: Piasters;
 }
 
 export interface InsightsData {
@@ -41,13 +43,15 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
   const today = cairoParts(now.toISOString()).day;
   const since = (days: number): string => new Date(now.getTime() - days * 86_400_000).toISOString();
   const cut30 = since(30);
-  const [invoices, products, balances, suppliers, customers, parties] = await Promise.all([
+  const monthFirst = `${today.slice(0, 8)}01`;
+  const [invoices, products, balances, suppliers, customers, parties, expenses] = await Promise.all([
     db.salesInvoices.where('issuedAt').aboveOrEqual(since(90)).toArray(),
     db.products.toArray(),
     db.stockBalances.toArray(),
     db.suppliers.toArray(),
     db.customers.toArray(),
     db.partyBalances.toArray(),
+    db.expenses.where('issuedAt').aboveOrEqual(`${monthFirst}T00:00:00`).toArray(),
   ]);
   const posted = invoices.filter((i) => i.status === 'posted');
   const events: SaleEvent[] = posted.map((i) => ({
@@ -106,6 +110,9 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
       stockValue: facts.reduce((a, p) => a + Math.round((Math.max(0, p.stockMilli) * p.unitCost) / 1000), 0),
       receivables: sumParty('customer', 1),
       payables: sumParty('supplier', -1),
+      monthExpenses: expenses
+        .filter((e) => e.status === 'posted' && cairoParts(e.issuedAt).day >= monthFirst)
+        .reduce((a, e) => a + (e.amount as number), 0),
     },
     products: facts,
     events,

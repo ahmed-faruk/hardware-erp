@@ -7,6 +7,7 @@ import { cairoTime } from '@/domain/receipt';
 import {
   devicesTable,
   exceptionsTables,
+  expensesTables,
   profitTable,
   purchasesTables,
   salesTables,
@@ -30,12 +31,22 @@ import { ReportActions, ReportTableView } from './ReportParts';
 import { ProductHistory } from './ProductHistory';
 import { SmartReport } from './SmartReport';
 
-type Tab = 'smart' | 'sales' | 'profit' | 'purchases' | 'productHistory' | 'exceptions' | 'devices' | 'stock';
+type Tab =
+  | 'smart'
+  | 'sales'
+  | 'profit'
+  | 'purchases'
+  | 'expenses'
+  | 'productHistory'
+  | 'exceptions'
+  | 'devices'
+  | 'stock';
 const TABS: Tab[] = [
   'smart',
   'sales',
   'profit',
   'purchases',
+  'expenses',
   'productHistory',
   'exceptions',
   'devices',
@@ -78,6 +89,7 @@ export function ReportsScreen() {
       sales: 'report_sales_summary',
       profit: 'report_profit',
       purchases: 'report_purchases',
+      expenses: 'report_expenses',
       exceptions: 'report_exceptions',
       devices: 'report_devices',
     }[tab];
@@ -94,9 +106,11 @@ export function ReportsScreen() {
             ? [profitTable(d, t)]
             : tab === 'purchases'
               ? purchasesTables(d, t)
-              : tab === 'exceptions'
-                ? exceptionsTables(d, t, time, reasonName)
-                : [devicesTable(d, t, time)];
+              : tab === 'expenses'
+                ? expensesTables(d, t, time)
+                : tab === 'exceptions'
+                  ? exceptionsTables(d, t, time, reasonName)
+                  : [devicesTable(d, t, time)];
       setLoaded({ key, tables, error: null });
     });
     return () => {

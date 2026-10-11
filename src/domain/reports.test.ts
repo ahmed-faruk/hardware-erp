@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { devicesTable, historyTable, profitTable, purchasesTables, salesTables, stockTable } from './reports';
+import {
+  devicesTable,
+  expensesTables,
+  historyTable,
+  percentOf,
+  profitTable,
+  purchasesTables,
+  salesTables,
+  stockTable,
+} from './reports';
 
 const t = new Proxy({}, { get: (_, k) => String(k) }) as Record<string, string>;
 
@@ -161,5 +170,48 @@ describe('item history report', () => {
     expect(r.rows[0]).toEqual(['2026-10-06', 'PURCHASE_INVOICE', 'K1-PUR-000001', 'مورد', '5', '', '13']);
     expect(r.rows[1]).toEqual(['2026-05-01', 'SALES_INVOICE (legacyTag)', 'OSPOS-S1', '', '', '3', '10']);
     expect(r.note).toBe('historyNote');
+  });
+});
+
+describe('expenses report', () => {
+  const d = {
+    total: { count: 3, amount: 20000 },
+    by_category: [
+      { category: 'كهرباء', count: 1, amount: 15000 },
+      { category: '', count: 2, amount: 5000 },
+    ],
+    by_account: [
+      { account: 'درج', count: 2, amount: 18500 },
+      { account: null, count: 1, amount: 1500 },
+    ],
+    by_day: [{ day: '2026-10-01', count: 1, amount: 15000 }],
+    list: [
+      {
+        number: 'K1-EXP-000001',
+        at: '2026-10-01T10:00:00Z',
+        category: 'كهرباء',
+        account: 'درج',
+        amount: 15000,
+        legacy: false,
+        note: null,
+      },
+    ],
+    legacy_count: 1,
+  };
+  it('totals by category with each share, and names what has no category or account', () => {
+    const r = expensesTables(d, t, (iso) => iso.slice(0, 10));
+    expect(r[0]!.rows).toEqual([
+      ['كهرباء', '1', '150.00', '75%'],
+      ['noCategory', '2', '50.00', '25%'],
+    ]);
+    expect(r[0]!.totals).toEqual(['total', '3', '200.00', '100%']);
+    expect(r[0]!.note).toBe('legacy: 1');
+    expect(r[1]!.rows[1]).toEqual(['noAccount', '1', '15.00']);
+    expect(r[3]!.rows[0]).toEqual(['K1-EXP-000001', '2026-10-01', 'كهرباء', 'درج', '150.00']);
+  });
+  it('rounds a share half up and is 0 for an empty period', () => {
+    expect(percentOf(1, 3)).toBe(33);
+    expect(percentOf(2, 3)).toBe(67);
+    expect(percentOf(0, 0)).toBe(0);
   });
 });
