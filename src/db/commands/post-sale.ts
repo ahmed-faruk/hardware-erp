@@ -1,5 +1,5 @@
 import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
-import { newCommon, type DeviceContext } from './context';
+import { approvalRole, canCtx, newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { customerPriceList } from '../pricing';
 import { priceFor } from '@/domain/pricing';
@@ -23,7 +23,6 @@ import { discountNeedsApproval, priceNeedsApproval } from '@/domain/settings';
 import type { Action } from '@/domain/permissions';
 import { checkCredit } from '@/domain/credit';
 import { validatePayments } from '@/domain/payments';
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import { saleInputSchema, type SaleInput } from '@/domain/schemas';
 import { computeInvoice } from '@/domain/totals';
@@ -41,7 +40,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
   const parsed = saleInputSchema.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات الفاتورة غير صحيحة');
   const input = parsed.data;
-  if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
 
   const products = await db.products.bulkGet(input.lines.map((l) => l.productId));
@@ -97,7 +96,14 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
   const overrides: { action: string; approves: Action; after: unknown }[] = [];
   const units = await db.productUnits.bulkGet(input.lines.map((l) => l.productUnitId ?? ''));
   input.lines.forEach((l, i) => {
-    if (discountNeedsApproval(settings, ctx.role, l.discount, invoice.lines[i]!.grossAmount)) {
+    if (
+      discountNeedsApproval(
+        settings,
+        approvalRole(ctx, 'discountOverLimit'),
+        l.discount,
+        invoice.lines[i]!.grossAmount,
+      )
+    ) {
       needs.add('discountOverLimit');
       overrides.push({
         action: 'discount_over_limit',
@@ -115,7 +121,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
           : null,
       customerList,
     );
-    if (priceNeedsApproval(settings, ctx.role, l.unitPrice, listPrice)) {
+    if (priceNeedsApproval(settings, approvalRole(ctx, 'priceOverride'), l.unitPrice, listPrice)) {
       needs.add('priceOverride');
       overrides.push({
         action: 'price_override',
@@ -125,7 +131,14 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     }
   });
   const netSum = invoice.lines.reduce((a, l) => a + l.netAmount, 0);
-  if (discountNeedsApproval(settings, ctx.role, input.invoiceDiscount ?? undefined, netSum)) {
+  if (
+    discountNeedsApproval(
+      settings,
+      approvalRole(ctx, 'discountOverLimit'),
+      input.invoiceDiscount ?? undefined,
+      netSum,
+    )
+  ) {
     needs.add('discountOverLimit');
     overrides.push({
       action: 'discount_over_limit',
@@ -145,7 +158,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       input.creditPolicy,
       input.isOffline,
     );
-    if (!check.ok && ctx.role !== 'manager') needs.add('creditOverLimit');
+    if (!check.ok && canCtx(ctx, 'creditOverLimit') !== 'yes') needs.add('creditOverLimit');
   }
 
   const approvals: { token: string; approval: Approval }[] = [];

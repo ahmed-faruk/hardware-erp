@@ -40,27 +40,35 @@ export function ShiftMenuDialog({
   onPick: (t: ShiftTool) => void;
   onClose: () => void;
 }) {
+  const { can } = useSession();
   const items = [
-    { key: 'x', icon: ClipboardList, label: strings.shift.showX },
-    { key: 'expense', icon: Wallet, label: strings.cash.expense },
-    { key: 'transfer', icon: ArrowRightLeft, label: strings.cash.transfer },
-    { key: 'close', icon: Lock, label: strings.shift.close },
+    { key: 'x', icon: ClipboardList, label: strings.shift.showX, shown: true },
+    { key: 'expense', icon: Wallet, label: strings.cash.expense, shown: can('recordExpense') !== 'no' },
+    {
+      key: 'transfer',
+      icon: ArrowRightLeft,
+      label: strings.cash.transfer,
+      shown: can('cashTransfer') !== 'no',
+    },
+    { key: 'close', icon: Lock, label: strings.shift.close, shown: true },
   ] as const;
   return (
     <Dialog title={strings.sell.shiftOpen} open={open} onClose={onClose}>
       <div className={styles.reasons}>
-        {items.map(({ key, icon: Icon, label }) => (
-          <button
-            key={key}
-            type="button"
-            className={styles.reason}
-            onClick={() => onPick(key)}
-            data-testid={`shift-${key}`}
-          >
-            <Icon size={32} aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
+        {items
+          .filter((i) => i.shown)
+          .map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              type="button"
+              className={styles.reason}
+              onClick={() => onPick(key)}
+              data-testid={`shift-${key}`}
+            >
+              <Icon size={32} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
       </div>
     </Dialog>
   );
@@ -254,7 +262,8 @@ function Body({
   ask: Ask;
   onClosed: (id: string) => void;
 }) {
-  const { context } = useSession();
+  const session = useSession();
+  const { context } = session;
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [preview, setPreview] = useState<ClosePreview | null>(null);
   const [note, setNote] = useState('');
@@ -273,8 +282,8 @@ function Body({
   const finish = async (): Promise<void> => {
     if (!context || !preview) return;
     let token: string | undefined;
-    if (preview.needsApproval && context.role !== 'manager') {
-      const t = await ask('cashAdjustment');
+    if (preview.needsApproval && session.can('shiftVarianceApprove') !== 'yes') {
+      const t = await ask('shiftVarianceApprove');
       if (!t) return;
       token = t;
     }

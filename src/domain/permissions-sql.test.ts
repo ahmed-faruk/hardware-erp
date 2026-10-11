@@ -12,7 +12,7 @@ const latest = readdirSync(dir)
   .sort()
   .at(-1) as string;
 const sql = readFileSync(`${dir}/${latest}`, 'utf8');
-const rows = [...sql.matchAll(/\('(cashier|storekeeper)', '(\w+)', '(yes|pin)'\)/g)].map((m) => ({
+const rows = [...sql.matchAll(/\('(cashier|storekeeper)', '([\w.]+)', '(yes|pin)'\)/g)].map((m) => ({
   role: m[1] as Role,
   action: m[2],
   access: m[3],

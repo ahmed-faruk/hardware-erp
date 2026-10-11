@@ -83,7 +83,8 @@ Offline policy (setting): `allow` | `reduce:<percent>` | `block`. Over limit →
 Open with counted float. Close: cashier enters counted cash by denomination BEFORE seeing expected.
 `variance = counted − expected`; stored automatically; manager comment required above a threshold.
 
-## 11. Roles (MVP)
+## 11. Roles (MVP) and permission groups
+The table below is the default of each role. A manager can build permission groups (every screen and button is an action; yes / pin / no) and give one to a worker: a worker with a group gets exactly the group, without a group he gets his role. Use `canCtx(ctx, action)` in commands and `useSession().can(action)` in screens, never `role ===`. Server: `worker_can()`.
 | Action | cashier | storekeeper | manager |
 | --- | --- | --- | --- |
 | Sell, hold carts, return with invoice within period | ✓ | ✗ | ✓ |

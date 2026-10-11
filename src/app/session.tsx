@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   createContext,
   useCallback,
@@ -11,8 +12,10 @@ import {
 } from 'react';
 
 import type { DeviceContext } from '@/db/commands/context';
+import { groupPermissions } from '@/db/permissions';
 import type { HanafyDB } from '@/db/schema';
 import { checkPin } from '@/db/workers';
+import { resolveAccess, type Access, type Action } from '@/domain/permissions';
 import type { SyncRunner } from '@/sync/runner';
 
 import type { DeviceIdentity } from './device-setup';
@@ -28,10 +31,13 @@ export interface CurrentWorker {
   id: string;
   name: string;
   role: 'cashier' | 'storekeeper' | 'manager';
+  groupId?: string | null;
 }
 
 interface SessionValue {
   worker: CurrentWorker | null;
+  /** what the logged-in worker may do (his permission group, else his role); 'no' while nobody is logged in */
+  can: (action: Action) => Access;
   /** checks the PIN locally (works offline): 'locked' after 5 wrong tries for 5 minutes */
   login: (worker: CurrentWorker, pin: string) => Promise<'ok' | 'wrong' | 'locked'>;
   lock: () => void;
@@ -60,17 +66,28 @@ export function SessionProvider({ services, children }: { services: Services; ch
   const [worker, setWorker] = useState<CurrentWorker | null>(null);
   const idleMs = useRef(DEFAULT_IDLE_MINUTES * 60_000);
 
+  // the worker's group is read live: a manager changing it applies at once, also to a worker who is logged in
+  const live = useLiveQuery(async () => {
+    if (!worker) return null;
+    const fresh = await services.db.workers.get(worker.id);
+    return { permissions: await groupPermissions(services.db, fresh?.groupId ?? worker.groupId) };
+  }, [worker?.id, services]);
+  const permissions = live?.permissions ?? null;
+
   const context = useMemo<DeviceContext | null>(
     () =>
-      worker && {
-        db: services.db,
-        companyId: services.identity.companyId,
-        deviceId: services.identity.deviceId,
-        devicePrefix: services.identity.prefix,
-        workerId: worker.id,
-        role: worker.role,
-      },
-    [worker, services],
+      worker && live
+        ? {
+            db: services.db,
+            companyId: services.identity.companyId,
+            deviceId: services.identity.deviceId,
+            devicePrefix: services.identity.prefix,
+            workerId: worker.id,
+            role: worker.role,
+            permissions,
+          }
+        : null,
+    [worker, live, permissions, services],
   );
 
   const login = useCallback(
@@ -115,9 +132,13 @@ export function SessionProvider({ services, children }: { services: Services; ch
     };
   }, [worker]);
 
+  const can = useCallback(
+    (action: Action): Access => (worker ? resolveAccess(worker.role, permissions, action) : 'no'),
+    [worker, permissions],
+  );
   const value = useMemo<SessionValue>(
-    () => ({ worker, login, lock: () => setWorker(null), context }),
-    [worker, login, context],
+    () => ({ worker, can, login, lock: () => setWorker(null), context }),
+    [worker, can, login, context],
   );
   return (
     <ServicesContext.Provider value={services}>

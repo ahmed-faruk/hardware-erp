@@ -6,7 +6,6 @@ import { useServices, useSession } from '@/app/session';
 import { postPurchase, postPurchaseReturn } from '@/db/commands/purchasing';
 import type { Product, ProductUnit } from '@/db/types';
 import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
-import { can } from '@/domain/permissions';
 import { computePurchase } from '@/domain/purchase';
 import { cairoTime } from '@/domain/receipt';
 
@@ -170,9 +169,10 @@ function SupplierSelect({
 
 function PurchaseForm({ onDone }: { onDone: () => void }) {
   const { db } = useServices();
-  const { context, worker } = useSession();
+  const session = useSession();
+  const { context } = session;
   const basics = useBasics();
-  const isManager = worker ? can(worker.role, 'editPrices') === 'yes' : false;
+  const isManager = session.can('editPrices') === 'yes';
   const [supplierId, setSupplierId] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [paid, setPaid] = useState<number | null>(null);

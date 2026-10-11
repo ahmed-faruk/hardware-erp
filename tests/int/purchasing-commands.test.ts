@@ -212,7 +212,7 @@ describe('stock adjustment', () => {
       });
     expect((await adj(1000)).ok).toBe(true);
     expect(await adj(200000)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'stockAdjustment');
+    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'stockAdjustmentOverLimit');
     if (!a.ok) throw new Error(a.code);
     expect((await adj(200000, [a.value.token])).ok).toBe(true);
     const row = (await t.ctx.db.stockAdjustments.toArray()).find((x) => x.approvedBy);

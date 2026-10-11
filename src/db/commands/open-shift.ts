@@ -1,8 +1,7 @@
-import { can } from '@/domain/permissions';
 import { err, type Err } from '@/domain/result';
 import { openShiftSchema } from '@/domain/schemas';
 
-import { newCommon, type DeviceContext } from './context';
+import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso } from '../ids';
 import { isClockSafe } from '../clock';
 import { nextNumber } from '../numbering';
@@ -16,7 +15,7 @@ export async function openShift(
 ): Promise<{ ok: true; id: string; number: string } | Err> {
   const parsed = openShiftSchema.safeParse(raw);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات الوردية غير صحيحة');
-  if (can(ctx.role, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
+  if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   // a device clock that went backwards or is far from the server would date the whole shift wrong (offline-sync skill §6)
   if (!(await isClockSafe(db))) return err('CLOCK_UNSAFE', 'ساعة الجهاز غلط');

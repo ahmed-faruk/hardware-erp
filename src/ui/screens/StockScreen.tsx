@@ -61,7 +61,7 @@ export function StockScreen() {
     };
     let r = await postStockAdjustment(context, base);
     if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
-      const token = await ask('stockAdjustment');
+      const token = await ask('stockAdjustmentOverLimit');
       if (token) r = await postStockAdjustment(context, { ...base, approvalTokens: [token] });
     }
     if (r.ok) {

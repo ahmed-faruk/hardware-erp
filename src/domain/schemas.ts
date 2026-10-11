@@ -141,6 +141,16 @@ export const workerFieldsSchema = z
     role: z.enum(['cashier', 'storekeeper', 'manager']),
     active: z.boolean(),
     pin: z.string().regex(/^\d{6,12}$/),
+    groupId: id.nullable(),
+  })
+  .partial()
+  .strict();
+
+export const permissionGroupFieldsSchema = z
+  .object({
+    name: text,
+    permissions: z.record(z.string().max(64), z.enum(['yes', 'pin', 'no'])),
+    deletedAt: z.string().nullable(),
   })
   .partial()
   .strict();
