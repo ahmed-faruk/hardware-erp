@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
@@ -6,8 +6,20 @@ import { newCashierFixture, productId, sql } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const SECOND = 'a0000000-0000-7000-8000-0000000ca002';
+const FIRST = 'a0000000-0000-7000-8000-0000000ca001';
 
 test('sales in two categories show as bars, KPIs and a table that equal the database', async ({ page }) => {
+  try {
+    await run(page);
+  } finally {
+    // the test database is shared: put the catalog back so other specs find their tiles in the first category
+    sql(`update products set category_id = '${FIRST}' where id = '${productId(3)}'`);
+    sql(`update products set category_id = null where category_id = '${SECOND}'`);
+    sql(`delete from categories where id = '${SECOND}'`);
+  }
+});
+
+async function run(page: Page): Promise<void> {
   const f = newCashierFixture();
   sql(
     `insert into categories (id, company_id, name, color_token, icon, sort) values ('${SECOND}', '${COMPANY}', 'سباكة اختبار', 'cat-2', 'wrench', -2) on conflict (id) do nothing`,
@@ -70,4 +82,4 @@ test('sales in two categories show as bars, KPIs and a table that equal the data
   await expect(table).toContainText('سباكة اختبار');
   await expect(table).toContainText(revenue(`p.category_id = '${SECOND}'`));
   await expect(page.getByTestId('report-totals-0')).toContainText(revenue('true'));
-});
+}
