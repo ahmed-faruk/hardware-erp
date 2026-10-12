@@ -10,14 +10,15 @@ end $$;
 -- fixtures (superuser): Cairo is UTC+3 in October, so 22:30 UTC on 30 Sep is 01:30 on 1 Oct there
 insert into sales_invoices (id, company_id, number, issued_at, subtotal, total, worker_id, status, is_legacy) values
   ('0190f000-0000-7000-8000-0000000000b1', 'a0000000-0000-7000-8000-000000000001', 'K1-INV-000001', '2026-09-30 22:30:00+00', 10000, 10000, 'a0000000-0000-7000-8000-0000000000d1', 'posted', false),
-  ('0190f000-0000-7000-8000-0000000000b2', 'a0000000-0000-7000-8000-000000000001', 'OSPOS-2', '2026-10-01 10:00:00+00', 5000, 5000, 'a0000000-0000-7000-8000-0000000000d1', 'posted', true),
   ('0190f000-0000-7000-8000-0000000000b3', 'a0000000-0000-7000-8000-000000000001', 'K1-INV-000003', '2026-10-02 08:00:00+00', 2000, 2000, 'a0000000-0000-7000-8000-0000000000d1', 'voided', false);
 insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost, line_discount, is_legacy) values
-  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000b1', 1, 'a0000000-0000-7000-8000-000000000001', 1000, 2000, 5100, 10000, 400, 200, false),
-  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000b2', 1, 'a0000000-0000-7000-8000-000000000001', 1000, 1000, 5000, 5000, 3000, 0, true);
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000b1', 1, 'a0000000-0000-7000-8000-000000000001', 1000, 2000, 5100, 10000, 400, 200, false);
 insert into payments (id, company_id, document_type, document_id, method, amount, is_legacy) values
-  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'sales_invoice', '0190f000-0000-7000-8000-0000000000b1', 'cash', 10000, false),
-  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'sales_invoice', '0190f000-0000-7000-8000-0000000000b2', 'card', 5000, true);
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'sales_invoice', '0190f000-0000-7000-8000-0000000000b1', 'cash', 10000, false);
+-- the imported (OpenSourcePOS) sale of 1 October: compact tables, 50.00 paid by card, cost 30.00
+update workers set legacy_employee_id = 77 where id = 'a0000000-0000-7000-8000-0000000000d1';
+insert into legacy_sales (company_id, id, kind, day, employee_id, total, card) values ('a0000000-0000-7000-8000-000000000001', 2, 0, '2026-10-01', 77, 5000, 5000);
+insert into legacy_sale_lines (sale_id, line_no, qty, net, cost) values (2, 1, 1000, 5000, 3000);
 insert into sales_returns (id, company_id, number, issued_at, total, refund_method) values
   ('0190f000-0000-7000-8000-0000000000c1', 'a0000000-0000-7000-8000-000000000001', 'K1-RET-000001', '2026-10-02 09:00:00+00', 1000, 'cash');
 insert into sales_return_lines (id, company_id, return_id, product_id, qty, net_amount, unit_cost) values

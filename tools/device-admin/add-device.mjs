@@ -22,9 +22,19 @@ const args = Object.fromEntries(
   process.argv.slice(2).flatMap((a, i, all) => (a.startsWith('--') ? [[a.slice(2), all[i + 1]]] : [])),
 );
 const { name, prefix, kind = 'pc', role = 'cashier', company, 'drawer-for': drawerFor } = args;
-if (!drawerFor && (!name || !/^[A-Z0-9]{2,3}$/.test(prefix ?? '') || !['pc', 'mobile'].includes(kind) || !['cashier', 'storekeeper', 'manager'].includes(role))) {
-  console.error('Usage: npm run device:add -- --name "<name>" --prefix <2-3 chars A-Z0-9> --kind pc|mobile --role cashier|storekeeper|manager');
-  console.error('   or: npm run device:add -- --drawer-for <prefix>   (adds the cash drawer of an existing device)');
+if (
+  !drawerFor &&
+  (!name ||
+    !/^[A-Z0-9]{2,3}$/.test(prefix ?? '') ||
+    !['pc', 'mobile'].includes(kind) ||
+    !['cashier', 'storekeeper', 'manager'].includes(role))
+) {
+  console.error(
+    'Usage: npm run device:add -- --name "<name>" --prefix <2-3 chars A-Z0-9> --kind pc|mobile --role cashier|storekeeper|manager',
+  );
+  console.error(
+    '   or: npm run device:add -- --drawer-for <prefix>   (adds the cash drawer of an existing device)',
+  );
   process.exit(1);
 }
 const url = process.env.TARGET_SUPABASE_URL;
@@ -56,24 +66,54 @@ if (!companyId) {
 
 // every cashier device has a cash drawer, and the shop has one main safe (docs/DATABASE.md §4.1); both are created once
 async function ensureCashAccounts(deviceId, deviceName) {
-  const { data: drawers, error: dErr } = await db.from('cash_accounts').select('id').eq('company_id', companyId).eq('owner_device_id', deviceId).eq('kind', 'drawer');
+  const { data: drawers, error: dErr } = await db
+    .from('cash_accounts')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('owner_device_id', deviceId)
+    .eq('kind', 'drawer');
   if (dErr) fail('drawer lookup', dErr);
   if (drawers.length === 0) {
-    const { error } = await db.from('cash_accounts').insert({ id: randomUUID(), company_id: companyId, name: `درج ${deviceName}`, kind: 'drawer', owner_device_id: deviceId });
+    const { error } = await db
+      .from('cash_accounts')
+      .insert({
+        id: randomUUID(),
+        company_id: companyId,
+        name: `درج ${deviceName}`,
+        kind: 'drawer',
+        owner_device_id: deviceId,
+      });
     if (error) fail('drawer', error);
     console.log('Cash drawer created.');
   }
-  const { data: safes, error: sErr } = await db.from('cash_accounts').select('id').eq('company_id', companyId).eq('kind', 'safe');
+  const { data: safes, error: sErr } = await db
+    .from('cash_accounts')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('kind', 'safe');
   if (sErr) fail('safe lookup', sErr);
   if (safes.length === 0) {
-    const { error } = await db.from('cash_accounts').insert({ id: randomUUID(), company_id: companyId, name: 'الخزينة الرئيسية', kind: 'safe', owner_device_id: null });
+    const { error } = await db
+      .from('cash_accounts')
+      .insert({
+        id: randomUUID(),
+        company_id: companyId,
+        name: 'الخزينة الرئيسية',
+        kind: 'safe',
+        owner_device_id: null,
+      });
     if (error) fail('safe', error);
     console.log('Main safe created.');
   }
 }
 
 if (drawerFor) {
-  const { data: found, error } = await db.from('devices').select('id,name').eq('company_id', companyId).eq('prefix', drawerFor).limit(1);
+  const { data: found, error } = await db
+    .from('devices')
+    .select('id,name')
+    .eq('company_id', companyId)
+    .eq('prefix', drawerFor)
+    .limit(1);
   if (error || found.length !== 1) fail('device', error ?? new Error(`no device with prefix ${drawerFor}`));
   await ensureCashAccounts(found[0].id, found[0].name);
   process.exit(0);

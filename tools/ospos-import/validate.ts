@@ -23,6 +23,13 @@ async function count(db: Db, table: string, companyId: string, legacy?: boolean)
   return n ?? 0;
 }
 
+/** Rows of a table that has no company column (the compact history lines). */
+async function countPlain(db: Db, table: string): Promise<number> {
+  const { count: n, error } = await db.from(table).select('*', { count: 'exact', head: true });
+  if (error) throw new Error(`count ${table}: ${error.message}`);
+  return n ?? 0;
+}
+
 async function fetchAll(
   db: Db,
   table: string,
@@ -82,13 +89,13 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
     ['suppliers', ['suppliers'], Number(counts.suppliers) + 1, 0], // + the archive placeholder
     ['workers', ['workers'], Number(counts.employees), 0],
     [
-      'sales + returns',
+      'sales + returns (compact legacy_sales)',
       ['sales_invoices', 'sales_returns'],
       Number(counts.sales) - warn('UNKNOWN_SALE_TYPE') - warn('BAD_SALE_ROW'),
       0,
     ],
     [
-      'purchases + returns',
+      'purchases + returns (compact legacy_purchases)',
       ['purchase_invoices', 'purchase_returns'],
       Number(counts.receivings) - result.stats.requisitions.length - warn('BAD_RECEIVING_ROW'),
       0,
@@ -97,8 +104,15 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
   ];
   for (const [label, tables, want] of expected) {
     const transformed = tables.reduce((a, name) => a + t[name].length, 0);
+    // the imported history lives in the compact tables; everything else in its own table
+    const compactTable = label.startsWith('sales')
+      ? 'legacy_sales'
+      : label.startsWith('purchases')
+        ? 'legacy_purchases'
+        : null;
     let inDb = 0;
-    for (const name of tables) inDb += await count(db, name, cid);
+    if (compactTable) inDb = await count(db, compactTable, cid);
+    else for (const name of tables) inDb += await count(db, name, cid);
     add(
       `Count: ${label}`,
       transformed === want && inDb === want,
@@ -106,17 +120,15 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
       `export ${want} · transformed ${transformed} · database ${inDb}`,
     );
   }
-  for (const name of [
-    'sales_invoice_lines',
-    'sales_return_lines',
-    'purchase_invoice_lines',
-    'purchase_return_lines',
-    'payments',
-    'barcodes',
-    'categories',
-    'expense_categories',
-    'stock_movements',
-  ] as TableName[]) {
+  for (const [label, compact, wide] of [
+    ['legacy_sale_lines', 'legacy_sale_lines', ['sales_invoice_lines', 'sales_return_lines']],
+    ['legacy_purchase_lines', 'legacy_purchase_lines', ['purchase_invoice_lines', 'purchase_return_lines']],
+  ] as const) {
+    const transformed = wide.reduce((a, name) => a + t[name].length, 0);
+    const inDb = await countPlain(db, compact);
+    add(`Count: ${label}`, inDb === transformed, true, `transformed ${transformed} · database ${inDb}`);
+  }
+  for (const name of ['barcodes', 'categories', 'expense_categories', 'stock_movements'] as TableName[]) {
     const inDb = await count(db, name, cid);
     add(`Count: ${name}`, inDb === t[name].length, true, `transformed ${t[name].length} · database ${inDb}`);
   }
@@ -143,13 +155,9 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
 
   // 3. monthly totals: database vs export
   const dbMonthly: Record<string, number> = {};
-  for (const r of await fetchAll(db, 'sales_invoices', 'issued_at,total', cid, { is_legacy: true })) {
-    const k = String(r.issued_at).slice(0, 7);
-    dbMonthly[k] = (dbMonthly[k] ?? 0) + Number(r.total);
-  }
-  for (const r of await fetchAll(db, 'sales_returns', 'issued_at,total', cid, { is_legacy: true })) {
-    const k = String(r.issued_at).slice(0, 7);
-    dbMonthly[k] = (dbMonthly[k] ?? 0) - Number(r.total);
+  for (const r of await fetchAll(db, 'legacy_sales', 'day,total,kind', cid)) {
+    const k = String(r.day).slice(0, 7);
+    dbMonthly[k] = (dbMonthly[k] ?? 0) + (Number(r.kind) === 1 ? -Number(r.total) : Number(r.total));
   }
   const badMonths = months.filter((k) => dbMonthly[k] !== result.stats.salesTotalByMonth[k]);
   add(
@@ -260,16 +268,27 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
   let sampleBad = 0;
   const sampleNotes: string[] = [];
   for (const inv of sample) {
-    const sale = bySaleId.get(String((inv.legacy as { ospos_id: number }).ospos_id));
-    const { data: row } = await db
-      .from('sales_invoices')
-      .select('number,total,tax_total,cash_rounding')
-      .eq('id', String(inv.id))
+    const osposId = (inv.legacy as { ospos_id: number }).ospos_id;
+    const sale = bySaleId.get(String(osposId));
+    const { data: stored } = await db
+      .from('legacy_sales')
+      .select('id,total,cash,card,credit,other')
+      .eq('company_id', cid)
+      .eq('id', osposId)
       .single();
-    const lines = await fetchAll(db, 'sales_invoice_lines', 'net_amount', cid, {
-      invoice_id: String(inv.id),
-    });
-    const pays = await fetchAll(db, 'payments', 'amount', cid, { document_id: String(inv.id) });
+    const row = stored
+      ? {
+          number: `LG-INV-${String(osposId).padStart(6, '0')}`,
+          total: Number(stored.total),
+          tax_total: Number(inv.tax_total ?? 0), // tax is not kept in the compact table: the transform's value is used
+          cash_rounding: Number(inv.cash_rounding ?? 0),
+        }
+      : null;
+    const { data: lineRows } = await db.from('legacy_sale_lines').select('net').eq('sale_id', osposId);
+    const lines = (lineRows ?? []).map((l) => ({ net_amount: Number(l.net) }));
+    const pays = stored
+      ? [{ amount: Number(stored.cash) + Number(stored.card) + Number(stored.credit) + Number(stored.other) }]
+      : [];
     const total = parseMoney(sale?.total ?? '') ?? NaN;
     const tax = Number(row?.tax_total ?? 0);
     const exportLines = data.sale_lines[String(sale?.id)] ?? [];
