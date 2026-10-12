@@ -1,8 +1,6 @@
+const DAY_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' });
 const cairoDay = (d: Date): number => {
-  const [y = 0, m = 1, day = 1] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' })
-    .format(d)
-    .split('-')
-    .map(Number);
+  const [y = 0, m = 1, day = 1] = DAY_FORMAT.format(d).split('-').map(Number);
   return Date.UTC(y, m - 1, day) / 86_400_000;
 };
 

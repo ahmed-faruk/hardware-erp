@@ -150,6 +150,13 @@ test('every manager screen and report tab', async ({ page }) => {
   }
   mkdirSync('perf-results', { recursive: true });
   writeFileSync('perf-results/screens.json', JSON.stringify(rows, null, 2));
+  // budgets on the seeded volume (docs/perf-baseline.md): every screen under 1.5 s, the first report under 2 s
+  const slow = rows.filter(
+    (r) =>
+      r.screen !== 'activation + first pull' &&
+      r.ms > (r.screen.startsWith('reports (default') ? 2000 : 1500),
+  );
+  expect(slow.map((r) => `${r.screen}: ${r.ms} ms`)).toEqual([]);
 });
 
 test('cashier: login to a paid sale', async ({ page }) => {

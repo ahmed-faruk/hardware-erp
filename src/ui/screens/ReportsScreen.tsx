@@ -65,6 +65,8 @@ interface Loaded {
 }
 
 const labels = strings.reports as unknown as Record<string, string>;
+/** Last server answer per tab and period: switching back to a tab shows it at once, then the fresh answer replaces it. */
+const RESULTS = new Map<string, { at: number; value: Loaded }>();
 const time = (iso: string): string => cairoTime(iso);
 const reasonName = (r: string): string =>
   (strings.voidInvoice.reasons as Record<string, string>)[r] ??
@@ -83,7 +85,11 @@ export function ReportsScreen() {
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const stockRows = useLiveQuery(() => loadStockRows(db), [db]);
+  // the stock rows are read from this device only when the stock tab is open
+  const stockRows = useLiveQuery(
+    () => (tab === 'stock' ? loadStockRows(db) : Promise.resolve(undefined)),
+    [db, tab],
+  );
 
   const key = `${tab}|${from}|${to}`;
   useEffect(() => {
@@ -123,7 +129,9 @@ export function ReportsScreen() {
                   : tab === 'exceptions'
                     ? exceptionsTables(d, t, time, reasonName)
                     : [devicesTable(d, t, time)];
-      setLoaded({ key, tables, error: null });
+      const value: Loaded = { key, tables, error: null };
+      RESULTS.set(key, { at: Date.now(), value });
+      setLoaded(value);
     });
     return () => {
       live = false;
@@ -139,7 +147,8 @@ export function ReportsScreen() {
         ? null
         : loaded?.key === key
           ? loaded.tables
-          : null;
+          : // the last answer for this tab and period shows at once while a fresh one loads
+            (RESULTS.get(key)?.value.tables ?? null);
   const error =
     tab !== 'stock' &&
     tab !== 'smart' &&

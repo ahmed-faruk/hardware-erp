@@ -52,18 +52,17 @@ export interface ReceiptData {
 }
 
 /** Cairo wall-clock time as `dd/mm/yyyy hh:mm`. */
-export const cairoTime = (iso: string): string =>
-  new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Africa/Cairo',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-    .format(new Date(iso))
-    .replace(', ', ' ');
+// one formatter for all rows: constructing an Intl.DateTimeFormat per call made long tables take seconds
+const TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Africa/Cairo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+export const cairoTime = (iso: string): string => TIME_FORMAT.format(new Date(iso)).replace(', ', ' ');
 
 export function buildReceipt(input: ReceiptInput): ReceiptData {
   const kind = input.kind ?? 'sale';
