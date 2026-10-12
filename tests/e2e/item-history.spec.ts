@@ -11,14 +11,15 @@ test('the product screen shows every movement with the balance after it, includi
 }) => {
   const f = newCashierFixture();
   // an imported sale of this product in 2020: a line without any stock movement
-  const legacyId = '0190f000-0000-7000-8000-0000000007a1';
-  sql(`delete from sales_invoice_lines where invoice_id = '${legacyId}'`);
-  sql(`delete from sales_invoices where id = '${legacyId}'`);
+  // an imported sale of this product in 2020 (compact history tables: it never had a stock movement)
+  sql(`update products set legacy_item_id = 880002 where id = '${productId(2)}'`);
+  sql(`delete from legacy_sale_lines where sale_id = 800101`);
+  sql(`delete from legacy_sales where id = 800101`);
   sql(
-    `insert into sales_invoices (id, company_id, number, issued_at, subtotal, total, status, is_legacy) values ('${legacyId}', '${COMPANY}', 'OSPOS-HIST-1', '2020-01-10 10:00:00+02', 1500, 1500, 'posted', true)`,
+    `insert into legacy_sales (company_id, id, kind, day, total, cash) values ('${COMPANY}', 800101, 0, '2020-01-10', 1500, 1500)`,
   );
   sql(
-    `insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost, line_discount, is_legacy) values (gen_random_uuid(), '${COMPANY}', '${legacyId}', 1, '${productId(2)}', 1000, 2000, 750, 1500, 400, 0, true)`,
+    `insert into legacy_sale_lines (sale_id, line_no, product_id, qty, net, cost) values (800101, 1, 880002, 2000, 1500, 800)`,
   );
 
   await page.goto('/');
@@ -55,7 +56,7 @@ test('the product screen shows every movement with the balance after it, includi
   await page.getByTestId('history-all').click();
   const table = page.getByTestId('report-table-0');
   await expect(table).toContainText(`${f.prefix}-INV-000001`);
-  await expect(table).toContainText('OSPOS-HIST-1');
+  await expect(table).toContainText('LG-INV-800101');
   await expect(table).toContainText(strings.reports.legacyTag);
   const now =
     Number(sql(`select coalesce(sum(qty), 0) from stock_movements where product_id = '${productId(2)}'`)) /

@@ -7,7 +7,10 @@ export const ITERATIONS = 210_000;
 export function hashPin(pin) {
   if (!/^\d{6,12}$/.test(pin)) throw new Error('PIN must be 6 to 12 digits');
   const salt = randomBytes(16);
-  return { pinHash: pbkdf2Sync(pin, salt, ITERATIONS, 32, 'sha256').toString('base64'), pinSalt: salt.toString('base64') };
+  return {
+    pinHash: pbkdf2Sync(pin, salt, ITERATIONS, 32, 'sha256').toString('base64'),
+    pinSalt: salt.toString('base64'),
+  };
 }
 
 /** Reads a line from the terminal without echoing it. */

@@ -33,7 +33,7 @@ saves `ospos-export-YYYY-MM-DD.json`. Field-by-field format and mapping: [refere
    correct and approve. Stock openings = OSPOS quantities exactly (inventory_summary).
 6. `images` — download each `item_pic_url` (public URL), resize to 256 px WebP (sharp), upload to `product-images`.
    First export: no product has a photo (`item_pic_url` empty for all 1,406) — skip unless photos were added since.
-7. `load-target` — `import_batch` RPC (service role), batches of 500: staging first, then production.
+7. `load-target` — the history goes in compact form (`compact.ts` → `import_legacy_batch`: `legacy_sales`, `legacy_sale_lines`, `legacy_purchases`, `legacy_purchase_lines`); everything else through the `import_batch` RPC (service role), batches of 500: staging first, then production.
 8. `validate` — `out/validation-report.md`; exit ≠ 0 if a blocking check fails.
 
 ## 3. Rules
