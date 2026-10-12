@@ -1,0 +1,62 @@
+.view {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.voided {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 8px;
+  background: var(--tint-danger);
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.meta,
+.totals {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.meta > div,
+.totals > div,
+.list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.meta dt,
+.totals dt {
+  color: var(--text-muted);
+}
+
+.meta dd,
+.totals dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.grand {
+  font-size: var(--fs-h2);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.view h3 {
+  margin: 0;
+  font-size: var(--fs-body);
+}

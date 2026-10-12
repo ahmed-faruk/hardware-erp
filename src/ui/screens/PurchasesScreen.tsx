@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Printer, Trash2, Undo2 } from 'lucide-react';
+import { Eye, Plus, Printer, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -15,6 +15,7 @@ import { type Column, DataTable } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
 import { FormField } from '../components/FormField';
+import { InvoiceViewDialog } from '../components/InvoiceView';
 import { NumberField } from '../components/NumberField';
 import { ProductPicker } from '../components/ProductPicker';
 import { Skeleton } from '../components/Skeleton';
@@ -54,6 +55,7 @@ export function PurchasesScreen() {
         supplierName: suppliers.get(p.supplierId as string) ?? '',
       }));
   }, [db]);
+  const [viewId, setViewId] = useState<string | null>(null);
   const print = async (id: string): Promise<void> => {
     const [{ loadPurchaseDocument }, render, { printHtml, cairoFontFaces }] = await Promise.all([
       import('@/db/purchase-document'),
@@ -87,13 +89,22 @@ export function PurchasesScreen() {
       key: 'print',
       header: '',
       cell: (p) => (
-        <ActionButton
-          label={strings.purchases.print}
-          icon={Printer}
-          variant="ghost"
-          onClick={() => void print(p.id)}
-          testId={`print-${p.number}`}
-        />
+        <>
+          <ActionButton
+            label={strings.invoiceView.view}
+            icon={Eye}
+            variant="ghost"
+            onClick={() => setViewId(p.id)}
+            testId={`view-${p.number}`}
+          />
+          <ActionButton
+            label={strings.purchases.print}
+            icon={Printer}
+            variant="ghost"
+            onClick={() => void print(p.id)}
+            testId={`print-${p.number}`}
+          />
+        </>
       ),
     },
   ];
@@ -126,6 +137,7 @@ export function PurchasesScreen() {
       ) : (
         <DataTable label={strings.purchases.title} rows={rows} columns={columns} rowKey={(p) => p.id} />
       )}
+      <InvoiceViewDialog kind="purchase" invoiceId={viewId} onClose={() => setViewId(null)} />
       <Dialog title={strings.purchases.newPurchase} open={formOpen} onClose={() => setFormOpen(false)}>
         <PurchaseForm onDone={() => setFormOpen(false)} />
       </Dialog>
