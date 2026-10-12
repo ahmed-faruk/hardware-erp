@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Ban, Banknote, CircleHelp, Coins, Printer, Trash2, Undo2 } from 'lucide-react';
+import { Ban, Banknote, CircleHelp, Coins, Eye, Printer, Trash2, Undo2 } from 'lucide-react';
+import { useState } from 'react';
 
 import { useServices } from '@/app/session';
 import { discardCart, listHeldCarts, type HeldCartRow } from '@/db/commands/carts';
@@ -10,6 +11,7 @@ import { formatMoney } from '@/domain/money';
 import { ActionButton } from '../components/ActionButton';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
+import { InvoiceViewDialog } from '../components/InvoiceView';
 import { strings } from '../strings.ar';
 
 import { PauseCircle, Receipt } from 'lucide-react';
@@ -86,6 +88,7 @@ export function RecentInvoicesDialog({
   onClose: () => void;
 }) {
   const { db } = useServices();
+  const [viewId, setViewId] = useState<string | null>(null);
   const invoices = useLiveQuery(
     async () =>
       shiftId
@@ -96,37 +99,48 @@ export function RecentInvoicesDialog({
     [db, shiftId, open],
   );
   return (
-    <Dialog title={strings.sell.recent} open={open} onClose={onClose}>
-      {invoices && invoices.length === 0 ? (
-        <EmptyState icon={Receipt} word={strings.sell.noRecent} />
-      ) : (
-        <ul className={styles.list}>
-          {invoices?.map((inv) => (
-            <li key={inv.id} className={styles.item} data-testid={`recent-${inv.number}`}>
-              <span dir="ltr">{digits(inv.number)}</span>
-              <strong>{digits(formatMoney(inv.total))}</strong>
-              <ActionButton
-                big
-                label={strings.sell.reprint}
-                icon={Printer}
-                onClick={() => onReprint(inv.id)}
-                testId={`reprint-${inv.number}`}
-              />
-              {onVoid && inv.status === 'posted' && (
+    <>
+      <Dialog title={strings.sell.recent} open={open} onClose={onClose}>
+        {invoices && invoices.length === 0 ? (
+          <EmptyState icon={Receipt} word={strings.sell.noRecent} />
+        ) : (
+          <ul className={styles.list}>
+            {invoices?.map((inv) => (
+              <li key={inv.id} className={styles.item} data-testid={`recent-${inv.number}`}>
+                <span dir="ltr">{digits(inv.number)}</span>
+                <strong>{digits(formatMoney(inv.total))}</strong>
                 <ActionButton
                   big
-                  label={strings.voidInvoice.button}
-                  icon={Ban}
-                  variant="danger"
-                  onClick={() => onVoid(inv.id)}
-                  testId={`void-${inv.number}`}
+                  label={strings.invoiceView.view}
+                  icon={Eye}
+                  variant="ghost"
+                  onClick={() => setViewId(inv.id)}
+                  testId={`view-${inv.number}`}
                 />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Dialog>
+                <ActionButton
+                  big
+                  label={strings.sell.reprint}
+                  icon={Printer}
+                  onClick={() => onReprint(inv.id)}
+                  testId={`reprint-${inv.number}`}
+                />
+                {onVoid && inv.status === 'posted' && (
+                  <ActionButton
+                    big
+                    label={strings.voidInvoice.button}
+                    icon={Ban}
+                    variant="danger"
+                    onClick={() => onVoid(inv.id)}
+                    testId={`void-${inv.number}`}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Dialog>
+      <InvoiceViewDialog kind="sale" invoiceId={viewId} onClose={() => setViewId(null)} />
+    </>
   );
 }
 
