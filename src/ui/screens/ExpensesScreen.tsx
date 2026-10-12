@@ -3,13 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
-import {
-  CASH_ADJUST_REASONS,
-  postCashAdjustment,
-  postCashTransfer,
-  postExpense,
-  saveExpenseCategory,
-} from '@/db/commands/cash';
+import { CASH_ADJUST_REASONS, postCashAdjustment, postCashTransfer, postExpense } from '@/db/commands/cash';
 import { formatMoney, toPiasters } from '@/domain/money';
 import { cairoTime } from '@/domain/receipt';
 
@@ -27,13 +21,13 @@ import styles from './screens.module.css';
 /** Manager: expenses from any account, cash transfers between accounts, and the list of expense categories the cashier picks from. */
 export function ExpensesScreen() {
   const { db } = useServices();
-  const { context } = useSession();
   const [open, setOpen] = useState<'expense' | 'transfer' | 'adjust' | null>(null);
-  const [newCategory, setNewCategory] = useState('');
   const data = useLiveQuery(async () => {
-    const categories = (await db.expenseCategories.toArray()).filter((c) => !c.deletedAt);
+    // old types stay on old expenses (their names show in the list) but only the two current types can be picked
+    const allCategories = await db.expenseCategories.toArray();
+    const categories = allCategories.filter((c) => !c.deletedAt);
     const accounts = (await db.cashAccounts.toArray()).filter((a) => !a.deletedAt);
-    const names = new Map(categories.map((c) => [c.id, c.name]));
+    const names = new Map(allCategories.map((c) => [c.id, c.name]));
     const rows = (await db.expenses.toArray())
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
       .slice(0, 100)
@@ -83,37 +77,6 @@ export function ExpensesScreen() {
             variant="soft"
             onClick={() => setOpen('adjust')}
             testId="new-adjustment"
-          />
-        </div>
-      </div>
-      <div className={styles.section}>
-        <h2>{strings.cash.categories}</h2>
-        <p data-testid="categories">
-          {data.categories.map((c) => c.name).join(strings.cash.listSeparator) || strings.cash.noCategories}
-        </p>
-        <div className={styles.row}>
-          <FormField label={strings.cash.newCategory}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                data-testid="category-name"
-              />
-            )}
-          </FormField>
-          <ActionButton
-            label={strings.common.add}
-            icon={Plus}
-            disabled={!newCategory.trim()}
-            onClick={() => {
-              if (!context) return;
-              void saveExpenseCategory(context, { name: newCategory }).then(
-                (r) => r.ok && setNewCategory(''),
-              );
-            }}
-            testId="add-category"
           />
         </div>
       </div>

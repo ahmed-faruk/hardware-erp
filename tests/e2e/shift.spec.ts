@@ -18,10 +18,6 @@ const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visi
 
 async function start(page: Page): Promise<CashierFixture> {
   const f = newCashierFixture();
-  // an expense category must exist before the device first syncs
-  sql(
-    `insert into expense_categories (id, company_id, name) values ('a0000000-0000-7000-8000-000000000e91', 'a0000000-0000-7000-8000-000000000001', 'نثريات') on conflict do nothing`,
-  );
   await recordPrints(page);
   await page.goto('/');
   await page.getByTestId('activation-code').fill(f.code);
@@ -63,7 +59,9 @@ test.describe('shift close', () => {
     await sellCash(page);
     await page.getByTestId('shift-menu').click();
     await page.getByTestId('shift-expense').click();
-    await page.getByTestId('expense-cat-نثريات').click();
+    // only the two expense types are offered
+    await expect(page.locator('[data-testid^="expense-cat-"]')).toHaveText(['مشتريات', 'مصروفات محل']);
+    await page.getByTestId('expense-cat-مصروفات محل').click();
     await page.keyboard.type('5');
     await page.keyboard.press('Enter');
 

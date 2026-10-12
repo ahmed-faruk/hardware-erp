@@ -7,8 +7,7 @@ import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
 import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
-import { upsertRow, type SaveResult } from './save-master';
-import type { AuditRow, CashMovement, ExpenseCategory } from '../types';
+import type { AuditRow, CashMovement } from '../types';
 import { err, type Err } from '@/domain/result';
 import { countByDenomination, requiresVarianceApproval, shiftVariance } from '@/domain/shift';
 
@@ -293,28 +292,6 @@ export async function postCashTransfer(
       return { ok: true as const, id: transferId, number };
     },
   );
-}
-
-/** Manager: add or rename an expense category (the cashier picks from these as big buttons). */
-export async function saveExpenseCategory(
-  ctx: DeviceContext,
-  input: { id?: string; name: string; icon?: string | null; baseVersion?: number },
-): Promise<SaveResult> {
-  if (canCtx(ctx, 'settings') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
-  const name = input.name.trim();
-  if (!name || name.length > 60) return err('E_VALIDATION', 'الاسم مطلوب');
-  const { db } = ctx;
-  return db.transaction('rw', [db.expenseCategories, db.outbox, db.syncState], async () => {
-    const r = await upsertRow<ExpenseCategory>(
-      ctx,
-      'expenseCategories',
-      db.expenseCategories,
-      { id: input.id, baseVersion: input.baseVersion, fields: {} },
-      { name, icon: input.icon ?? null },
-      () => ({ ...newCommon(ctx), name: '', icon: null }),
-    );
-    return r.ok ? { ok: true as const, id: r.id, version: r.version } : r;
-  });
 }
 
 export const CASH_ADJUST_REASONS = ['count_error', 'old_difference', 'entry_fix', 'other'] as const;
