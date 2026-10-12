@@ -9,7 +9,6 @@ import {
   postExpense,
   previewClose,
   postCashAdjustment,
-  saveExpenseCategory,
 } from '@/db/commands/cash';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
 import { postSale } from '@/db/commands/post-sale';
@@ -162,15 +161,14 @@ describe('expense and transfer', () => {
     ).toBe(true);
   });
 
-  it('only the manager manages expense categories', async () => {
-    const t = await setup();
-    expect(await saveExpenseCategory(t.ctx, { name: 'إيجار' })).toMatchObject({
-      ok: false,
-      code: 'E_FORBIDDEN',
-    });
-    const m = await setup('manager');
-    expect((await saveExpenseCategory(m.ctx, { name: 'إيجار' })).ok).toBe(true);
-    expect((await m.ctx.db.expenseCategories.toArray()).some((c) => c.name === 'إيجار')).toBe(true);
+  it('an expense on a retired type is refused and nothing is written (B4)', async () => {
+    const t = await setup('manager');
+    await t.ctx.db.expenseCategories.put({ ...t.category, deletedAt: '2026-10-12T00:00:00.000Z' });
+    const before = await t.ctx.db.expenses.count();
+    const r = await t.expense(500);
+    expect(r.ok).toBe(false);
+    expect(await t.ctx.db.expenses.count()).toBe(before);
+    expect((await t.ctx.db.cashMovements.toArray()).filter((m) => m.docType === 'expense')).toHaveLength(0);
   });
 });
 

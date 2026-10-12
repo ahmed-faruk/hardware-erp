@@ -35,7 +35,8 @@ insert into cash_accounts (id, company_id, name, kind, owner_device_id) values
   ('a0000000-0000-7000-8000-000000000a12', 'a0000000-0000-7000-8000-000000000001', 'Drawer K2', 'drawer', 'a0000000-0000-7000-8000-0000000000f2'),
   ('a0000000-0000-7000-8000-000000000a13', 'a0000000-0000-7000-8000-000000000001', 'Main safe', 'safe', null);
 insert into expense_categories (id, company_id, name) values
-  ('a0000000-0000-7000-8000-000000000e01', 'a0000000-0000-7000-8000-000000000001', 'Transport');
+  ('a0000000-0000-7000-8000-000000000e01', 'a0000000-0000-7000-8000-000000000001', 'مشتريات'),
+  ('a0000000-0000-7000-8000-000000000e02', 'a0000000-0000-7000-8000-000000000001', 'مصروفات محل');
 insert into customers (id, company_id, name, phone, credit_limit) values
   ('a0000000-0000-7000-8000-000000000c01', 'a0000000-0000-7000-8000-000000000001', 'Test Customer', '01000000000', 100000000);
 insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals)
