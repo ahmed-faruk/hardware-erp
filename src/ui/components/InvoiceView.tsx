@@ -157,6 +157,7 @@ function Body({ kind, invoiceId }: { kind: InvoiceKind; invoiceId: string }) {
         </>
       )}
       <ActionButton
+        big
         label={t.print}
         icon={Printer}
         variant="soft"

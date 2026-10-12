@@ -162,4 +162,37 @@ test.describe('invoice view on screen', () => {
     await page.getByTestId('iv-print').click();
     await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
   });
+
+  test('E6: the view fits 320, 390, 1024 and 1366 px: no sideways scroll, a 56 px print button', async ({
+    page,
+  }) => {
+    const f = await start(page);
+    await sellTwoItems(page);
+    await page.getByTestId('recent').click();
+    await page.getByTestId(`view-${f.prefix}-INV-000001`).click();
+    await expect(page.getByTestId('invoice-view')).toBeVisible();
+    for (const [width, height] of [
+      [320, 640],
+      [390, 844],
+      [1024, 768],
+      [1366, 768],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      const found = await page.evaluate(() => {
+        const dialog = document.querySelector<HTMLElement>('dialog[open]:has([data-testid="invoice-view"])');
+        const print = document.querySelector<HTMLElement>('[data-testid="iv-print"]');
+        const view = document.querySelector<HTMLElement>('[data-testid="invoice-view"]');
+        return {
+          page: document.documentElement.scrollWidth - window.innerWidth,
+          view: view ? view.scrollWidth - view.clientWidth : 0,
+          dialog: dialog ? dialog.getBoundingClientRect().width - window.innerWidth : 0,
+          print: print ? print.getBoundingClientRect().height : 0,
+        };
+      });
+      expect(found.page, `${width}px page scrolls sideways`).toBeLessThanOrEqual(1);
+      expect(found.view, `${width}px view scrolls sideways`).toBeLessThanOrEqual(1);
+      expect(found.dialog, `${width}px dialog wider than the screen`).toBeLessThanOrEqual(0);
+      expect(found.print, `${width}px print button`).toBeGreaterThanOrEqual(55.5);
+    }
+  });
 });
