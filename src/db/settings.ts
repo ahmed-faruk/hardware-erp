@@ -11,7 +11,6 @@ export async function loadSettings(db: HanafyDB): Promise<Settings> {
 const DEVICE_DEFAULTS = {
   paper: '80',
   copies: 1,
-  autoPrint: true,
   sounds: true,
   digits: 'latn',
   idleLockMinutes: 10,
@@ -21,7 +20,6 @@ const DEVICE_DEFAULTS = {
 export type DeviceSettings = {
   paper: '58' | '80';
   copies: number;
-  autoPrint: boolean;
   sounds: boolean;
   digits: 'latn' | 'arab';
   /** SEC-03: the screen locks after this many idle minutes */

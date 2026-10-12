@@ -57,7 +57,7 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 > **Added by the owner on 2026-10-11 (outside the original MVP list, approved by him):** available quantity on sale tiles; permission groups for every screen and button; purchases paid from the safe and/or the owner's pocket; item movement history (imported history included); expenses report; category KPIs and charts; payroll (salary, advances, deductions) with reports; smart overview report.
 
 ## 7. User flows (each is an e2e test)
-1. **Cash sale:** scan or tap photos → adjust qty → pay (cash) → change shown as notes → receipt prints → drawer opens.
+1. **Cash sale:** scan or tap photos → adjust qty → pay (cash) → change shown as notes → receipt prints only when the cashier presses «اطبع تاني» (nothing prints by itself) → drawer opens with that print.
 2. **Credit sale + collection:** pick customer by photo/phone → credit or split → receipt shows old/new balance →
    later "receive payment" reduces the ledger.
 3. **Return with invoice:** scan receipt number/QR → choose lines and qty (≤ sold − returned) → refund method → stock back.

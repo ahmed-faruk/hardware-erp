@@ -81,8 +81,12 @@ test.describe('cashier journeys', () => {
     await page.getByTestId('finish').click();
     await expect(page.getByTestId('done')).toBeVisible();
     await expect(page.getByTestId('change-display')).toContainText('12.50');
+    // nothing prints by itself; the cashier presses «اطبع تاني»
+    await page.waitForTimeout(1500);
+    expect(await prints(page)).toHaveLength(0);
+    expect(Date.now() - started).toBeLessThan(5000);
+    await page.getByTestId('print-again').click();
     await expect.poll(async () => (await prints(page)).length, { timeout: 5000 }).toBe(1);
-    expect(Date.now() - started).toBeLessThan(3000);
     const html = (await prints(page))[0] as string;
     expect(html).toContain(`${f.prefix}-INV-000001`);
     expect(html).toContain('87.50');
@@ -128,7 +132,10 @@ test.describe('cashier journeys', () => {
     await expect(page.getByTestId('remaining')).toHaveText('0.00');
     await page.getByTestId('finish').click();
     await expect(page.getByTestId('done')).toBeVisible();
-    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(2);
+    await page.waitForTimeout(1000);
+    expect(await prints(page)).toHaveLength(0);
+    await page.getByTestId('print-again').click();
+    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
     expect((await prints(page)).at(-1)).toContain('4321');
   });
 
@@ -190,8 +197,8 @@ test.describe('cashier journeys', () => {
     await page.getByTestId('new-sale').click();
     await page.getByTestId('recent').click();
     await page.getByTestId(`reprint-${f.prefix}-INV-000001`).click();
-    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(2);
-    expect((await prints(page))[1]).toContain(strings.receipt.copy);
+    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
+    expect((await prints(page))[0]).toContain(strings.receipt.copy);
   });
 
   test('works offline: a sale waits in the outbox and syncs when the connection returns', async ({

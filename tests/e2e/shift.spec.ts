@@ -77,6 +77,9 @@ test.describe('shift close', () => {
     await expect(page.getByTestId('close-variance')).toHaveText('0.00');
     await page.getByTestId('close-confirm').click();
     await expect(page.getByTestId('open-shift')).toBeVisible();
+    await page.waitForTimeout(1000);
+    expect(await prints(page)).toHaveLength(0);
+    await page.getByTestId('print-offer').click();
 
     await expect
       .poll(async () => (await prints(page)).filter((h) => h.includes(strings.shift.z)).length, {

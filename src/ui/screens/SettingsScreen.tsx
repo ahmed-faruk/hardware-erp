@@ -303,15 +303,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
             <label className={styles.check}>
               <input
                 type="checkbox"
-                checked={device.autoPrint}
-                onChange={(e) => void saveDeviceSetting(db, 'autoPrint', e.target.checked)}
-                data-testid="auto-print"
-              />
-              {strings.settings.autoPrint}
-            </label>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
                 checked={device.sounds}
                 onChange={(e) => void saveDeviceSetting(db, 'sounds', e.target.checked)}
               />

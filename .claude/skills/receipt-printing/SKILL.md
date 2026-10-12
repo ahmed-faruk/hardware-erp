@@ -37,7 +37,7 @@ footer from settings. Returns print "مرتجع" banner; reprints print "نسخ�
 - "No-sale" drawer open = print a short slip with reason + worker (audited), which triggers the drawer.
 
 ## 5. Paper and settings
-Settings per device (local, not synced): paper `58 | 80 | A4`, copies, auto-print on sale (on/off),
+Settings per device (local, not synced): paper `58 | 80 | A4`, copies, no automatic printing (the cashier presses «اطبع» / «اطبع تاني»; a no-sale drawer open still prints its slip because that is how the drawer opens),
 print logo (on/off). A4 for statements always uses the default A4 printer via the normal dialog.
 
 ## 6. Tests
