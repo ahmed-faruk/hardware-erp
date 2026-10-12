@@ -6,13 +6,14 @@ import { nowIso, uuidv7 } from '../ids';
 import { validateAllocations } from '../allocations';
 import { drawerBalance } from '../cash';
 import { nextNumber } from '../numbering';
+import { loadSoldReturned } from '../returnable';
 import { enqueue } from '../outbox';
 import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
 import type { AuditRow, CashMovement, LooseRow, PartyLedgerRow, Payment, StockMovement } from '../types';
 import { mulDivRound } from '@/domain/money';
 import { err, type Err } from '@/domain/result';
-import { allocateRefund, computeReturnLine, type PriorReturn } from '@/domain/returns';
+import { allocateRefund, checkFreeReturn, computeReturnLine, type PriorReturn } from '@/domain/returns';
 import { isWithinReturnPeriod } from '@/domain/returnWindow';
 
 const uuid = z.string().min(1);
@@ -94,6 +95,20 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   const main = warehouses.find((w) => w.kind === 'main');
   const scrap = warehouses.find((w) => w.kind === 'scrap');
   if (!main || !scrap) return err('NO_WAREHOUSE', 'مفيش مخزن');
+
+  if (!byInvoice) {
+    // a return without invoice: every product must have been sold before, and not more than sold - already returned
+    if (input.lines.some((l) => !l.productId)) return err('E_VALIDATION', 'الصنف مطلوب');
+    const asked = input.lines.map((l) => ({ productId: l.productId as string, qtyMilli: l.qtyMilli }));
+    const checked = checkFreeReturn(
+      asked,
+      await loadSoldReturned(
+        db,
+        asked.map((l) => l.productId),
+      ),
+    );
+    if (!checked.ok) return checked;
+  }
 
   const returnId = uuidv7();
   const lines: LooseRow[] = [];

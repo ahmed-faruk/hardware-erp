@@ -1,14 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Minus, PackageCheck, PackageX, Plus, Receipt } from 'lucide-react';
+import { Minus, PackageCheck, PackageX, Plus, Receipt, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { postSalesReturn, type PostedDoc } from '@/db/commands/returns';
+import { loadSoldReturned } from '@/db/returnable';
 import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
-import { formatMoney, toPiasters } from '@/domain/money';
+import { formatMoney, formatQty, toPiasters } from '@/domain/money';
 import type { Action } from '@/domain/permissions';
-import { computeReturnLine, type PriorReturn } from '@/domain/returns';
+import { computeReturnLine, returnableOf, type PriorReturn } from '@/domain/returns';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
@@ -302,6 +303,14 @@ function InvoiceReturn({
   );
 }
 
+interface FreeItem {
+  product: Product;
+  price: number;
+  qty: number;
+  cond: Cond;
+}
+
+/** Manager: a return without invoice with many lines. Only products that were sold before can be picked, never above sold - returned. */
 function FreeReturn({
   shiftId,
   cashAccountId,
@@ -314,119 +323,195 @@ function FreeReturn({
   const { context } = session;
   const [text, setText] = useState('');
   const [found, setFound] = useState<Product[]>([]);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [price, setPrice] = useState<number | null>(null);
+  const [items, setItems] = useState<FreeItem[]>([]);
+  const [draft, setDraft] = useState<FreeItem | null>(null);
   const [priceOpen, setPriceOpen] = useState(false);
-  const [q, setQ] = useState(1000);
-  const [cond, setCond] = useState<Cond>('good');
   const [error, setError] = useState<string | null>(null);
+  const totals = useLiveQuery(() => loadSoldReturned(db), [db]);
   useEffect(() => {
-    void searchProducts(db, text, { limit: 8 }).then(setFound);
+    void searchProducts(db, text, { limit: 40 }).then(setFound);
   }, [db, text]);
   if (session.can('returnWithoutInvoice') !== 'yes') return null;
 
-  if (!product)
-    return (
-      <div className={styles.stack}>
-        <p className={styles.lead}>{strings.returns.pickProduct}</p>
-        <input
-          className="control"
-          type="search"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          aria-label={strings.returns.pickProduct}
-          data-testid="free-search"
-        />
-        <ul className={styles.list}>
-          {found.map((p) => (
-            <li key={p.id} className={styles.item}>
-              <span>{p.name}</span>
-              <ActionButton
-                big
-                label={strings.returns.button}
-                onClick={() => {
-                  setProduct(p);
-                  setPrice(p.price);
-                }}
-                testId={`free-${p.sku ?? p.id}`}
-              />
-            </li>
-          ))}
-        </ul>
-        <ActionButton big variant="ghost" label={strings.common.back} onClick={onBack} />
-      </div>
-    );
+  // what is still returnable of a product, after the lines already in this document
+  const left = (id: string, except?: FreeItem): number =>
+    returnableOf(totals?.get(id)) -
+    items.filter((x) => x !== except && x.product.id === id).reduce((a, x) => a + x.qty, 0);
+  const soldProducts = found.filter((p) => returnableOf(totals?.get(p.id)) > 0);
+  const lineTotal = (x: FreeItem): number => Math.round((x.price * x.qty) / 1000);
+  const total = items.reduce((a, x) => a + lineTotal(x), 0);
 
-  const total = price === null ? 0 : Math.round((price * q) / 1000);
   const confirm = async (): Promise<void> => {
-    if (!context || price === null) return;
+    if (!context || items.length === 0) return;
+    setError(null);
     const r = await postSalesReturn(context, {
       originalInvoiceId: null,
-      lines: [
-        { originalLineId: null, productId: product.id, qtyMilli: q, unitRefund: price, condition: cond },
-      ],
+      lines: items.map((x) => ({
+        originalLineId: null,
+        productId: x.product.id,
+        qtyMilli: x.qty,
+        unitRefund: x.price,
+        condition: x.cond,
+      })),
       reason: 'other',
       shiftId,
       cashAccountId,
     });
-    if (r.ok) onDone(r);
-    else setError(r.code === 'DRAWER_SHORT' ? strings.returns.drawerShort : strings.returns.failed);
+    if (r.ok) return onDone(r);
+    setError(
+      r.code === 'DRAWER_SHORT'
+        ? strings.returns.drawerShort
+        : r.code === 'NOT_SOLD'
+          ? strings.returns.notSold
+          : r.code === 'OVER_SOLD'
+            ? strings.returns.overSold
+            : strings.returns.failed,
+    );
   };
+
+  if (draft) {
+    const max = left(draft.product.id);
+    return (
+      <div className={styles.stack}>
+        <p className={styles.lead}>{draft.product.name}</p>
+        <p data-testid="free-available">
+          {strings.returns.available}: {digits(formatQty(max))}
+        </p>
+        <div className={styles.item}>
+          <ActionButton
+            big
+            icon={Minus}
+            label=""
+            variant="ghost"
+            onClick={() => setDraft({ ...draft, qty: Math.max(1000, draft.qty - 1000) })}
+          />
+          <strong data-testid="free-qty">{digits(formatQty(draft.qty))}</strong>
+          <ActionButton
+            big
+            icon={Plus}
+            label=""
+            variant="ghost"
+            disabled={draft.qty + 1000 > max}
+            onClick={() => setDraft({ ...draft, qty: draft.qty + 1000 })}
+          />
+          <ActionButton
+            big
+            label={`${strings.returns.price}: ${money(digits, draft.price)}`}
+            variant="ghost"
+            onClick={() => setPriceOpen(true)}
+            testId="free-price"
+          />
+          <ActionButton
+            big
+            icon={draft.cond === 'good' ? PackageCheck : PackageX}
+            label={draft.cond === 'good' ? strings.returns.good : strings.returns.damaged}
+            variant={draft.cond === 'good' ? 'ok' : 'danger'}
+            onClick={() => setDraft({ ...draft, cond: draft.cond === 'good' ? 'damaged' : 'good' })}
+          />
+        </div>
+        <div className={styles.info}>
+          <span>
+            {strings.returns.refund}
+            <strong>{money(digits, lineTotal(draft))}</strong>
+          </span>
+        </div>
+        <ActionButton
+          big
+          variant="ok"
+          label={strings.returns.addLine}
+          disabled={lineTotal(draft) <= 0 || draft.qty > max}
+          onClick={() => {
+            setItems((list) => [...list, draft]);
+            setDraft(null);
+            setText('');
+          }}
+          testId="free-add"
+        />
+        <ActionButton big variant="ghost" label={strings.common.back} onClick={() => setDraft(null)} />
+        <NumEntry
+          title={strings.returns.price}
+          open={priceOpen}
+          decimals={2}
+          onCancel={() => setPriceOpen(false)}
+          onSubmit={(t) => {
+            const p = toPiasters(t);
+            if (p.ok) setDraft({ ...draft, price: p.value });
+            setPriceOpen(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.stack}>
-      <p className={styles.lead}>{product.name}</p>
-      <div className={styles.item}>
-        <ActionButton
-          big
-          icon={Minus}
-          label=""
-          variant="ghost"
-          onClick={() => setQ((x) => Math.max(1000, x - 1000))}
-        />
-        <strong>{digits(String(q / 1000))}</strong>
-        <ActionButton big icon={Plus} label="" variant="ghost" onClick={() => setQ((x) => x + 1000)} />
-        <ActionButton
-          big
-          label={`${strings.returns.price}: ${money(digits, price ?? 0)}`}
-          variant="ghost"
-          onClick={() => setPriceOpen(true)}
-          testId="free-price"
-        />
-        <ActionButton
-          big
-          icon={cond === 'good' ? PackageCheck : PackageX}
-          label={cond === 'good' ? strings.returns.good : strings.returns.damaged}
-          variant={cond === 'good' ? 'ok' : 'danger'}
-          onClick={() => setCond((c) => (c === 'good' ? 'damaged' : 'good'))}
-        />
-      </div>
-      <div className={styles.info}>
-        <span>
-          {strings.returns.refund}
-          <strong>{money(digits, total)}</strong>
-        </span>
-      </div>
+      <p className={styles.lead}>{strings.returns.pickProduct}</p>
+      <input
+        className="control"
+        type="search"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        aria-label={strings.returns.pickProduct}
+        data-testid="free-search"
+      />
+      {text.trim() && totals && soldProducts.length === 0 && (
+        <BigAlert tone="warn" word={strings.returns.notSold} sound={false} />
+      )}
+      <ul className={styles.list}>
+        {soldProducts.slice(0, 8).map((p) => (
+          <li key={p.id} className={styles.item}>
+            <span>{p.name}</span>
+            <ActionButton
+              big
+              label={strings.returns.button}
+              disabled={left(p.id) <= 0}
+              onClick={() =>
+                setDraft({ product: p, price: p.price, qty: Math.min(1000, left(p.id)), cond: 'good' })
+              }
+              testId={`free-${p.sku ?? p.id}`}
+            />
+          </li>
+        ))}
+      </ul>
+      {items.length > 0 && (
+        <>
+          <p className={styles.lead}>{strings.returns.lines}</p>
+          <ul className={styles.list} data-testid="free-lines">
+            {items.map((x, i) => (
+              <li key={`${x.product.id}-${i}`} className={styles.item} data-testid={`free-line-${i}`}>
+                <span>
+                  {x.product.name} × {digits(formatQty(x.qty))}
+                </span>
+                <strong>{money(digits, lineTotal(x))}</strong>
+                <ActionButton
+                  big
+                  icon={Trash2}
+                  label=""
+                  variant="ghost"
+                  onClick={() => setItems((list) => list.filter((_, j) => j !== i))}
+                  testId={`free-remove-${i}`}
+                />
+              </li>
+            ))}
+          </ul>
+          <div className={styles.info}>
+            <span>
+              {strings.returns.refund}
+              <strong data-testid="free-total">{money(digits, total)}</strong>
+            </span>
+          </div>
+        </>
+      )}
       {error && <BigAlert tone="danger" word={error} />}
       <ActionButton
         big
         variant="ok"
         label={strings.returns.confirm}
-        disabled={total <= 0}
+        disabled={items.length === 0 || total <= 0}
         onClick={() => void confirm()}
         testId="confirm-free-return"
       />
-      <ActionButton big variant="ghost" label={strings.common.back} onClick={() => setProduct(null)} />
-      <NumEntry
-        title={strings.returns.price}
-        open={priceOpen}
-        decimals={2}
-        onCancel={() => setPriceOpen(false)}
-        onSubmit={(t) => {
-          const p = toPiasters(t);
-          if (p.ok) setPrice(p.value);
-          setPriceOpen(false);
-        }}
-      />
+      <ActionButton big variant="ghost" label={strings.common.back} onClick={onBack} />
     </div>
   );
 }

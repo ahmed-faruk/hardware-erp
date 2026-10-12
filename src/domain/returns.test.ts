@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allocateRefund, computeReturnLine, returnableQty } from './returns';
+import { allocateRefund, checkFreeReturn, computeReturnLine, returnableOf, returnableQty } from './returns';
 
 const sold = { id: 'l1', qtyMilli: 3000, finalAmount: 2999, unitCost: 80 };
 
@@ -47,5 +47,48 @@ describe('allocateRefund', () => {
       cash: 300,
     });
     expect(allocateRefund(mix, 7001)).toMatchObject({ ok: false });
+  });
+});
+
+describe('return without invoice, many items (D1, D3, D4)', () => {
+  const totals = new Map([
+    ['p1', { sold: 3000, returned: 1000 }],
+    ['p2', { sold: 2000, returned: 0 }],
+    ['p4', { sold: 0, returned: 0 }],
+  ]);
+  it('returnable is sold minus returned, never below zero, zero for an unknown product', () => {
+    expect(returnableOf(totals.get('p1'))).toBe(2000);
+    expect(returnableOf({ sold: 1000, returned: 1500 })).toBe(0);
+    expect(returnableOf(undefined)).toBe(0);
+  });
+  it('accepts several products within their limits, up to the exact limit', () => {
+    expect(
+      checkFreeReturn(
+        [
+          { productId: 'p1', qtyMilli: 2000 },
+          { productId: 'p2', qtyMilli: 1 },
+        ],
+        totals,
+      ),
+    ).toEqual({ ok: true });
+  });
+  it('a product never sold, or not in the totals, is NOT_SOLD (and says which)', () => {
+    expect(checkFreeReturn([{ productId: 'p4', qtyMilli: 1 }], totals)).toMatchObject({
+      ok: false,
+      code: 'NOT_SOLD',
+      productId: 'p4',
+    });
+    expect(checkFreeReturn([{ productId: 'zz', qtyMilli: 1 }], totals)).toMatchObject({ code: 'NOT_SOLD' });
+  });
+  it('lines of the same product add up before the limit is checked', () => {
+    expect(
+      checkFreeReturn(
+        [
+          { productId: 'p1', qtyMilli: 1500 },
+          { productId: 'p1', qtyMilli: 1000 },
+        ],
+        totals,
+      ),
+    ).toMatchObject({ ok: false, code: 'OVER_SOLD', productId: 'p1' });
   });
 });
