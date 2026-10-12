@@ -121,6 +121,10 @@ Per worker what was advanced, deducted and paid in the period (`total`, `by_work
 
 Posted expenses of the period (imported ones included): `total`, `by_category`, `by_account` (null = imported, no cash account), `by_day` and the newest 500 in `list`.
 
+### `report_returns(p_from date, p_to date)` — manager devices only
+
+Posted returns of the period (Cairo days, voided ones left out), device documents and the imported history (`LG-RET-` / `LG-PRT-` numbers) together: `sales` and `purchases`, each with `total {count, amount}`, `legacy_count`, `by_day`, `by_product` (qty in base units, top 300), the 500 newest in `list`, and `by_reason` + `by_method` (sales; imported returns have reason `unknown` and are split by how they were paid) or `by_supplier` (purchases). The tab «المرتجعات» is the permission `report.returns` (managers; a permission group must be given it explicitly).
+
 ### `product_usage(p_product_id uuid)` — manager devices only
 
 What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`.

@@ -10,6 +10,8 @@ import {
   expensesTables,
   payrollTables,
   profitTable,
+  returnsTables,
+  type ReturnsData,
   purchasesTables,
   salesTables,
   stockTable,
@@ -40,6 +42,7 @@ type Tab =
   | 'expenses'
   | 'categories'
   | 'payroll'
+  | 'returns'
   | 'productHistory'
   | 'exceptions'
   | 'devices'
@@ -52,6 +55,7 @@ const TABS: Tab[] = [
   'expenses',
   'categories',
   'payroll',
+  'returns',
   'productHistory',
   'exceptions',
   'devices',
@@ -73,6 +77,8 @@ const reasonName = (r: string): string =>
   (strings.stock.reasons as Record<string, string>)[r] ??
   r;
 const methodName = (k: string): string => (strings.receipt.pay as Record<string, string>)[k] ?? k;
+const returnReason = (k: string): string => (strings.reports.returnReasons as Record<string, string>)[k] ?? k;
+const returnMethod = (k: string): string => (strings.reports.returnMethods as Record<string, string>)[k] ?? k;
 
 /** Manager reports: sales, profit, exceptions and devices come from the server (they include the old OpenSourcePOS history); stock comes from this device. */
 export function ReportsScreen() {
@@ -84,6 +90,7 @@ export function ReportsScreen() {
   const tab = tabs.includes(chosen) ? chosen : (tabs[0] ?? 'smart');
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
+  const [retKind, setRetKind] = useState<'sales' | 'purchases'>('sales');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // the stock rows are read from this device only when the stock tab is open
   const stockRows = useLiveQuery(
@@ -91,7 +98,7 @@ export function ReportsScreen() {
     [db, tab],
   );
 
-  const key = `${tab}|${from}|${to}`;
+  const key = `${tab}|${from}|${to}${tab === 'returns' ? `|${retKind}` : ''}`;
   useEffect(() => {
     if (tab === 'stock' || tab === 'smart' || tab === 'productHistory' || tab === 'categories') return;
     let live = true;
@@ -101,6 +108,7 @@ export function ReportsScreen() {
       purchases: 'report_purchases',
       expenses: 'report_expenses',
       payroll: 'report_payroll',
+      returns: 'report_returns',
       exceptions: 'report_exceptions',
       devices: 'report_devices',
     }[tab];
@@ -109,7 +117,15 @@ export function ReportsScreen() {
       if (!live) return;
       if (!r.ok) return setLoaded({ key, tables: null, error: r.network ? 'offline' : 'failed' });
       const d = r.data as never;
-      const t = { ...labels, title: strings.reports.tabs[tab] };
+      const t = {
+        ...labels,
+        title:
+          tab === 'returns'
+            ? retKind === 'sales'
+              ? strings.reports.returnsSales
+              : strings.reports.returnsPurchases
+            : strings.reports.tabs[tab],
+      };
       const tables =
         tab === 'sales'
           ? salesTables(d, t, methodName)
@@ -126,9 +142,11 @@ export function ReportsScreen() {
                       time,
                       (k) => (strings.payroll.kinds as Record<string, string>)[k] ?? k,
                     )
-                  : tab === 'exceptions'
-                    ? exceptionsTables(d, t, time, reasonName)
-                    : [devicesTable(d, t, time)];
+                  : tab === 'returns'
+                    ? returnsTables(d as ReturnsData, retKind, t, time, returnReason, returnMethod)
+                    : tab === 'exceptions'
+                      ? exceptionsTables(d, t, time, reasonName)
+                      : [devicesTable(d, t, time)];
       const value: Loaded = { key, tables, error: null };
       RESULTS.set(key, { at: Date.now(), value });
       setLoaded(value);
@@ -136,7 +154,7 @@ export function ReportsScreen() {
     return () => {
       live = false;
     };
-  }, [client, tab, from, to, key]);
+  }, [client, tab, from, to, key, retKind]);
 
   const tables: ReportTable[] | null =
     tab === 'stock'
@@ -190,6 +208,22 @@ export function ReportsScreen() {
       ) : (
         <>
           {tab !== 'stock' && tab !== 'devices' && <PeriodBar from={from} to={to} onChange={preset} />}
+          {tab === 'returns' && (
+            <div className={styles.toolbar}>
+              <div className={styles.fixed}>
+                <SegmentedControl
+                  label={strings.reports.tabs.returns}
+                  options={[
+                    { key: 'sales', label: strings.reports.returnsSales },
+                    { key: 'purchases', label: strings.reports.returnsPurchases },
+                  ]}
+                  value={retKind}
+                  onChange={setRetKind}
+                  testIdPrefix="returns-kind-"
+                />
+              </div>
+            </div>
+          )}
           <p data-testid="report-up-to">{upTo}</p>
           {error === 'offline' && <BigAlert tone="warn" word={strings.reports.needsNet} sound={false} />}
           {error === 'failed' && <BigAlert tone="danger" word={strings.reports.failed} sound={false} />}

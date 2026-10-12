@@ -26,6 +26,10 @@ select length(report_purchases_core(:co, current_date - 400, current_date)::text
 \echo -- expenses
 select length(report_expenses_core(:co, current_date, current_date)::text);
 select length(report_expenses_core(:co, current_date - 400, current_date)::text);
+\echo -- returns
+select length(report_returns_core(:co, current_date, current_date)::text);
+select length(report_returns_core(:co, current_date - 30, current_date)::text);
+select length(report_returns_core(:co, current_date - 400, current_date)::text);
 \echo -- categories
 select length(report_categories_core(:co, current_date, current_date)::text);
 select length(report_categories_core(:co, current_date - 30, current_date)::text);

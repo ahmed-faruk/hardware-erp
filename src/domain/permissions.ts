@@ -62,6 +62,7 @@ export const ACTIONS = [
   'report.productHistory',
   'report.purchases',
   'report.payroll',
+  'report.returns',
   'printReports',
   'exportCsv',
   // payroll

@@ -73,4 +73,13 @@ describe('sections', () => {
     expect(new Set(all).size).toBe(all.length);
     expect([...all].sort()).toEqual([...ACTIONS].sort());
   });
+
+  it('F6: the returns report is a manager action; a group decides it for anyone else', () => {
+    expect(can('manager', 'report.returns')).toBe('yes');
+    expect(can('cashier', 'report.returns')).toBe('no');
+    expect(can('storekeeper', 'report.returns')).toBe('no');
+    expect(resolveAccess('cashier', { 'report.returns': 'yes' }, 'report.returns')).toBe('yes');
+    // a group made before this report existed does not have it: a missing action is no
+    expect(resolveAccess('manager', { 'report.sales': 'yes' }, 'report.returns')).toBe('no');
+  });
 });
