@@ -95,6 +95,10 @@
   font-weight: 700;
 }
 
+.section > * {
+  min-inline-size: 0; /* a wide chart or table scrolls inside its card instead of widening the page */
+}
+
 .section h2 {
   margin: 0;
   font-size: var(--fs-h2);

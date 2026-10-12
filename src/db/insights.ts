@@ -26,15 +26,23 @@ export interface InsightsData {
 
 const WEEKDAYS: Record<string, number> = { Sat: 0, Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6 };
 
+// building an Intl.DateTimeFormat costs far more than formatting with one: made once, not once per invoice
+const DAY_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' });
+const HOUR_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Africa/Cairo',
+  hour: '2-digit',
+  hour12: false,
+});
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', weekday: 'short' });
+
 /** Cairo calendar day, hour and weekday (0 = Saturday) of an instant. */
 export function cairoParts(iso: string): { day: string; hour: number; weekday: number } {
   const d = new Date(iso);
-  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
-  const hour = Number(
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hour12: false }).format(d),
-  );
-  const wd = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', weekday: 'short' }).format(d);
-  return { day, hour: hour % 24, weekday: WEEKDAYS[wd] ?? 0 };
+  return {
+    day: DAY_FORMAT.format(d),
+    hour: Number(HOUR_FORMAT.format(d)) % 24,
+    weekday: WEEKDAYS[WEEKDAY_FORMAT.format(d)] ?? 0,
+  };
 }
 
 /**
@@ -58,14 +66,15 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
       db.categories.toArray(),
     ]);
   const posted = invoices.filter((i) => i.status === 'posted');
+  const parts = new Map(posted.map((i) => [i.id, cairoParts(i.issuedAt)]));
   const events: SaleEvent[] = posted.map((i) => ({
     customerId: i.customerId,
     total: i.total,
-    ...cairoParts(i.issuedAt),
+    ...parts.get(i.id)!,
   }));
 
   const recent = posted.filter((i) => i.issuedAt >= cut30);
-  const dayOf = new Map(recent.map((i) => [i.id, cairoParts(i.issuedAt).day]));
+  const dayOf = new Map(recent.map((i) => [i.id, parts.get(i.id)!.day]));
   const lines = await db.salesInvoiceLines
     .where('invoiceId')
     .anyOf([...dayOf.keys()])
@@ -101,7 +110,7 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
       };
     });
 
-  const todays = posted.filter((i) => cairoParts(i.issuedAt).day === today);
+  const todays = posted.filter((i) => parts.get(i.id)!.day === today);
   const todayNet = todays.reduce((a, i) => a + i.total, 0);
   const sumParty = (type: 'customer' | 'supplier', sign: 1 | -1): Piasters =>
     parties.filter((p) => p.partyType === type).reduce((a, p) => a + Math.max(0, sign * p.amount), 0);

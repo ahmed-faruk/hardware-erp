@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildReceipt, type ReceiptInput } from './receipt';
+import { buildReceipt, cairoTime, type ReceiptInput } from './receipt';
 
 const base: ReceiptInput = {
   shop: { name: 'مركز حنفي للتلوين', phone: '0100', address: 'القاهرة', footer: 'شكرًا' },
@@ -97,5 +97,16 @@ describe('buildReceipt', () => {
     }));
     const r = buildReceipt({ ...base, lines, invoice: { ...base.invoice, total: 3000 } });
     expect(r.lines).toHaveLength(30);
+  });
+});
+
+describe('cairoTime on long tables', () => {
+  it('formats 20,000 timestamps quickly (one shared formatter, not one per row)', () => {
+    const t0 = performance.now();
+    let last = '';
+    for (let i = 0; i < 20_000; i++)
+      last = cairoTime(new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString());
+    expect(last).toMatch(/^\d\d\/\d\d\/\d{4} \d\d:\d\d$/);
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 });

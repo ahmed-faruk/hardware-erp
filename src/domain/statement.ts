@@ -27,8 +27,8 @@ export interface Statement {
   aging: Aging;
 }
 
-const cairoDate = (iso: string): string =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(iso));
+const DATE_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' });
+const cairoDate = (iso: string): string => DATE_FORMAT.format(new Date(iso));
 
 /** `period` are Cairo calendar dates (yyyy-mm-dd), both inclusive. Aging always covers the whole history up to `period.to`. */
 export function buildStatement(

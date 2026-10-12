@@ -3,8 +3,8 @@ import { uuidv7, nowIso } from '@/db/ids';
 import { enqueue } from '@/db/outbox';
 import type { HanafyDB } from '@/db/schema';
 
-const cairoDay = (ms: number): string =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(ms));
+const DAY_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' });
+const cairoDay = (ms: number): string => DAY_FORMAT.format(new Date(ms));
 
 /** AUD-02: a device clock far from the server's is written to the audit log, once per Cairo day. */
 export async function auditClock(db: HanafyDB, skewMs: number, nowMs: number): Promise<void> {
