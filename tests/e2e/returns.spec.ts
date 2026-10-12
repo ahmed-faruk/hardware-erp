@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
@@ -48,6 +50,121 @@ async function sellOneCash(page: Page): Promise<void> {
   await expect(page.getByTestId('done')).toBeVisible();
   await page.getByTestId('new-sale').click();
 }
+
+const COMPANY = 'a0000000-0000-7000-8000-000000000001';
+
+async function sellProduct(page: Page, n: number): Promise<void> {
+  await page
+    .locator(`[data-testid="tile-${productId(n)}"] button`)
+    .first()
+    .click();
+  await vis(page, 'pay').click();
+  await page.getByTestId('pay-cash').click();
+  await page.keyboard.type('50');
+  await page.keyboard.press('Enter');
+  await page.getByTestId('finish').click();
+  await expect(page.getByTestId('done')).toBeVisible();
+  await page.getByTestId('new-sale').click();
+}
+
+test.describe('return without invoice, many items', () => {
+  test('a manager returns two sold products in ONE document; removing a line updates the total; the receipt shows both', async ({
+    page,
+  }) => {
+    const f = await start(page, 'manager');
+    await sellProduct(page, 2);
+    await sellProduct(page, 3);
+    await page.getByTestId('return').click();
+    await page.getByTestId('return-free').click();
+    await page.getByTestId('free-search').fill('Test product 2');
+    await page.getByTestId('free-P002').click();
+    await expect(page.getByTestId('free-available')).toBeVisible();
+    await page.getByTestId('free-add').click();
+    await page.getByTestId('free-search').fill('Test product 3');
+    await page.getByTestId('free-P003').click();
+    await page.getByTestId('free-add').click();
+    await expect(page.getByTestId('free-lines').locator('li')).toHaveCount(2);
+    await expect(page.getByTestId('free-total')).toHaveText('32.50'); // 15.00 + 17.50
+    await page.getByTestId('free-remove-0').click();
+    await expect(page.getByTestId('free-total')).toHaveText('17.50');
+    await page.getByTestId('free-search').fill('Test product 2');
+    await page.getByTestId('free-P002').click();
+    await page.getByTestId('free-add').click();
+    await expect(page.getByTestId('free-total')).toHaveText('32.50');
+    await page.getByTestId('confirm-free-return').click();
+
+    await expect
+      .poll(
+        () =>
+          sql(
+            `select count(*) || ':' || max(r.total) from sales_returns r join sales_return_lines l on l.return_id = r.id where r.number = '${f.prefix}-RET-000001'`,
+          ),
+        { timeout: 60_000 },
+      )
+      .toBe('2:3250');
+    await page.waitForTimeout(500);
+    await page.getByTestId('print-offer').click();
+    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
+    const html = (await prints(page))[0] as string;
+    expect(html).toContain(`${f.prefix}-RET-000001`);
+    expect(html).toContain('Test product 2');
+    expect(html).toContain('Test product 3');
+  });
+
+  test('a product that was never sold cannot be picked, and the quantity stops at what was sold', async ({
+    page,
+  }) => {
+    const f = await start(page, 'manager');
+    void f;
+    const run = randomUUID().slice(0, 6);
+    // created before the page loads its data: one unsold product and one sold exactly once below
+    const unsold = `غيرمباع${run}`;
+    sql(
+      `insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals, category_id) values ('${randomUUID()}', '${COMPANY}', 'U${run}', '${unsold}', 'pcs', 1000, 500, 0, null)`,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
+    await page.keyboard.type(f.pin);
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: strings.nav.sell }).click();
+    await page.getByTestId('return').click();
+    await page.getByTestId('return-free').click();
+    await page.getByTestId('free-search').fill(unsold);
+    await expect(page.getByText(strings.returns.notSold)).toBeVisible();
+    await expect(page.getByTestId(`free-U${run}`)).toHaveCount(0);
+  });
+
+  test('the plus button stops at the sold quantity', async ({ page }) => {
+    const f = await start(page, 'manager');
+    const run = randomUUID().slice(0, 6);
+    const name = `بيع مرة${run}`;
+    sql(
+      `insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals) values ('${randomUUID()}', '${COMPANY}', 'S${run}', '${name}', 'pcs', 1000, 500, 0)`,
+    );
+    await page.reload();
+    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
+    await page.keyboard.type(f.pin);
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: strings.nav.sell }).click();
+    await page.getByTestId('sell-search').fill(name);
+    await page.getByTestId('sell-search').press('Enter');
+    await vis(page, 'pay').click();
+    await page.getByTestId('pay-cash').click();
+    await page.keyboard.type('10');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('finish').click();
+    await expect(page.getByTestId('done')).toBeVisible();
+    await page.getByTestId('new-sale').click();
+    await page.getByTestId('return').click();
+    await page.getByTestId('return-free').click();
+    await page.getByTestId('free-search').fill(name);
+    await page.getByTestId(`free-S${run}`).click();
+    await expect(page.getByTestId('free-available')).toContainText('1');
+    await expect(page.getByTestId('free-qty')).toHaveText('1');
+    // plus is disabled: the only unit sold is already in the line
+    await expect(page.locator('[data-testid="free-qty"] + button')).toBeDisabled();
+  });
+});
 
 test.describe('returns, voids and collections', () => {
   test('@smoke a cashier returns an item by invoice: refund from the drawer, stock back, return receipt, server agrees', async ({

@@ -830,6 +830,11 @@ export const strings = {
     price: 'سعر الوحدة',
     failed: 'المرتجع ماتحفظش',
     needsManager: 'المرتجع بعد المهلة محتاج المدير',
+    addLine: 'زوّد للمرتجع',
+    available: 'المتاح للمرتجع',
+    lines: 'الأصناف',
+    notSold: 'الصنف ده ما اتباعش',
+    overSold: 'الكمية أكبر من المباع',
   },
   voidInvoice: {
     button: 'إلغاء الفاتورة',

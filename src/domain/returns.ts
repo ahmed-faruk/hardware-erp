@@ -55,3 +55,30 @@ export function allocateRefund(
   const credit = mulDivRound(refund, creditPaid, total);
   return { ok: true, credit, cash: refund - credit };
 }
+
+/** What was sold and already returned of one product, in base milli-units, over every posted invoice and return. */
+export interface SoldReturned {
+  sold: Milli;
+  returned: Milli;
+}
+
+export const returnableOf = (t: SoldReturned | undefined): Milli =>
+  t ? Math.max(0, t.sold - t.returned) : 0;
+
+/**
+ * A return without invoice (manager) may have many lines. Each product must have been sold before on the system
+ * (NOT_SOLD) and the quantities of its lines together may not exceed sold - already returned (OVER_SOLD).
+ */
+export function checkFreeReturn(
+  lines: { productId: string; qtyMilli: Milli }[],
+  totals: Map<string, SoldReturned>,
+): { ok: true } | (Err & { productId: string }) {
+  const asked = new Map<string, Milli>();
+  for (const l of lines) asked.set(l.productId, (asked.get(l.productId) ?? 0) + l.qtyMilli);
+  for (const [productId, qty] of asked) {
+    const t = totals.get(productId);
+    if (!t || t.sold <= 0) return { ...err('NOT_SOLD', 'الصنف ده ما اتباعش'), productId };
+    if (qty > returnableOf(t)) return { ...err('OVER_SOLD', 'الكمية أكبر من المباع'), productId };
+  }
+  return { ok: true };
+}

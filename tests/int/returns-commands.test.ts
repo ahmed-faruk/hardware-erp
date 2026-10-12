@@ -149,6 +149,119 @@ describe('sales return', () => {
   });
 });
 
+describe('return without invoice with many items (D1..D11)', () => {
+  const free = (
+    t: Awaited<ReturnType<typeof setup>>,
+    lines: [number, number, number, ('good' | 'damaged')?][],
+  ) =>
+    postSalesReturn(t.ctx, {
+      originalInvoiceId: null,
+      lines: lines.map(([p, qtyMilli, unitRefund, condition]) => ({
+        originalLineId: null,
+        productId: t.s.products[p]!.id,
+        qtyMilli,
+        unitRefund,
+        condition: condition ?? 'good',
+      })),
+      shiftId: t.s.shiftId,
+      cashAccountId: t.s.cashAccountId,
+    });
+  const sellSecond = async (t: Awaited<ReturnType<typeof setup>>) => {
+    const r = await postSale(t.ctx, {
+      lines: [{ productId: t.s.products[1]!.id, qtyMilli: 2000, unitPrice: 2000 }],
+      payments: [{ method: 'cash', amount: 4000 }],
+      customerId: null,
+      warehouseId: t.main.id,
+      shiftId: t.s.shiftId,
+      cashAccountId: t.s.cashAccountId,
+    } as never);
+    if (!r.ok) throw new Error(r.code);
+  };
+
+  it('D2: two sold products in one return give one document with two lines and both back in stock', async () => {
+    const t = await setup('manager');
+    await sellSecond(t);
+    const before = await t.ctx.db.salesReturns.count();
+    const r = await free(t, [
+      [0, 1000, 900],
+      [1, 2000, 1800],
+    ]);
+    expect(r).toMatchObject({ ok: true, total: 900 + 3600, cash: 4500, credit: 0 });
+    expect(await t.ctx.db.salesReturns.count()).toBe(before + 1);
+    const lines = await t.ctx.db.salesReturnLines.toArray();
+    expect(lines).toHaveLength(2);
+    const moved = (await t.ctx.db.stockMovements.toArray()).filter((m) => m.docType === 'sales_return');
+    expect(moved.map((m) => m.qty).sort()).toEqual([1000, 2000]);
+    expect((await t.ctx.db.outbox.toArray()).filter((o) => o.table === 'salesReturns')).toHaveLength(1);
+  });
+
+  it('D3: a product that was never sold is refused and nothing is written', async () => {
+    const t = await setup('manager');
+    const before = await t.ctx.db.salesReturns.count();
+    const outbox = await t.ctx.db.outbox.count();
+    expect(await free(t, [[2, 1000, 500]])).toMatchObject({ ok: false, code: 'NOT_SOLD' });
+    expect(
+      await free(t, [
+        [0, 1000, 500],
+        [2, 1000, 500],
+      ]),
+    ).toMatchObject({ ok: false, code: 'NOT_SOLD' });
+    expect(await t.ctx.db.salesReturns.count()).toBe(before);
+    expect(await t.ctx.db.outbox.count()).toBe(outbox);
+  });
+
+  it('D3: a product sold only on a voided invoice counts as not sold', async () => {
+    const t = await setup('manager');
+    const v = await voidInvoice(t.ctx, { invoiceId: t.sold.id, reason: 'mistake', shiftId: t.s.shiftId });
+    expect(v.ok).toBe(true);
+    expect(await free(t, [[0, 1000, 500]])).toMatchObject({ ok: false, code: 'NOT_SOLD' });
+  });
+
+  it('D4: never more than sold minus already returned, over lines, documents and invoice returns', async () => {
+    const t = await setup('manager');
+    expect((await t.ret(1000)).ok).toBe(true); // 3 sold, 1 returned by invoice: 2 left
+    expect(await free(t, [[0, 2500, 100]])).toMatchObject({ ok: false, code: 'OVER_SOLD' });
+    expect(
+      await free(t, [
+        [0, 1500, 100],
+        [0, 1000, 100],
+      ]),
+    ).toMatchObject({ ok: false, code: 'OVER_SOLD' });
+    expect((await free(t, [[0, 1500, 100]])).ok).toBe(true);
+    expect(await free(t, [[0, 1000, 100]])).toMatchObject({ ok: false, code: 'OVER_SOLD' });
+    expect((await free(t, [[0, 500, 100]])).ok).toBe(true);
+    expect(await free(t, [[0, 1, 100]])).toMatchObject({ ok: false, code: 'OVER_SOLD' });
+  });
+
+  it('D5: a damaged line goes to scrap and a good one to the main warehouse, in the same document', async () => {
+    const t = await setup('manager');
+    await sellSecond(t);
+    const r = await free(t, [
+      [0, 1000, 900, 'damaged'],
+      [1, 1000, 1800, 'good'],
+    ]);
+    expect(r.ok).toBe(true);
+    const moved = (await t.ctx.db.stockMovements.toArray()).filter((m) => m.docType === 'sales_return');
+    expect(moved.find((m) => m.productId === t.s.products[0]!.id)?.warehouseId).toBe(t.scrap.id);
+    expect(moved.find((m) => m.productId === t.s.products[1]!.id)?.warehouseId).toBe(t.main.id);
+  });
+
+  it('D6: a refund bigger than the drawer holds is refused, with the same rule as before', async () => {
+    const t = await setup('manager');
+    expect(await free(t, [[0, 2000, 50_000]])).toMatchObject({ ok: false, code: 'DRAWER_SHORT' });
+  });
+
+  it('D11: the total is the sum of the lines only', async () => {
+    const t = await setup('manager');
+    await sellSecond(t);
+    const r = await free(t, [
+      [0, 1000, 1000],
+      [1, 1000, 2000],
+    ]);
+    expect(r).toMatchObject({ ok: true, total: 3000 });
+  });
+});
+
 describe('void', () => {
   it('is for the manager only', async () => {
     const t = await setup();
