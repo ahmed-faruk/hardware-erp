@@ -25,7 +25,7 @@ export function ShiftOpen({
   offer,
 }: {
   drawer: CashAccount | null | undefined;
-  /** the «اطبع» button for the report of the shift that was just closed */
+  /** the print button for the report of the shift that was just closed */
   offer?: ReactNode;
 }) {
   const { context } = useSession();

@@ -122,7 +122,7 @@ export function SellScreen() {
   const [step, setStep] = useState<Step>('items');
   const [searchText, setSearchText] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
-  /** after a return, collection, void, expense, transfer or shift close nothing prints by itself: one «اطبع» button offers it */
+  /** after a return, collection, void, expense, transfer or shift close nothing prints by itself: one print button offers it */
   const [printOffer, setPrintOffer] = useState<(() => void) | null>(null);
   const [tokens, setTokens] = useState<string[]>([]);
   const [undo, setUndo] = useState<{
