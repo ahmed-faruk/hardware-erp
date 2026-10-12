@@ -106,6 +106,20 @@ test.describe('manager journeys', () => {
     await expect(page.getByRole('button', { name: strings.nav.workers })).toHaveCount(0);
   });
 
+  test('the settings screen has no auto-print switch any more', async ({ page }) => {
+    const f = newFixture();
+    await page.goto('/');
+    await page.getByTestId('activation-code').fill(f.code);
+    await page.getByTestId('activate').click();
+    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
+    await page.keyboard.type(f.pin);
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('sync-status')).toBeVisible();
+    await page.getByRole('button', { name: strings.nav.settings }).click();
+    await expect(page.getByTestId('backup-pass')).toBeVisible();
+    await expect(page.getByTestId('auto-print')).toHaveCount(0);
+  });
+
   test('wrong PIN shakes and 5 wrong tries lock the worker', async ({ page }) => {
     const f = newFixture();
     await page.goto('/');

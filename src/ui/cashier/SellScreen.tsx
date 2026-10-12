@@ -73,7 +73,6 @@ const DEVICE_DEFAULTS: DeviceSettings = {
   lastBackupAt: '',
   paper: '80',
   copies: 1,
-  autoPrint: true,
   sounds: true,
   digits: 'latn',
 };
@@ -123,6 +122,8 @@ export function SellScreen() {
   const [step, setStep] = useState<Step>('items');
   const [searchText, setSearchText] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  /** after a return, collection, void, expense, transfer or shift close nothing prints by itself: one «اطبع» button offers it */
+  const [printOffer, setPrintOffer] = useState<(() => void) | null>(null);
   const [tokens, setTokens] = useState<string[]>([]);
   const [undo, setUndo] = useState<{
     prev: Cart;
@@ -276,29 +277,34 @@ export function SellScreen() {
     setReturnOpen(false);
     setScannedReceipt(null);
     flash(strings.returns.done);
-    if (!device.autoPrint) return;
-    void (async () => {
-      const { loadReturnReceipt } = await import('@/db/commands/receipts');
-      const receipt = await loadReturnReceipt(db, posted.id, false);
-      if (receipt.ok) await printDoc((r, faces) => r.renderReceiptHtml(receipt.value, device.paper, faces));
-    })();
+    setPrintOffer(() => () => {
+      void (async () => {
+        const { loadReturnReceipt } = await import('@/db/commands/receipts');
+        const receipt = await loadReturnReceipt(db, posted.id, false);
+        if (receipt.ok) await printDoc((r, faces) => r.renderReceiptHtml(receipt.value, device.paper, faces));
+      })();
+    });
   };
 
   const onCollectDone = (id: string): void => {
     setCollectOpen(false);
     flash(strings.collection.done);
-    if (!device.autoPrint) return;
-    void (async () => {
-      const { loadCollectionSlip } = await import('@/db/commands/receipts');
-      const slip = await loadCollectionSlip(db, id);
-      if (slip.ok)
-        await printDoc((r, faces) => r.renderCollectionHtml(slip.value, device.digits, device.paper, faces));
-    })();
+    setPrintOffer(() => () => {
+      void (async () => {
+        const { loadCollectionSlip } = await import('@/db/commands/receipts');
+        const slip = await loadCollectionSlip(db, id);
+        if (slip.ok)
+          await printDoc((r, faces) =>
+            r.renderCollectionHtml(slip.value, device.digits, device.paper, faces),
+          );
+      })();
+    });
   };
 
   const doVoid = async (reason: (typeof VOID_REASONS)[number]): Promise<void> => {
     const id = voidTarget;
     setVoidTarget(null);
+    setRecentOpen(false);
     if (!context || !id || !shift) return;
     const r = await voidInvoice(context, { invoiceId: id, reason, shiftId: shift.id });
     if (!r.ok) {
@@ -313,10 +319,14 @@ export function SellScreen() {
     }
     play('done');
     flash(strings.voidInvoice.done);
-    const { loadReceipt } = await import('@/db/commands/receipts');
-    const receipt = await loadReceipt(db, id, false, 'void');
-    if (receipt.ok)
-      await printDoc((render, faces) => render.renderReceiptHtml(receipt.value, device.paper, faces));
+    setPrintOffer(() => () => {
+      void (async () => {
+        const { loadReceipt } = await import('@/db/commands/receipts');
+        const receipt = await loadReceipt(db, id, false, 'void');
+        if (receipt.ok)
+          await printDoc((render, faces) => render.renderReceiptHtml(receipt.value, device.paper, faces));
+      })();
+    });
   };
 
   const printShiftReport = (shiftId: string): void => {
@@ -366,8 +376,20 @@ export function SellScreen() {
     play('done');
     sayAmounts(sale);
     setDone({ sale, printFailed: false });
-    if (device.autoPrint) void printInvoice(sale.id, false).then((ok) => setDone({ sale, printFailed: !ok }));
   };
+
+  const offerButton = printOffer ? (
+    <ActionButton
+      label={strings.sell.print}
+      icon={Printer}
+      variant="ghost"
+      onClick={() => {
+        printOffer();
+        setPrintOffer(null);
+      }}
+      testId="print-offer"
+    />
+  ) : null;
 
   const newCart = (): void => {
     setDone(null);
@@ -454,7 +476,7 @@ export function SellScreen() {
   };
 
   if (drawer === undefined || shift === undefined || warehouse === undefined) return <Skeleton rows={3} />;
-  if (!shift) return <ShiftOpen drawer={drawer} />;
+  if (!shift) return <ShiftOpen drawer={drawer} offer={offerButton} />;
   if (!warehouse) return <BigAlert tone="warn" word={strings.sell.noWarehouse} />;
 
   const qtyLine = cart.lines.find((l) => l.key === qtyKey);
@@ -631,6 +653,7 @@ export function SellScreen() {
           </div>
         </div>
         {notice && <BigAlert tone="danger" word={notice} sound={false} />}
+        {offerButton}
         <ProductGrid searchText={searchText} digits={digits} onAdd={add} />
       </div>
       <aside className={styles.right}>
@@ -729,7 +752,7 @@ export function SellScreen() {
         onDone={(id) => {
           setShiftTool(null);
           flash(strings.cash.saved);
-          if (device.autoPrint) printMoneySlip('expense', id);
+          setPrintOffer(() => () => printMoneySlip('expense', id));
         }}
       />
       <TransferDialog
@@ -740,7 +763,7 @@ export function SellScreen() {
         onDone={(id) => {
           setShiftTool(null);
           flash(strings.cash.saved);
-          if (device.autoPrint) printMoneySlip('transfer', id);
+          setPrintOffer(() => () => printMoneySlip('transfer', id));
         }}
       />
       <CloseShiftDialog
@@ -751,7 +774,7 @@ export function SellScreen() {
         onClose={() => setShiftTool(null)}
         onClosed={(id) => {
           setShiftTool(null);
-          printShiftReport(id);
+          setPrintOffer(() => () => printShiftReport(id));
           // BAK-01: a backup at every shift close, when the manager set a passphrase on this device
           if (device.backupPassphrase) void runBackup(db, device.backupPassphrase);
         }}

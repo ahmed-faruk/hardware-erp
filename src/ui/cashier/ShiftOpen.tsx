@@ -1,5 +1,5 @@
 import { LockOpen } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { useSession } from '@/app/session';
 import { openShift } from '@/db/commands/open-shift';
@@ -20,7 +20,14 @@ const ERRORS: Record<string, string> = {
 };
 
 /** Sales are blocked until a shift is open with the counted float (FIN-02). One open shift per drawer. */
-export function ShiftOpen({ drawer }: { drawer: CashAccount | null | undefined }) {
+export function ShiftOpen({
+  drawer,
+  offer,
+}: {
+  drawer: CashAccount | null | undefined;
+  /** the «اطبع» button for the report of the shift that was just closed */
+  offer?: ReactNode;
+}) {
   const { context } = useSession();
   const [entering, setEntering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +45,7 @@ export function ShiftOpen({ drawer }: { drawer: CashAccount | null | undefined }
         testId="open-shift"
       />
       {error && <BigAlert tone="danger" word={error} />}
+      {offer}
       <NumEntry
         title={strings.sell.float}
         open={entering}

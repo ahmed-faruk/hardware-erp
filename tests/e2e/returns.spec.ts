@@ -60,8 +60,11 @@ test.describe('returns, voids and collections', () => {
     await page.getByTestId('plus-1').click();
     await expect(page.getByTestId('refund-total')).toHaveText('15.00');
     await page.getByTestId('confirm-return').click();
-    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(2);
-    const html = (await prints(page))[1] as string;
+    await page.waitForTimeout(1000);
+    expect(await prints(page)).toHaveLength(0);
+    await page.getByTestId('print-offer').click();
+    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
+    const html = (await prints(page))[0] as string;
     expect(html).toContain(`${f.prefix}-RET-000001`);
     expect(html).toContain('مرتجع');
 
@@ -90,6 +93,11 @@ test.describe('returns, voids and collections', () => {
         timeout: 60_000,
       })
       .toBe('voided');
+    // no auto print after a void; «اطبع» prints the voided copy
+    await page.waitForTimeout(1000);
+    expect(await prints(page)).toHaveLength(0);
+    await page.getByTestId('print-offer').click();
+    await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
   });
 
   test('a collection from a customer reaches the server and prints a slip', async ({ page }) => {
@@ -100,6 +108,9 @@ test.describe('returns, voids and collections', () => {
     await page.keyboard.type('5');
     await page.keyboard.press('Enter');
     await page.getByTestId('collect-save').click();
+    await page.waitForTimeout(1000);
+    expect(await prints(page)).toHaveLength(0);
+    await page.getByTestId('print-offer').click();
     await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
     expect((await prints(page))[0]).toContain(`${f.prefix}-RCV-000001`);
     await expect
