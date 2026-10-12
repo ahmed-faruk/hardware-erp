@@ -1,12 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { deleteProduct } from '@/db/commands/delete-product';
 import { saveProduct } from '@/db/commands/save-product';
+import { localProductUsage } from '@/db/product-usage';
 import type { Barcode, Product, ProductUnit } from '@/db/types';
 import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
+import { mergeUsage, usageFromServer, usageReasons, type UsageReason } from '@/domain/product-usage';
+import { callRpc } from '@/sync/errors';
 
+import { UndoToast } from '../cashier/UndoToast';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { Dialog } from '../components/Dialog';
@@ -44,7 +49,7 @@ export function ProductFormScreen({ id }: { id: string }) {
 }
 
 function ProductForm({ loaded }: { loaded: Loaded }) {
-  const { db } = useServices();
+  const { db, client } = useServices();
   const { context, worker, can } = useSession();
   const { product } = loaded;
   const [view, setView] = useState<'form' | 'history'>('form');
@@ -85,6 +90,35 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   const [missing, setMissing] = useState(false);
 
   const saver = useSaver(() => navigate('products'));
+
+  // delete: the server is asked first (the old history lives there), then the manager has 5 seconds to undo
+  const [blocked, setBlocked] = useState<UsageReason[] | null>(null);
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const deleting = useRef(false);
+  const askDelete = async (): Promise<void> => {
+    if (!product) return;
+    setBlocked(null);
+    setDeleteNote(null);
+    const r = await callRpc<Record<string, unknown>>(client, 'product_usage', { p_product_id: product.id });
+    if (!r.ok) return setDeleteNote(r.network ? strings.products.deleteNeedsNet : strings.errors.saveFailed);
+    const reasons = usageReasons(
+      mergeUsage(await localProductUsage(db, product.id), usageFromServer(r.data)),
+    );
+    if (reasons.length > 0) return setBlocked(reasons);
+    setPendingDelete(true);
+  };
+  const runDelete = (): void => {
+    setPendingDelete(false);
+    if (!context || !product || deleting.current) return;
+    deleting.current = true;
+    void deleteProduct(context, product.id).then((r) => {
+      deleting.current = false;
+      if (r.ok) return navigate('products');
+      if ('reasons' in r && r.reasons) setBlocked(r.reasons as UsageReason[]);
+      else setDeleteNote(strings.errors.saveFailed);
+    });
+  };
 
   const submit = (): void => {
     if (!context) return;
@@ -412,6 +446,22 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
                 <BigAlert tone="danger" word={saver.error} />
               </div>
             )}
+            {deleteNote && (
+              <div className={styles.span}>
+                <BigAlert tone="warn" word={deleteNote} sound={false} />
+              </div>
+            )}
+            {blocked && (
+              <div className={styles.span} data-testid="delete-blocked">
+                <BigAlert
+                  tone="warn"
+                  word={`${strings.products.deleteBlocked}: ${blocked
+                    .map((x) => strings.products.deleteReasons[x])
+                    .join(strings.cash.listSeparator)}`}
+                  sound={false}
+                />
+              </div>
+            )}
             <div className={styles.actions}>
               <ActionButton
                 label={strings.common.save}
@@ -426,9 +476,26 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
                 variant="ghost"
                 onClick={() => navigate('products')}
               />
+              {product && can('editProductData') === 'yes' && (
+                <ActionButton
+                  label={strings.products.deleteProduct}
+                  icon={Trash2}
+                  variant="danger"
+                  onClick={() => void askDelete()}
+                  disabled={pendingDelete}
+                  testId="delete-product"
+                />
+              )}
             </div>
           </form>
         </>
+      )}
+      {pendingDelete && (
+        <UndoToast
+          message={strings.products.deleting}
+          onUndo={() => setPendingDelete(false)}
+          onExpire={runDelete}
+        />
       )}
       <Dialog title={strings.products.icon} open={picking} onClose={() => setPicking(false)}>
         <IconPicker

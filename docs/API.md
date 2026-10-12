@@ -31,15 +31,16 @@ There is no custom backend server. The app talks to two APIs:
 { "ok": false, "error": { "code": "E_VALIDATION", "message": "Arabic text safe to show", "details": { } } }
 ```
 
-| Code                                                                                 | Meaning                                | Client reaction                                        |
-| ------------------------------------------------------------------------------------ | -------------------------------------- | ------------------------------------------------------ |
-| `E_VALIDATION`                                                                       | payload shape or business rule failed  | mark row rejected, show on manager sync screen         |
-| `E_FORBIDDEN`                                                                        | worker role or device role not allowed | mark rejected, audit                                   |
-| `E_DEVICE_REVOKED`                                                                   | device revoked by manager              | stop sync, wipe local data at next start               |
-| `E_VERSION_TOO_OLD`                                                                  | app older than accepted versions       | show "update needed", keep selling, retry after update |
-| `E_CONFLICT`                                                                         | master-data field conflict             | server value kept, conflict logged                     |
-| `E_RATE_LIMIT`                                                                       | too many calls                         | back off                                               |
-| `E_INTERNAL`                                                                         | unexpected                             | retry with backoff, log `client_errors`                |
+| Code                                                                                 | Meaning                                                                   | Client reaction                                        |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `E_VALIDATION`                                                                       | payload shape or business rule failed                                     | mark row rejected, show on manager sync screen         |
+| `E_FORBIDDEN`                                                                        | worker role or device role not allowed                                    | mark rejected, audit                                   |
+| `E_IN_USE`                                                                           | a product delete was refused: the product has movements, history or stock | mark rejected, show on manager sync screen             |
+| `E_DEVICE_REVOKED`                                                                   | device revoked by manager                                                 | stop sync, wipe local data at next start               |
+| `E_VERSION_TOO_OLD`                                                                  | app older than accepted versions                                          | show "update needed", keep selling, retry after update |
+| `E_CONFLICT`                                                                         | master-data field conflict                                                | server value kept, conflict logged                     |
+| `E_RATE_LIMIT`                                                                       | too many calls                                                            | back off                                               |
+| `E_INTERNAL`                                                                         | unexpected                                                                | retry with backoff, log `client_errors`                |
 | Network errors are not envelopes: retry 5 s, 30 s, 2 min, 10 min, then every 10 min. |
 
 ## 4. RPC endpoints (`supabase.rpc(name, args)`)
@@ -119,6 +120,10 @@ Per worker what was advanced, deducted and paid in the period (`total`, `by_work
 ### `report_expenses(p_from date, p_to date)` — manager devices only
 
 Posted expenses of the period (imported ones included): `total`, `by_category`, `by_account` (null = imported, no cash account), `by_day` and the newest 500 in `list`.
+
+### `product_usage(p_product_id uuid)` — manager devices only
+
+What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`.
 
 ### `report_product_history(p_product uuid, p_from date, p_to date, p_offset int)` — manager devices only
 
