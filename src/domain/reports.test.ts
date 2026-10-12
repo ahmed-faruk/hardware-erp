@@ -8,6 +8,7 @@ import {
   percentOf,
   profitTable,
   purchasesTables,
+  returnsTables,
   salesTables,
   stockTable,
 } from './reports';
@@ -270,5 +271,109 @@ describe('payroll report', () => {
     expect(
       expensesTables({ ...base, payroll: { count: 0, amount: 0 } }, t, (i) => i).map((x) => x.title),
     ).not.toContain('payrollTitle');
+  });
+});
+
+describe('returns report (F5)', () => {
+  const labels = {
+    title: 'مرتجعات المبيعات',
+    count: 'العدد',
+    amount: 'المبلغ',
+    share: 'النسبة',
+    total: 'الإجمالي',
+    byDay: 'حسب اليوم',
+    day: 'اليوم',
+    byProduct: 'حسب الصنف',
+    product: 'الصنف',
+    qty: 'الكمية',
+    byReason: 'حسب السبب',
+    reason: 'السبب',
+    byMethod: 'حسب الطريقة',
+    method: 'الطريقة',
+    bySupplier: 'حسب المورد',
+    supplier: 'المورد',
+    customer: 'العميل',
+    list: 'القائمة',
+    number: 'الرقم',
+    time: 'الوقت',
+    noCustomer: 'بدون عميل',
+    noSupplier: 'مورد غير معروف',
+    noProduct: 'صنف غير معروف',
+    legacyReturns: 'مرتجعات قديمة',
+  };
+  const side = {
+    total: { count: 2, amount: 4000 },
+    legacy_count: 1,
+    by_day: [{ day: '2026-10-05', count: 2, amount: 4000 }],
+    by_product: [{ product: 'دهان', qty: 3000, amount: 4000 }],
+    by_reason: [
+      { reason: 'defect', count: 1, amount: 3000 },
+      { reason: 'unknown', count: 1, amount: 1000 },
+    ],
+    by_method: [{ method: 'cash', amount: 4000 }],
+    by_supplier: [{ supplier: '', count: 2, amount: 4000 }],
+    list: [
+      {
+        number: 'K1-RET-1',
+        at: '2026-10-05T10:00:00Z',
+        customer: '',
+        reason: 'defect',
+        method: 'cash',
+        amount: 3000,
+        legacy: false,
+      },
+      {
+        number: 'LG-RET-000001',
+        at: '2026-10-05T00:00:00Z',
+        supplier: 'مورد',
+        reason: 'unknown',
+        method: 'legacy',
+        amount: 1000,
+        legacy: true,
+      },
+    ],
+  };
+  const data = { sales: side, purchases: side };
+  const time = (iso: string): string => iso.slice(0, 10);
+  const name = (k: string): string => `<${k}>`;
+
+  it('sales: totals, reasons with their share, methods, days, products and the list', () => {
+    const t = returnsTables(data, 'sales', labels, time, name, name);
+    expect(t.map((x) => x.title)).toEqual([
+      'مرتجعات المبيعات',
+      'حسب السبب',
+      'حسب الطريقة',
+      'حسب اليوم',
+      'حسب الصنف',
+      'القائمة',
+    ]);
+    expect(t[0]).toMatchObject({ rows: [['2', '40.00']], note: 'مرتجعات قديمة: 1' });
+    expect(t[1]?.rows).toEqual([
+      ['<defect>', '1', '30.00', '75%'],
+      ['<unknown>', '1', '10.00', '25%'],
+    ]);
+    expect(t[1]?.totals).toEqual(['الإجمالي', '2', '40.00', '100%']);
+    expect(t[4]?.rows).toEqual([['دهان', '3', '40.00']]);
+    expect(t[5]?.rows[0]).toEqual(['K1-RET-1', '2026-10-05', 'بدون عميل', '<defect>', '<cash>', '30.00']);
+  });
+
+  it('purchases: by supplier (an unknown supplier is named) and the list', () => {
+    const t = returnsTables(data, 'purchases', labels, time, name, name);
+    expect(t.map((x) => x.title)).toEqual([
+      'مرتجعات المبيعات',
+      'حسب المورد',
+      'حسب اليوم',
+      'حسب الصنف',
+      'القائمة',
+    ]);
+    expect(t[1]?.rows).toEqual([['مورد غير معروف', '2', '40.00', '100%']]);
+    expect(t[4]?.rows[1]).toEqual(['LG-RET-000001', '2026-10-05', 'مورد', '10.00']);
+  });
+
+  it('an empty period gives empty tables, not errors', () => {
+    const empty = { total: { count: 0, amount: 0 }, legacy_count: 0, by_day: [], by_product: [], list: [] };
+    const t = returnsTables({ sales: empty, purchases: empty }, 'sales', labels, time, name, name);
+    expect(t[0]).toMatchObject({ rows: [['0', '0.00']], note: undefined });
+    expect(t[1]?.totals).toEqual(['الإجمالي', '0', '0.00', '0%']);
   });
 });

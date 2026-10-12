@@ -406,3 +406,112 @@ export function payrollTables(
     },
   ];
 }
+
+interface ReturnsSide {
+  total: { count: number; amount: number };
+  legacy_count: number;
+  by_day: { day: string; count: number; amount: number }[];
+  by_product: { product: string; qty: number; amount: number }[];
+  by_reason?: { reason: string; count: number; amount: number }[];
+  by_method?: { method: string; amount: number }[];
+  by_supplier?: { supplier: string; count: number; amount: number }[];
+  list: {
+    number: string;
+    at: string;
+    customer?: string;
+    supplier?: string;
+    reason?: string;
+    method?: string;
+    amount: number;
+    legacy: boolean;
+  }[];
+}
+export interface ReturnsData {
+  sales: ReturnsSide;
+  purchases: ReturnsSide;
+}
+
+/** Returns of one kind (sales or purchases): totals, by reason / method / supplier, by day, by product and the list. */
+export function returnsTables(
+  d: ReturnsData,
+  kind: 'sales' | 'purchases',
+  t: ReportLabels,
+  time: (iso: string) => string,
+  reasonName: (k: string) => string,
+  methodName: (k: string) => string,
+): ReportTable[] {
+  const x = d[kind];
+  const all = x.total.amount;
+  const note = x.legacy_count > 0 ? `${t.legacyReturns}: ${x.legacy_count}` : undefined;
+  const common: ReportTable[] = [
+    {
+      title: t.byDay!,
+      headers: [t.day!, t.count!, t.amount!],
+      rows: x.by_day.map((r) => [r.day, String(r.count), m(r.amount)]),
+    },
+    {
+      title: t.byProduct!,
+      headers: [t.product!, t.qty!, t.amount!],
+      rows: x.by_product.map((r) => [r.product || t.noProduct!, formatQty(r.qty), m(r.amount)]),
+    },
+  ];
+  const head: ReportTable = {
+    title: t.title ?? '',
+    headers: [t.count!, t.amount!],
+    rows: [[String(x.total.count), m(all)]],
+    note,
+  };
+  if (kind === 'purchases')
+    return [
+      head,
+      {
+        title: t.bySupplier!,
+        headers: [t.supplier!, t.count!, t.amount!, t.share!],
+        rows: (x.by_supplier ?? []).map((r) => [
+          r.supplier || t.noSupplier!,
+          String(r.count),
+          m(r.amount),
+          `${percentOf(r.amount, all)}%`,
+        ]),
+        totals: [t.total!, String(x.total.count), m(all), all > 0 ? '100%' : '0%'],
+      },
+      ...common,
+      {
+        title: t.list!,
+        headers: [t.number!, t.time!, t.supplier!, t.amount!],
+        rows: x.list.map((r) => [r.number, time(r.at), r.supplier || t.noSupplier!, m(r.amount)]),
+      },
+    ];
+  return [
+    head,
+    {
+      title: t.byReason!,
+      headers: [t.reason!, t.count!, t.amount!, t.share!],
+      rows: (x.by_reason ?? []).map((r) => [
+        reasonName(r.reason),
+        String(r.count),
+        m(r.amount),
+        `${percentOf(r.amount, all)}%`,
+      ]),
+      totals: [t.total!, String(x.total.count), m(all), all > 0 ? '100%' : '0%'],
+    },
+    {
+      title: t.byMethod!,
+      headers: [t.method!, t.amount!],
+      rows: (x.by_method ?? []).map((r) => [methodName(r.method), m(r.amount)]),
+    },
+    ...common,
+    {
+      title: t.list!,
+      headers: [t.number!, t.time!, t.customer!, t.reason!, t.method!, t.amount!],
+      rows: x.list.map((r) => [
+        r.number,
+        time(r.at),
+        r.customer || t.noCustomer!,
+        reasonName(r.reason ?? 'unknown'),
+        methodName(r.method ?? 'cash'),
+        m(r.amount),
+      ]),
+    },
+  ];
+}
