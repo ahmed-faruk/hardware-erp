@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
@@ -10,15 +12,13 @@ describe('purchase returns', () => {
     const f = newCashierFixture();
     const run = Date.now();
     const supplier = `Agent supplier ${run}`;
-    const sid = '0190f000-0000-7000-8000-0000000b1e01';
-    sql(`delete from suppliers where id = '${sid}'`);
+    const sid = randomUUID();
     sql(
       `insert into suppliers (id, company_id, name) values ('${sid}', 'a0000000-0000-7000-8000-000000000001', '${supplier}')`,
     );
     const numbers = [`AG-PUR-${run}A`, `AG-PUR-${run}B`];
     numbers.forEach((number, i) => {
-      const inv = `0190f000-0000-7000-8000-0000000b1e1${i}`;
-      sql(`delete from purchase_invoices where id = '${inv}'`);
+      const inv = randomUUID();
       sql(
         `insert into purchase_invoices (id, company_id, number, issued_at, supplier_id, warehouse_id, subtotal, total) values ('${inv}', 'a0000000-0000-7000-8000-000000000001', '${number}', now(), '${sid}', 'a0000000-0000-7000-8000-0000000000c1', 5000, 5000)`,
       );
