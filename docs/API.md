@@ -127,7 +127,7 @@ Posted returns of the period (Cairo days, voided ones left out), device document
 
 ### `product_usage(p_product_id uuid)` — manager devices only
 
-What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`.
+What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`, except an **archive**: a product with history is accepted at stock 0 for a worker with `archiveProduct` (otherwise `E_FORBIDDEN`; with stock `E_IN_USE`). Clearing `deleted_at` on a product with history (restore) also needs `archiveProduct`.
 
 ### `report_product_history(p_product uuid, p_from date, p_to date, p_offset int)` — manager devices only
 
