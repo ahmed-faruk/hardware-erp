@@ -6,7 +6,7 @@ import { useServices, useSession } from '@/app/session';
 import { holdCart, listHeldCarts, loadCurrentCart, resumeCart, saveCurrentCart } from '@/db/commands/carts';
 import type { SaleReceipt } from '@/db/commands/post-sale';
 import { noSale, reprintInvoice, type NoSaleReason } from '@/db/commands/receipts';
-import { voidInvoice, type VOID_REASONS } from '@/db/commands/returns';
+import { voidInvoice, voidReturn, type VOID_REASONS } from '@/db/commands/returns';
 import { findByBarcode } from '@/db/lookup';
 import { searchProducts } from '@/db/search';
 import { loadDeviceSettings, loadSettings, type DeviceSettings } from '@/db/settings';
@@ -142,6 +142,7 @@ export function SellScreen() {
   const [scannedReceipt, setScannedReceipt] = useState<string | null>(null);
   const [collectOpen, setCollectOpen] = useState(false);
   const [voidTarget, setVoidTarget] = useState<string | null>(null);
+  const [voidReturnTarget, setVoidReturnTarget] = useState<string | null>(null);
   const [shiftMenu, setShiftMenu] = useState(false);
   const [shiftTool, setShiftTool] = useState<Exclude<ShiftTool, 'x'> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -299,6 +300,28 @@ export function SellScreen() {
           );
       })();
     });
+  };
+
+  const doVoidReturn = async (reason: (typeof VOID_REASONS)[number]): Promise<void> => {
+    const id = voidReturnTarget;
+    setVoidReturnTarget(null);
+    setRecentOpen(false);
+    if (!context || !id || !shift) return;
+    const r = await voidReturn(context, { returnId: id, reason, shiftId: shift.id });
+    if (!r.ok) {
+      play('error');
+      return flash(
+        r.code === 'ALREADY_VOIDED'
+          ? strings.voidReturn.already
+          : r.code === 'WRONG_DRAWER'
+            ? strings.voidReturn.wrongDrawer
+            : r.code === 'NO_SHIFT'
+              ? strings.voidReturn.needShift
+              : strings.errors.saveFailed,
+      );
+    }
+    play('done');
+    flash(strings.voidReturn.done);
   };
 
   const doVoid = async (reason: (typeof VOID_REASONS)[number]): Promise<void> => {
@@ -723,11 +746,17 @@ export function SellScreen() {
         onClose={() => setRecentOpen(false)}
         onReprint={(id) => void printInvoice(id, true)}
         onVoid={can('void') === 'yes' ? setVoidTarget : undefined}
+        onVoidReturn={can('voidReturn') === 'yes' ? setVoidReturnTarget : undefined}
       />
       <VoidReasonDialog
         open={voidTarget !== null}
         onPick={(r) => void doVoid(r)}
         onClose={() => setVoidTarget(null)}
+      />
+      <VoidReasonDialog
+        open={voidReturnTarget !== null}
+        onPick={(r) => void doVoidReturn(r)}
+        onClose={() => setVoidReturnTarget(null)}
       />
       <ReturnDialog
         open={returnOpen}

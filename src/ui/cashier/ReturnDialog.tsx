@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { postSalesReturn, type PostedDoc } from '@/db/commands/returns';
-import { loadSoldReturned } from '@/db/returnable';
+import { loadSoldReturned, postedReturnLines } from '@/db/returnable';
 import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
 import { formatMoney, formatQty, toPiasters } from '@/domain/money';
@@ -199,10 +199,10 @@ function InvoiceReturn({
   const { context } = useSession();
   const data = useLiveQuery(async () => {
     const lines = await db.salesInvoiceLines.where('invoiceId').equals(invoiceId).sortBy('lineNo');
-    const prior = await db.salesReturnLines
-      .where('originalLineId')
-      .anyOf(lines.map((l) => l.id))
-      .toArray();
+    const prior = await postedReturnLines(
+      db,
+      lines.map((l) => l.id),
+    );
     const products = await db.products.bulkGet(lines.map((l) => l.productId ?? ''));
     return { lines, prior, products };
   }, [db, invoiceId]);

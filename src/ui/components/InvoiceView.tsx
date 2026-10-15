@@ -23,22 +23,32 @@ interface Props {
   /** the invoice to show; null = closed */
   invoiceId: string | null;
   onClose: () => void;
+  /** a manager may void a return from here (only passed on the sell screen, where the shift is known) */
+  onVoidReturn?: (returnId: string) => void;
 }
 
 /** The data of a sales or purchase invoice on the screen, with the same print as the list's print button. */
-export function InvoiceViewDialog({ kind, invoiceId, onClose }: Props) {
+export function InvoiceViewDialog({ kind, invoiceId, onClose, onVoidReturn }: Props) {
   return (
     <Dialog
       title={kind === 'sale' ? t.saleTitle : t.purchaseTitle}
       open={invoiceId !== null}
       onClose={onClose}
     >
-      {invoiceId && <Body kind={kind} invoiceId={invoiceId} />}
+      {invoiceId && <Body kind={kind} invoiceId={invoiceId} onVoidReturn={onVoidReturn} />}
     </Dialog>
   );
 }
 
-function Body({ kind, invoiceId }: { kind: InvoiceKind; invoiceId: string }) {
+function Body({
+  kind,
+  invoiceId,
+  onVoidReturn,
+}: {
+  kind: InvoiceKind;
+  invoiceId: string;
+  onVoidReturn?: (returnId: string) => void;
+}) {
   const { db } = useServices();
   const view = useLiveQuery(() => loadInvoiceView(db, kind, invoiceId), [db, kind, invoiceId]);
   if (view === undefined) return <Skeleton />;
@@ -151,6 +161,15 @@ function Body({ kind, invoiceId }: { kind: InvoiceKind; invoiceId: string }) {
               <li key={r.number}>
                 <span dir="ltr">{r.number}</span>
                 <strong>{formatMoney(r.total)}</strong>
+                {onVoidReturn && view.kind === 'sale' && (
+                  <ActionButton
+                    big
+                    label={strings.voidReturn.button}
+                    variant="danger"
+                    onClick={() => onVoidReturn(r.id)}
+                    testId={`void-return-${r.number}`}
+                  />
+                )}
               </li>
             ))}
           </ul>
