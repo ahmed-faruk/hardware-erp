@@ -6,6 +6,7 @@ import { approvalRole, canCtx, newCommon, type DeviceContext } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
+import { lastPurchaseLine } from '../purchase-return';
 import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
 import { upsertRow } from './save-master';
@@ -28,6 +29,7 @@ import { baseQty, movingAverage } from '@/domain/costing';
 import { mulDivRound } from '@/domain/money';
 import { computePurchase, costPerBase } from '@/domain/purchase';
 import { err, type Err } from '@/domain/result';
+import { defaultReturnValue } from '@/domain/purchase-return';
 import { computeReturnLine, type PriorReturn } from '@/domain/returns';
 import { isWithinReturnPeriod } from '@/domain/returnWindow';
 
@@ -328,7 +330,8 @@ export async function postPurchase(
 
 const purchaseReturnInput = z.object({
   supplierId: id,
-  originalInvoiceId: id.nullable(),
+  /** optional now: lines may point at purchase lines of several invoices of this supplier (originalLineId) */
+  originalInvoiceId: id.nullable().default(null),
   warehouseId: id,
   lines: z
     .array(
@@ -336,8 +339,8 @@ const purchaseReturnInput = z.object({
         originalLineId: id.nullable(),
         productId: id.nullable().default(null),
         qtyMilli: z.number().int().positive(),
-        /** without an invoice: what the supplier gives back for the line */
-        netAmount: z.number().int().nonnegative().default(0),
+        /** without an invoice: what the supplier gives back for the line; null = the last price from this supplier */
+        netAmount: z.number().int().nonnegative().nullable().default(null),
       }),
     )
     .min(1),
@@ -356,16 +359,27 @@ export async function postPurchaseReturn(
   if (!parsed.success) return err('E_VALIDATION', 'بيانات المرتجع غير صحيحة');
   const input = parsed.data;
   if (canCtx(ctx, 'receivePurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
-  if (input.originalInvoiceId === null && ctx.role !== 'manager')
-    return err('E_FORBIDDEN', 'من غير فاتورة للمدير بس');
   const { db } = ctx;
   const supplier = await db.suppliers.get(input.supplierId);
   if (!supplier || supplier.deletedAt) return err('NOT_FOUND', 'مورد غير موجود');
-  const soldLines = (
-    input.originalInvoiceId
-      ? await db.purchaseInvoiceLines.where('invoiceId').equals(input.originalInvoiceId).toArray()
-      : []
-  ).map((r) => ({
+  // the lines are all linked to purchase lines (of one or several invoices of this supplier) or all without an invoice
+  const linkedCount = input.lines.filter((l) => l.originalLineId).length;
+  if (linkedCount !== 0 && linkedCount !== input.lines.length)
+    return err('E_VALIDATION', 'مينفعش تخلط سطور بفاتورة وسطور من غير فاتورة');
+  const linked = linkedCount > 0;
+  if (!linked && canCtx(ctx, 'purchaseReturnWithoutInvoice') !== 'yes')
+    return err('E_FORBIDDEN', 'من غير فاتورة محتاج صلاحية');
+  const origRows = linked
+    ? await db.purchaseInvoiceLines.bulkGet(input.lines.map((l) => l.originalLineId as string))
+    : [];
+  if (origRows.some((r) => !r)) return err('E_VALIDATION', 'سطر مش في الفاتورة');
+  const invoiceIds = [...new Set(origRows.map((r) => r!.invoiceId as string))];
+  const invoices = linked ? await db.purchaseInvoices.bulkGet(invoiceIds) : [];
+  if (invoices.some((i) => !i || i.status !== 'posted' || i.supplierId !== supplier.id))
+    return err('E_VALIDATION', 'الفاتورة غير صالحة للمرتجع');
+  if (input.originalInvoiceId && invoiceIds.some((x) => x !== input.originalInvoiceId))
+    return err('E_VALIDATION', 'سطر مش في الفاتورة');
+  const soldLines = [...new Map(origRows.map((r) => [r!.id, r!])).values()].map((r) => ({
     id: r.id,
     productId: r.productId as string | null,
     qty: r.qty as number,
@@ -384,13 +398,14 @@ export async function postPurchaseReturn(
         qtyMilli: r.qty as number,
       }))
     : [];
-  // after the purchase return period, whoever may not return alone needs a manager's PIN (his approval is kept on the document)
+  // after the purchase return period, whoever may not return alone needs a manager's PIN (his approval is kept on the document);
+  // one approval covers every old invoice in the return
   let approver: string | null = null;
   const tokens: string[] = [];
-  if (input.originalInvoiceId && canCtx(ctx, 'purchaseReturnAfterPeriod') !== 'yes') {
-    const invoice = await db.purchaseInvoices.get(input.originalInvoiceId);
+  if (linked && canCtx(ctx, 'purchaseReturnAfterPeriod') !== 'yes') {
     const { purchaseReturnPeriodDays } = await loadSettings(db);
-    if (invoice && !isWithinReturnPeriod(invoice.issuedAt, nowIso(), purchaseReturnPeriodDays)) {
+    const nowAt = nowIso();
+    if (invoices.some((i) => !isWithinReturnPeriod(i!.issuedAt, nowAt, purchaseReturnPeriodDays))) {
       const token = input.approvalTokens.find((t) => peekApproval(t, 'purchaseReturnAfterPeriod'));
       const approval = token ? peekApproval(token, 'purchaseReturnAfterPeriod') : null;
       if (!token || !approval) return err('APPROVAL_REQUIRED', 'purchaseReturnAfterPeriod');
@@ -410,7 +425,7 @@ export async function postPurchaseReturn(
     let unitCost = 0;
     let unitFactor = 1000;
     let costBase: number;
-    if (input.originalInvoiceId) {
+    if (linked) {
       const orig = soldLines.find((s) => s.id === l.originalLineId);
       if (!orig) return err('E_VALIDATION', 'سطر مش في الفاتورة');
       const now = taken.get(orig.id) ?? 0;
@@ -428,14 +443,25 @@ export async function postPurchaseReturn(
       costBase = costPerBase(orig.netAmount, mulDivRound(orig.qty, orig.unitFactor, 1000));
     } else {
       if (!productId) return err('E_VALIDATION', 'الصنف مطلوب');
-      net = l.netAmount;
-      costBase = (await db.products.get(productId))?.unitCost ?? 0;
+      const p = await db.products.get(productId);
+      if (!p) return err('PRODUCT_NOT_FOUND', 'صنف غير موجود');
+      // the value is the last price from this supplier (or the current cost); only a holder of editReturnValue changes it
+      const standard = defaultReturnValue(
+        await lastPurchaseLine(db, supplier.id, productId),
+        p.unitCost,
+        l.qtyMilli,
+      );
+      net = l.netAmount ?? standard;
+      if (net !== standard && canCtx(ctx, 'editReturnValue') !== 'yes')
+        return err('E_FORBIDDEN', 'تعديل القيمة للمدير');
+      costBase = 0; // set below: the goods leave at the value they are returned for
     }
     if (!productId) return err('E_VALIDATION', 'الصنف مطلوب');
     const product = await db.products.get(productId);
     if (!product) return err('PRODUCT_NOT_FOUND', 'صنف غير موجود');
     const base = baseQty(l.qtyMilli, unitFactor);
     if (!base.ok) return base;
+    if (!linked) costBase = base.value > 0 ? mulDivRound(net, 1000, base.value) : 0;
     const lineId = uuidv7();
     total += net;
     lines.push({
@@ -514,7 +540,7 @@ export async function postPurchaseReturn(
         notes: null,
         isLegacy: false,
         legacy: null,
-        originalInvoiceId: input.originalInvoiceId,
+        originalInvoiceId: invoices.length === 1 ? invoices[0]!.id : null,
         supplierId: supplier.id,
         warehouseId: input.warehouseId,
         subtotal: total,

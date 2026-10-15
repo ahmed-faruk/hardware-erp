@@ -35,12 +35,12 @@ function purchaseOnServer(daysAgo: number): { number: string; supplier: string }
   return { number, supplier };
 }
 
-async function startPurchaseReturn(page: Page, number: string): Promise<void> {
+async function startPurchaseReturn(page: Page, number: string, supplier: string): Promise<void> {
   await page.getByRole('button', { name: strings.nav.purchases }).click();
   await page.getByTestId('new-purchase-return').click();
+  await page.getByTestId('purchase-supplier').selectOption({ label: supplier });
   await page.getByTestId('return-find').fill(number);
-  await page.getByTestId('return-invoice').selectOption({ index: 1 });
-  await page.getByLabel(strings.purchases.returned).fill('1');
+  await page.getByTestId(`rt-plus-${number}-1`).click();
   await page.getByTestId('save-purchase-return').click();
 }
 
@@ -85,7 +85,7 @@ test.describe('return periods and finding any invoice', () => {
     const recent = purchaseOnServer(2);
     await login(page, f, keeper);
     // inside the period: no PIN
-    await startPurchaseReturn(page, recent.number);
+    await startPurchaseReturn(page, recent.number, recent.supplier);
     await expect
       .poll(
         () =>
@@ -98,7 +98,7 @@ test.describe('return periods and finding any invoice', () => {
       )
       .toBe('1');
     // after the period: the PIN of a manager is asked and kept on the return
-    await startPurchaseReturn(page, oldOne.number);
+    await startPurchaseReturn(page, oldOne.number, oldOne.supplier);
     await expect(page.getByText(strings.sell.approve).first()).toBeVisible();
     await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
     await page.keyboard.type(f.pin);
@@ -123,7 +123,7 @@ test.describe('return periods and finding any invoice', () => {
     const oldOne = purchaseOnServer(60);
     await login(page, f, { name: f.managerName, pin: f.pin });
     // the manager returns a 60 day old purchase without any PIN
-    await startPurchaseReturn(page, oldOne.number);
+    await startPurchaseReturn(page, oldOne.number, oldOne.supplier);
     await expect(page.getByText(strings.sell.approve)).toHaveCount(0);
     await expect
       .poll(
@@ -153,7 +153,7 @@ test.describe('return periods and finding any invoice', () => {
     const page2 = await (await browser.newContext()).newPage();
     const second = newCashierFixture();
     await login(page2, second, keeper);
-    await startPurchaseReturn(page2, oldOne.number);
+    await startPurchaseReturn(page2, oldOne.number, oldOne.supplier);
     await expect(page2.getByText(strings.sell.approve)).toHaveCount(0);
     await expect
       .poll(

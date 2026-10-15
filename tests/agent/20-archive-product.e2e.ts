@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { describe, test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
@@ -8,10 +10,8 @@ import { login, newCashierFixture, sql } from './helpers';
 describe('archive a product with history', () => {
   test('at stock 0 it is archived, shown under «المحذوف» and restored', async ({ app, screen, browser }) => {
     const f = newCashierFixture();
-    const id = '0190f000-0000-7000-8000-0000000a9e01';
+    const id = randomUUID();
     const name = `Agent archive ${Date.now()}`;
-    sql(`delete from stock_movements where product_id = '${id}'`);
-    sql(`delete from products where id = '${id}'`);
     sql(
       `insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals) values ('${id}', 'a0000000-0000-7000-8000-000000000001', 'AG${Date.now() % 100000}', '${name}', 'pcs', 1000, 500, 0)`,
     );

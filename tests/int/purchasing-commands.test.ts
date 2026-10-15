@@ -202,15 +202,147 @@ describe('purchase return', () => {
     expect(await ret(7000)).toMatchObject({ ok: false, code: 'RETURN_EXCEEDS_SOLD' });
   });
 
-  it('without an invoice it is for the manager only', async () => {
+  it('without an invoice a storekeeper returns at the last price from the supplier, and cannot change the value (P4)', async () => {
     const k = await setup('storekeeper');
-    const r = await postPurchaseReturn(k.ctx, {
-      supplierId: k.supplier.id,
-      originalInvoiceId: null,
-      warehouseId: k.warehouse.id,
-      lines: [{ originalLineId: null, productId: k.p1, qtyMilli: 1000, netAmount: 500 }],
+    // bought 10 pcs for 50.00 (5.00 a piece) from this supplier
+    expect((await k.buy(10000, 500, [{ method: 'credit', amount: 5000 }])).ok).toBe(true);
+    const post = (net: number | null) =>
+      postPurchaseReturn(k.ctx, {
+        supplierId: k.supplier.id,
+        warehouseId: k.warehouse.id,
+        lines: [{ originalLineId: null, productId: k.p1, qtyMilli: 3000, netAmount: net }],
+      });
+    expect(await post(1000)).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    const r = await post(null); // the default: 3 x 5.00
+    expect(r).toMatchObject({ ok: true, total: 1500 });
+    expect(await k.owed()).toBe(-5000 + 1500);
+    // the goods left at the value they were returned for: 5.00 a piece
+    expect(
+      (await k.ctx.db.stockMovements.toArray()).find((m) => m.docType === 'purchase_return')?.unitCost,
+    ).toBe(500);
+    // naming the default value itself is fine
+    expect((await post(1500)).ok).toBe(true);
+  });
+
+  it('a manager (editReturnValue) may change the value; a group without it may not', async () => {
+    const m = await setup('manager');
+    expect((await m.buy(10000, 500, [{ method: 'credit', amount: 5000 }])).ok).toBe(true);
+    const line = (net: number | null) => ({
+      originalLineId: null,
+      productId: m.p1,
+      qtyMilli: 1000,
+      netAmount: net,
     });
-    expect(r).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    const base = { supplierId: m.supplier.id, warehouseId: m.warehouse.id };
+    expect(await postPurchaseReturn(m.ctx, { ...base, lines: [line(900)] })).toMatchObject({
+      ok: true,
+      total: 900,
+    });
+    const g = {
+      ...m.ctx,
+      permissions: { receivePurchase: 'yes' as const, purchaseReturnWithoutInvoice: 'yes' as const },
+    };
+    expect(await postPurchaseReturn(g, { ...base, lines: [line(900)] })).toMatchObject({
+      ok: false,
+      code: 'E_FORBIDDEN',
+    });
+  });
+
+  it('with no earlier purchase from that supplier the value starts at the current cost', async () => {
+    const m = await setup('manager');
+    await m.ctx.db.products.update(m.p1, { unitCost: 700 });
+    const r = await postPurchaseReturn(m.ctx, {
+      supplierId: m.supplier.id,
+      warehouseId: m.warehouse.id,
+      lines: [{ originalLineId: null, productId: m.p1, qtyMilli: 2000 }],
+    });
+    expect(r).toMatchObject({ ok: true, total: 1400 });
+  });
+
+  it('a cashier, and a group without the right, cannot return without an invoice', async () => {
+    const c = await setup('cashier');
+    const lines = [{ originalLineId: null, productId: c.p1, qtyMilli: 1000 }];
+    expect(
+      await postPurchaseReturn(
+        { ...c.ctx, permissions: { receivePurchase: 'yes' } },
+        { supplierId: c.supplier.id, warehouseId: c.warehouse.id, lines },
+      ),
+    ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+  });
+
+  it('several invoices of the same supplier in one return; each line capped at bought - returned', async () => {
+    const t = await setup('manager');
+    const a = await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }]);
+    const b = await t.buy(4000, 1000, [{ method: 'credit', amount: 4000 }]);
+    if (!a.ok || !b.ok) throw new Error('buy');
+    const la = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(a.id).first())!;
+    const lb = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(b.id).first())!;
+    const ret = (lines: { originalLineId: string; qtyMilli: number }[]) =>
+      postPurchaseReturn(t.ctx, { supplierId: t.supplier.id, warehouseId: t.warehouse.id, lines });
+    const r = await ret([
+      { originalLineId: la.id, qtyMilli: 2000 },
+      { originalLineId: lb.id, qtyMilli: 1000 },
+    ]);
+    expect(r).toMatchObject({ ok: true, total: 1000 + 1000 });
+    const doc = (await t.ctx.db.purchaseReturns.toArray())[0]!;
+    expect(doc.originalInvoiceId).toBeNull(); // two invoices
+    expect(await t.ctx.db.purchaseReturnLines.count()).toBe(2);
+    expect(await t.owed()).toBe(-9000 + 2000);
+    expect(await ret([{ originalLineId: la.id, qtyMilli: 9000 }])).toMatchObject({
+      ok: false,
+      code: 'RETURN_EXCEEDS_SOLD',
+    });
+    // one invoice only: the header points at it
+    const one = await ret([{ originalLineId: lb.id, qtyMilli: 1000 }]);
+    expect(one.ok).toBe(true);
+    expect(
+      (await t.ctx.db.purchaseReturns.toArray()).find((d) => d.originalInvoiceId)?.originalInvoiceId,
+    ).toBe(b.id);
+  });
+
+  it('lines of different suppliers, or mixing invoice lines with plain lines, are refused and nothing is written', async () => {
+    const t = await setup('manager');
+    const a = await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }]);
+    if (!a.ok) throw new Error('buy');
+    const la = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(a.id).first())!;
+    const other: Supplier = {
+      ...(await t.ctx.db.suppliers.get(t.supplier.id))!,
+      ...newCommon(t.ctx),
+      name: 'مورد تاني',
+    };
+    await t.ctx.db.suppliers.put(other);
+    const before = await t.ctx.db.purchaseReturns.count();
+    expect(
+      await postPurchaseReturn(t.ctx, {
+        supplierId: other.id,
+        warehouseId: t.warehouse.id,
+        lines: [{ originalLineId: la.id, qtyMilli: 1000 }],
+      }),
+    ).toMatchObject({ ok: false, code: 'E_VALIDATION' });
+    expect(
+      await postPurchaseReturn(t.ctx, {
+        supplierId: t.supplier.id,
+        warehouseId: t.warehouse.id,
+        lines: [
+          { originalLineId: la.id, qtyMilli: 1000 },
+          { originalLineId: null, productId: t.p1, qtyMilli: 1000 },
+        ],
+      }),
+    ).toMatchObject({ ok: false, code: 'E_VALIDATION' });
+    expect(await t.ctx.db.purchaseReturns.count()).toBe(before);
+  });
+
+  it('a cash refund with no safe is refused by the screen rule: the command needs a cash account', async () => {
+    const t = await setup('manager');
+    expect((await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }])).ok).toBe(true);
+    const r = await postPurchaseReturn(t.ctx, {
+      supplierId: t.supplier.id,
+      warehouseId: t.warehouse.id,
+      lines: [{ originalLineId: null, productId: t.p1, qtyMilli: 1000 }],
+      refundTo: 'cash',
+      cashAccountId: null,
+    });
+    expect(r.ok).toBe(false);
   });
 });
 
