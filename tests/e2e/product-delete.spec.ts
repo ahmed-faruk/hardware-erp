@@ -64,7 +64,7 @@ test.describe('delete a product', () => {
     await expect(page.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });
   });
 
-  test('a product with a stock movement or with imported history cannot be deleted, and says why', async ({
+  test('a product with stock cannot be deleted, and says why; one with imported history only is offered the archive', async ({
     page,
   }) => {
     const f = newFixture();
@@ -74,7 +74,8 @@ test.describe('delete a product', () => {
     sql(
       `insert into stock_movements (id, company_id, product_id, warehouse_id, qty, unit_cost, doc_type, doc_id, occurred_at) values ('${doc}', '${COMPANY}', '${moved}', 'a0000000-0000-7000-8000-0000000000c1', 2000, 100, 'opening', '${doc}', now())`,
     );
-    sql(`update products set legacy_item_id = 880010 where id = '${old}'`);
+    sql(`update products set legacy_item_id = 880010, deleted_at = null where id = '${old}'`);
+    sql(`update products set deleted_at = null where id = '${moved}'`);
     sql(`delete from legacy_sales where id = 800301`);
     sql(
       `insert into legacy_sales (company_id, id, kind, day, total, cash) values ('${COMPANY}', 800301, 0, '2020-03-01', 500, 500)`,
@@ -92,7 +93,10 @@ test.describe('delete a product', () => {
 
       await openProduct(page, old);
       await page.getByTestId('delete-product').click();
-      await expect(page.getByTestId('delete-blocked')).toContainText(reasons.legacy);
+      // imported history only (stock 0): a manager is offered the archive with the undo toast; undo keeps it
+      await expect(page.getByTestId('undo-toast')).toContainText(strings.products.archiving);
+      await page.getByRole('button', { name: strings.sell.undo }).click();
+      await page.waitForTimeout(1000);
       expect(
         sql(`select count(*) from products where id in ('${moved}', '${old}') and deleted_at is null`),
       ).toBe('2');

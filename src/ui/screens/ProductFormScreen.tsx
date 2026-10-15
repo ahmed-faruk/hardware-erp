@@ -3,6 +3,7 @@ import { Plus, Save, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { archiveProduct } from '@/db/commands/archive-product';
 import { deleteProduct } from '@/db/commands/delete-product';
 import { saveProduct } from '@/db/commands/save-product';
 import { localProductUsage } from '@/db/product-usage';
@@ -94,7 +95,8 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
   // delete: the server is asked first (the old history lives there), then the manager has 5 seconds to undo
   const [blocked, setBlocked] = useState<UsageReason[] | null>(null);
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState(false);
+  // a product that never moved is deleted; one with history is archived (only at stock 0, only for archiveProduct)
+  const [pendingDelete, setPendingDelete] = useState<'delete' | 'archive' | null>(null);
   const deleting = useRef(false);
   const askDelete = async (): Promise<void> => {
     if (!product) return;
@@ -105,19 +107,31 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
     const reasons = usageReasons(
       mergeUsage(await localProductUsage(db, product.id), usageFromServer(r.data)),
     );
-    if (reasons.length > 0) return setBlocked(reasons);
-    setPendingDelete(true);
+    if (reasons.length === 0) return setPendingDelete('delete');
+    if (can('archiveProduct') !== 'yes') return setBlocked(reasons);
+    if (reasons.includes('stock')) {
+      setDeleteNote(strings.products.archiveNeedsZeroStock);
+      return setBlocked(reasons);
+    }
+    setPendingDelete('archive');
   };
   const runDelete = (): void => {
-    setPendingDelete(false);
-    if (!context || !product || deleting.current) return;
+    const mode = pendingDelete;
+    setPendingDelete(null);
+    if (!context || !product || !mode || deleting.current) return;
     deleting.current = true;
-    void deleteProduct(context, product.id).then((r) => {
+    const done = (r: { ok: boolean; code?: string; reasons?: string[] }): void => {
       deleting.current = false;
       if (r.ok) return navigate('products');
-      if ('reasons' in r && r.reasons) setBlocked(r.reasons as UsageReason[]);
-      else setDeleteNote(strings.errors.saveFailed);
-    });
+      if (r.reasons) setBlocked(r.reasons as UsageReason[]);
+      else
+        setDeleteNote(
+          r.code === 'HAS_STOCK' ? strings.products.archiveNeedsZeroStock : strings.errors.saveFailed,
+        );
+    };
+    void (mode === 'archive' ? archiveProduct(context, product.id) : deleteProduct(context, product.id)).then(
+      done,
+    );
   };
 
   const submit = (): void => {
@@ -476,13 +490,13 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
                 variant="ghost"
                 onClick={() => navigate('products')}
               />
-              {product && can('editProductData') === 'yes' && (
+              {product && (can('editProductData') === 'yes' || can('archiveProduct') === 'yes') && (
                 <ActionButton
                   label={strings.products.deleteProduct}
                   icon={Trash2}
                   variant="danger"
                   onClick={() => void askDelete()}
-                  disabled={pendingDelete}
+                  disabled={pendingDelete !== null}
                   testId="delete-product"
                 />
               )}
@@ -492,8 +506,8 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
       )}
       {pendingDelete && (
         <UndoToast
-          message={strings.products.deleting}
-          onUndo={() => setPendingDelete(false)}
+          message={pendingDelete === 'archive' ? strings.products.archiving : strings.products.deleting}
+          onUndo={() => setPendingDelete(null)}
           onExpire={runDelete}
         />
       )}

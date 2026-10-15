@@ -3,11 +3,13 @@ import { Package, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { restoreProduct } from '@/db/commands/archive-product';
 import type { HanafyDB } from '@/db/schema';
 import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
 import { formatMoney, formatQty } from '@/domain/money';
 
+import { BigAlert } from '../components/BigAlert';
 import { ActionButton } from '../components/ActionButton';
 import { type Column, DataTable } from '../components/DataTable';
 import { EmptyState } from '../components/EmptyState';
@@ -23,12 +25,27 @@ const PAGE = 50;
 
 type Row = Product & { qty: number; low: boolean };
 
-async function loadRows(db: HanafyDB, text: string, category: string, low: boolean): Promise<Row[]> {
+async function loadRows(
+  db: HanafyDB,
+  text: string,
+  category: string,
+  low: boolean,
+  archived: boolean,
+): Promise<Row[]> {
   const balances = await db.stockBalances.toArray();
   const stock = new Map<string, number>();
   for (const b of balances) stock.set(b.productId, (stock.get(b.productId) ?? 0) + b.qty);
   let list: Product[];
-  if (text.trim()) list = await searchProducts(db, text, { includeInactive: true, limit: 500 });
+  if (archived) {
+    // archived products: only the deleted ones, found by name
+    const needle = text.trim().toLowerCase();
+    list = (await db.products.filter((p) => !!p.deletedAt).toArray())
+      .filter(
+        (p) =>
+          !needle || p.name.toLowerCase().includes(needle) || (p.sku ?? '').toLowerCase().includes(needle),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  } else if (text.trim()) list = await searchProducts(db, text, { includeInactive: true, limit: 500 });
   else if (category)
     list = (await db.products.where('categoryId').equals(category).toArray()).filter((p) => !p.deletedAt);
   else
@@ -47,13 +64,18 @@ async function loadRows(db: HanafyDB, text: string, category: string, low: boole
 
 export function ProductsScreen() {
   const { db } = useServices();
-  const { worker } = useSession();
+  const { worker, context, can } = useSession();
   const [text, setText] = useState('');
   const [category, setCategory] = useState('');
   const [low, setLow] = useState(false);
+  const [archived, setArchived] = useState(false);
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).toArray(), [db]);
-  const rows = useLiveQuery(() => loadRows(db, text, category, low), [db, text, category, low]);
+  const rows = useLiveQuery(
+    () => loadRows(db, text, category, low, archived),
+    [db, text, category, low, archived],
+  );
   const isManager = worker?.role === 'manager';
 
   const columns: Column<Row>[] = [
@@ -73,6 +95,11 @@ export function ProductsScreen() {
             />
           </span>
           <span>{r.name}</span>
+          {r.deletedAt && (
+            <span className={styles.low} data-testid={`archived-mark-${r.id}`}>
+              {strings.products.archivedMark}
+            </span>
+          )}
         </span>
       ),
     },
@@ -95,6 +122,39 @@ export function ProductsScreen() {
         ]
       : []),
   ];
+
+  const restore = (id: string): void => {
+    if (!context) return;
+    setRestoreNote(null);
+    void restoreProduct(context, id).then((r) => {
+      if (!r.ok)
+        return setRestoreNote(
+          r.code === 'SKU_TAKEN' ? strings.products.restoreSkuTaken : strings.errors.saveFailed,
+        );
+      setRestoreNote(
+        r.skippedBarcodes.length
+          ? `${strings.products.restoredSkipped}: ${r.skippedBarcodes.join(strings.cash.listSeparator)}`
+          : strings.products.restored,
+      );
+    });
+  };
+  const columnsAll: Column<Row>[] = archived
+    ? [
+        ...columns,
+        {
+          key: 'restore',
+          header: '',
+          cell: (r: Row) => (
+            <ActionButton
+              label={strings.products.restore}
+              variant="soft"
+              onClick={() => restore(r.id)}
+              testId={`restore-${r.id}`}
+            />
+          ),
+        },
+      ]
+    : columns;
 
   return (
     <section>
@@ -137,6 +197,20 @@ export function ProductsScreen() {
           <input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} />
           {strings.products.lowStock}
         </label>
+        {can('archiveProduct') === 'yes' && (
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(e) => {
+                setArchived(e.target.checked);
+                setShown(PAGE);
+              }}
+              data-testid="archived-filter"
+            />
+            {strings.products.archived}
+          </label>
+        )}
         <div className={styles.fixed}>
           <ActionButton
             label={strings.products.newProduct}
@@ -146,6 +220,7 @@ export function ProductsScreen() {
           />
         </div>
       </div>
+      {restoreNote && <BigAlert tone="ok" word={restoreNote} sound={false} />}
       {!rows ? (
         <Skeleton />
       ) : rows.length === 0 ? (
@@ -155,9 +230,9 @@ export function ProductsScreen() {
           <DataTable
             label={strings.products.title}
             rows={rows.slice(0, shown)}
-            columns={columns}
+            columns={columnsAll}
             rowKey={(r) => r.id}
-            onRowClick={(r) => navigate('products', r.id)}
+            onRowClick={(r) => (r.deletedAt ? undefined : navigate('products', r.id))}
           />
           {rows.length > shown && (
             <p>
