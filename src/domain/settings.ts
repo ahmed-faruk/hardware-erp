@@ -13,6 +13,8 @@ export interface Settings {
   footer: string;
   /** days after the sale in which a cashier may take a return without the manager */
   returnPeriodDays: number;
+  /** days after a purchase in which a purchase return needs no manager approval */
+  purchaseReturnPeriodDays: number;
   /** a stock adjustment worth more than this (piasters) needs the manager's PIN */
   stockApprovalAbove: number;
   /** a drawer difference above this (piasters, either way) needs the manager at shift close */
@@ -33,6 +35,7 @@ export const SETTING_KEYS = {
   address: 'receipt.address',
   footer: 'receipt.footer',
   returnPeriodDays: 'return.periodDays',
+  purchaseReturnPeriodDays: 'return.purchaseDays',
   stockApprovalAbove: 'stock.approvalAbove',
   shiftVarianceAbove: 'shift.varianceAbove',
   stockNegativePolicy: 'stock.negativePolicy',
@@ -50,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   address: '',
   footer: '',
   returnPeriodDays: 30,
+  purchaseReturnPeriodDays: 30,
   stockApprovalAbove: 50000,
   shiftVarianceAbove: 2000,
   stockNegativePolicy: 'allow',
@@ -73,6 +77,7 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
   const negative = byKey.get(SETTING_KEYS.stockNegativePolicy);
   const stockLimit = byKey.get(SETTING_KEYS.stockApprovalAbove);
   const days = byKey.get(SETTING_KEYS.returnPeriodDays);
+  const purchaseDays = byKey.get(SETTING_KEYS.purchaseReturnPeriodDays);
   return {
     cashierMayDiscount: bool('cashierMayDiscount'),
     cashierDiscountLimitBp:
@@ -87,6 +92,13 @@ export function parseSettings(rows: { key: string; value: unknown }[]): Settings
       typeof days === 'number' && Number.isInteger(days) && days >= 0 && days <= 3650
         ? days
         : DEFAULT_SETTINGS.returnPeriodDays,
+    purchaseReturnPeriodDays:
+      typeof purchaseDays === 'number' &&
+      Number.isInteger(purchaseDays) &&
+      purchaseDays >= 0 &&
+      purchaseDays <= 3650
+        ? purchaseDays
+        : DEFAULT_SETTINGS.purchaseReturnPeriodDays,
     stockApprovalAbove:
       typeof stockLimit === 'number' && Number.isInteger(stockLimit) && stockLimit >= 0
         ? stockLimit

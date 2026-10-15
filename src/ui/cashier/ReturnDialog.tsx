@@ -9,6 +9,7 @@ import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
 import { formatMoney, formatQty, toPiasters } from '@/domain/money';
 import type { Action } from '@/domain/permissions';
+import { cairoTime } from '@/domain/receipt';
 import { computeReturnLine, returnableOf, type PriorReturn } from '@/domain/returns';
 
 import { ActionButton } from '../components/ActionButton';
@@ -54,6 +55,12 @@ function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }:
   const [pickedId, setInvoiceId] = useState<string | null>(null);
   const [free, setFree] = useState(false);
   const [typed, setTyped] = useState('');
+  const [find, setFind] = useState('');
+  const [limit, setLimit] = useState(12);
+  const customers = useLiveQuery(
+    async () => new Map((await db.customers.toArray()).map((c) => [c.id, c.name])),
+    [db],
+  );
 
   const invoices = useLiveQuery(
     async () => (await db.salesInvoices.toArray()).sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
@@ -94,9 +101,18 @@ function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }:
       />
     );
 
-  const shown = (invoices ?? [])
-    .filter((i) => i.status === 'posted' && (!typed || i.number.replace(/\D/g, '').endsWith(typed)))
-    .slice(0, 12);
+  // every invoice on this device can be found: by the last digits of its number, or by the customer's name or the date
+  const needle = find.trim().toLowerCase();
+  const matching = (invoices ?? []).filter(
+    (i) =>
+      i.status === 'posted' &&
+      (!typed || i.number.replace(/\D/g, '').endsWith(typed)) &&
+      (!needle ||
+        `${i.number} ${(i.customerId && customers?.get(i.customerId)) || ''} ${cairoTime(i.issuedAt)}`
+          .toLowerCase()
+          .includes(needle)),
+  );
+  const shown = matching.slice(0, limit);
   return (
     <div className={styles.stack}>
       <p className={styles.lead}>{strings.returns.pickInvoice}</p>
@@ -109,6 +125,18 @@ function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }:
       >
         {typed || strings.returns.invoiceDigits}
       </div>
+      <input
+        className="control"
+        type="search"
+        value={find}
+        onChange={(e) => {
+          setFind(e.target.value);
+          setLimit(12);
+        }}
+        aria-label={strings.returns.find}
+        placeholder={strings.returns.find}
+        data-testid="return-find"
+      />
       <NumPad
         onDigit={(d) => setTyped((t) => (t.length < 6 ? t + d : t))}
         onBackspace={() => setTyped((t) => t.slice(0, -1))}
@@ -131,6 +159,15 @@ function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }:
             </li>
           ))}
         </ul>
+      )}
+      {matching.length > shown.length && (
+        <ActionButton
+          big
+          variant="ghost"
+          label={strings.returns.more}
+          onClick={() => setLimit((n) => n + 12)}
+          testId="return-more"
+        />
       )}
       {isManager && (
         <ActionButton

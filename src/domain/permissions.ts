@@ -33,6 +33,7 @@ export const ACTIONS = [
   'view.purchases',
   'receivePurchase',
   'purchaseReturn',
+  'purchaseReturnAfterPeriod',
   'payFromOwner',
   'view.suppliers',
   'addSupplier',
@@ -128,7 +129,16 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     ],
   },
   { key: 'stock', actions: ['view.stock', 'stockAdjustment', 'stockAdjustmentOverLimit'] },
-  { key: 'purchases', actions: ['view.purchases', 'receivePurchase', 'purchaseReturn', 'payFromOwner'] },
+  {
+    key: 'purchases',
+    actions: [
+      'view.purchases',
+      'receivePurchase',
+      'purchaseReturn',
+      'purchaseReturnAfterPeriod',
+      'payFromOwner',
+    ],
+  },
   { key: 'suppliers', actions: ['view.suppliers', 'addSupplier', 'supplierPayment'] },
   { key: 'customers', actions: ['view.customers', 'addCustomerFull'] },
   {
@@ -176,6 +186,7 @@ const storekeeper: Permissions = {
   receivePurchase: 'yes',
   stockAdjustment: 'yes',
   editProductData: 'yes',
+  purchaseReturnAfterPeriod: 'pin',
 };
 
 /** The built-in access of a role: what a worker without a permission group gets. Managers get everything. */
