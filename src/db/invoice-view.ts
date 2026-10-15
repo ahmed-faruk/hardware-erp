@@ -10,6 +10,8 @@ export interface InvoiceView {
   /** the customer (sale) or the supplier (purchase); empty when there is none */
   party: string;
   worker: string;
+  /** the supplier's own (paper) invoice number, purchases only */
+  supplierRef: string;
   status: 'posted' | 'voided';
   lines: {
     name: string;
@@ -54,6 +56,7 @@ export async function loadInvoiceView(
       issuedAt: inv.issuedAt,
       party: customer?.name ?? '',
       worker: worker?.name ?? '',
+      supplierRef: '',
       status: inv.status,
       lines: lines.map((l, i) => ({
         name: products[i]?.name ?? l.legacyText ?? '',
@@ -87,6 +90,7 @@ export async function loadInvoiceView(
     issuedAt: inv.issuedAt,
     party: supplier?.name ?? '',
     worker: worker?.name ?? '',
+    supplierRef: (inv.supplierRef as string | null | undefined) ?? '',
     status: inv.status === 'voided' ? 'voided' : 'posted',
     lines: lines.map((l, i) => ({
       name: products[i]?.name ?? '',

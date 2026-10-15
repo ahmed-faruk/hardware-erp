@@ -228,3 +228,38 @@ export async function addCustomer(
     ),
   );
 }
+
+/** A supplier added from the purchase screen: name and phone only (permission addSupplier; the server lets such a worker create, not edit). */
+export async function addSupplier(
+  ctx: DeviceContext,
+  input: { name: string; phone?: string | null },
+): Promise<SaveResult> {
+  const parsed = supplierFieldsSchema
+    .pick({ name: true, phone: true })
+    .safeParse({ name: input.name, phone: input.phone ?? null });
+  if (!parsed.success || !parsed.data.name) return err('E_VALIDATION', 'بيانات المورد غير صحيحة');
+  if (canCtx(ctx, 'addSupplier') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  const { db } = ctx;
+  return db.transaction('rw', [db.suppliers, db.outbox, db.syncState], async () =>
+    out(
+      await upsertRow<Supplier>(
+        ctx,
+        'suppliers',
+        db.suppliers,
+        { fields: {} },
+        { name: parsed.data.name, phone: parsed.data.phone ?? null },
+        () => ({
+          ...newCommon(ctx),
+          name: '',
+          contactName: null,
+          phone: null,
+          address: null,
+          notes: null,
+          isExpenseSupplier: false,
+          active: true,
+          legacyPersonId: null,
+        }),
+      ),
+    ),
+  );
+}

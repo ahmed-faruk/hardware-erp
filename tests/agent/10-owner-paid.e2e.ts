@@ -22,9 +22,9 @@ describe('purchase paid from the safe and from the owner pocket', () => {
     await expect(screen.getByText(supplier)).toBeVisible();
     await screen.getByRole('button', strings.nav.purchases).tap();
     await screen.getByTestId('new-purchase').tap();
-    await screen.getByTestId('purchase-supplier').selectOption({ label: supplier });
-    await screen.getByTestId('product-picker').fill('Test product 5');
-    await screen.getByTestId('product-picker').press('Enter');
+    await screen.getByTestId('purchase-supplier').fill(supplier);
+    await screen.getByTestId('purchase-scan').fill('Test product 5');
+    await screen.getByTestId('purchase-scan').press('Enter');
     await screen.getByLabel(strings.purchases.qty).fill('10');
     await screen.getByLabel(strings.purchases.unitCost).fill('10');
     await screen.getByLabel(strings.purchases.paidCash).fill('40');

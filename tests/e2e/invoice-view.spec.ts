@@ -139,9 +139,9 @@ test.describe('invoice view on screen', () => {
     await expect(page.getByText(supplier)).toBeVisible();
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('new-purchase').click();
-    await page.getByTestId('purchase-supplier').selectOption({ label: supplier });
-    await page.getByTestId('product-picker').fill('Test product 5');
-    await page.getByTestId('product-picker').press('Enter');
+    await page.getByTestId('purchase-supplier').fill(supplier);
+    await page.getByTestId('purchase-scan').fill('Test product 5');
+    await page.getByTestId('purchase-scan').press('Enter');
     await page.getByLabel(strings.purchases.qty).fill('10');
     await page.getByLabel(strings.purchases.unitCost).fill('10');
     await page.getByLabel(strings.purchases.paidCash).fill('40');

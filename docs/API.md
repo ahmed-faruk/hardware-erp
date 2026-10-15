@@ -125,6 +125,10 @@ Posted expenses of the period (imported ones included): `total`, `by_category`, 
 
 Posted returns of the period (Cairo days, voided ones left out), device documents and the imported history (`LG-RET-` / `LG-PRT-` numbers) together: `sales` and `purchases`, each with `total {count, amount}`, `legacy_count`, `by_day`, `by_product` (qty in base units, top 300), the 500 newest in `list`, and `by_reason` + `by_method` (sales; imported returns have reason `unknown` and are split by how they were paid) or `by_supplier` (purchases). The tab «المرتجعات» is the permission `report.returns` (managers; a permission group must be given it explicitly).
 
+### Purchase screen permissions
+
+A new product is accepted only from a worker with `addProduct` (manager always, storekeeper by default, a permission group can take it away). A supplier row is accepted from a worker with `addSupplier` when it is new; changing an existing supplier needs `settings`. The purchase invoice carries `supplier_ref` (the supplier's paper number) and the invoice discount as line discounts (their sum is `purchase_invoices.discount`).
+
 ### `product_usage(p_product_id uuid)` — manager devices only
 
 What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`, except an **archive**: a product with history is accepted at stock 0 for a worker with `archiveProduct` (otherwise `E_FORBIDDEN`; with stock `E_IN_USE`). Clearing `deleted_at` on a product with history (restore) also needs `archiveProduct`.

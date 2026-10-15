@@ -26,6 +26,8 @@ export async function saveProduct(ctx: DeviceContext, input: SaveProductInput): 
   if (!fields.success || (codes && !codes.success) || (unit && !unit.success))
     return err('E_VALIDATION', 'بيانات الصنف غير صحيحة');
   if (canCtx(ctx, 'editProductData') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  // a NEW product needs addProduct as well (the storekeeper has it by default; a group can take it away)
+  if (!input.id && canCtx(ctx, 'addProduct') !== 'yes') return err('E_FORBIDDEN', 'مينفعش تضيف صنف');
   if (
     ('price' in fields.data ||
       'unitCost' in fields.data ||
