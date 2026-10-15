@@ -3,25 +3,25 @@ import { Eye, Plus, Printer, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
-import { postPurchase, postPurchaseReturn } from '@/db/commands/purchasing';
+import { postPurchase } from '@/db/commands/purchasing';
 import type { Product, ProductUnit } from '@/db/types';
 import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
 import { computePurchase, splitPurchasePayment } from '@/domain/purchase';
 import { cairoTime } from '@/domain/receipt';
 
-import { useApproval } from '../cashier/ApprovalDialog';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { type Column, DataTable } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
-import { FormField } from '../components/FormField';
 import { InvoiceViewDialog } from '../components/InvoiceView';
 import { NumberField } from '../components/NumberField';
 import { ProductPicker } from '../components/ProductPicker';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
+import { PurchaseReturnForm } from './PurchaseReturnForm';
+import { SupplierSelect, useBasics } from './purchaseParts';
 import styles from './screens.module.css';
 
 interface Row {
@@ -146,50 +146,6 @@ export function PurchasesScreen() {
         <PurchaseReturnForm onDone={() => setReturnOpen(false)} />
       </Dialog>
     </section>
-  );
-}
-
-function useBasics() {
-  const { db } = useServices();
-  return useLiveQuery(async () => {
-    const warehouse = (await db.warehouses.filter((w) => w.kind === 'main' && !w.deletedAt).first()) ?? null;
-    const safe = (await db.cashAccounts.filter((a) => a.kind === 'safe' && !a.deletedAt).first()) ?? null;
-    const suppliers = await db.suppliers
-      .orderBy('name')
-      .filter((s) => !s.deletedAt && s.active)
-      .toArray();
-    return { warehouse, safe, suppliers };
-  }, [db]);
-}
-
-function SupplierSelect({
-  value,
-  onChange,
-  suppliers,
-}: {
-  value: string;
-  onChange: (id: string) => void;
-  suppliers: { id: string; name: string }[];
-}) {
-  return (
-    <FormField label={strings.purchases.supplier}>
-      {(id) => (
-        <select
-          id={id}
-          className="control"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          data-testid="purchase-supplier"
-        >
-          <option value="">{strings.purchases.pickSupplier}</option>
-          {suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </FormField>
   );
 }
 
@@ -339,163 +295,6 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
           disabled={!supplierId || !totals}
           onClick={() => void save()}
           testId="save-purchase"
-        />
-      </div>
-    </div>
-  );
-}
-
-function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
-  const { db } = useServices();
-  const { context } = useSession();
-  const { ask, dialog: approvalDialog } = useApproval();
-  const [find, setFind] = useState('');
-  const basics = useBasics();
-  const [invoiceId, setInvoiceId] = useState('');
-  const [qty, setQty] = useState<Record<string, number>>({});
-  const [toCash, setToCash] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const invoices = useLiveQuery(async () => {
-    const suppliers = new Map((await db.suppliers.toArray()).map((s) => [s.id, s.name]));
-    return (await db.purchaseInvoices.toArray())
-      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
-      .map((p) => ({
-        ...p,
-        total: p.total as number,
-        supplierId: p.supplierId as string,
-        supplierName: suppliers.get(p.supplierId as string) ?? '',
-      }));
-  }, [db]);
-  const data = useLiveQuery(async () => {
-    if (!invoiceId) return null;
-    const lines = await db.purchaseInvoiceLines.where('invoiceId').equals(invoiceId).toArray();
-    const prior = await db.purchaseReturnLines
-      .where('originalLineId')
-      .anyOf(lines.map((l) => l.id))
-      .toArray();
-    const products = await db.products.bulkGet(lines.map((l) => (l.productId as string | null) ?? ''));
-    return lines.map((l, i) => ({
-      line: l,
-      name: products[i]?.name ?? '',
-      left:
-        (l.qty as number) -
-        prior.filter((p) => p.originalLineId === l.id).reduce((a, p) => a + (p.qty as number), 0),
-    }));
-  }, [db, invoiceId]);
-  if (!basics || !invoices) return <Skeleton />;
-  const invoice = invoices.find((i) => i.id === invoiceId);
-  // find an invoice by its number, the supplier's name or the date (day/month or day/month/year)
-  const needle = find.trim().toLowerCase();
-  const shownInvoices = needle
-    ? invoices.filter((i) =>
-        `${i.number} ${i.supplierName} ${cairoTime(i.issuedAt)}`.toLowerCase().includes(needle),
-      )
-    : invoices;
-  const lineValue = (net: number, orig: number, q: number): number => Math.round((net * q) / orig);
-  const total = (data ?? []).reduce(
-    (a, d) =>
-      a + (qty[d.line.id] ? lineValue(d.line.netAmount as number, d.line.qty as number, qty[d.line.id]!) : 0),
-    0,
-  );
-
-  const save = async (): Promise<void> => {
-    if (!context || !invoice || !basics.warehouse) return;
-    const lines = (data ?? [])
-      .filter((d) => (qty[d.line.id] ?? 0) > 0)
-      .map((d) => ({ originalLineId: d.line.id, qtyMilli: qty[d.line.id]! }));
-    if (toCash && !basics.safe) return setError(strings.purchases.noSafe);
-    const base = {
-      supplierId: invoice.supplierId as string,
-      originalInvoiceId: invoice.id,
-      warehouseId: basics.warehouse.id,
-      lines,
-      refundTo: toCash ? ('cash' as const) : ('credit' as const),
-      cashAccountId: toCash ? basics.safe!.id : null,
-    };
-    let r = await postPurchaseReturn(context, base);
-    if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
-      const token = await ask('purchaseReturnAfterPeriod');
-      if (token) r = await postPurchaseReturn(context, { ...base, approvalTokens: [token] });
-    }
-    if (r.ok) onDone();
-    else
-      setError(
-        r.code === 'APPROVAL_REQUIRED'
-          ? strings.purchases.returnNeedsManager
-          : strings.purchases.returnFailed,
-      );
-  };
-
-  return (
-    <div className={styles.form}>
-      <div className={styles.section}>
-        <FormField label={strings.purchases.findInvoice}>
-          {(id) => (
-            <input
-              id={id}
-              className="control"
-              type="search"
-              value={find}
-              onChange={(e) => setFind(e.target.value)}
-              data-testid="return-find"
-            />
-          )}
-        </FormField>
-        <FormField label={strings.purchases.pickInvoice}>
-          {(id) => (
-            <select
-              id={id}
-              className="control"
-              value={invoiceId}
-              onChange={(e) => {
-                setInvoiceId(e.target.value);
-                setQty({});
-              }}
-              data-testid="return-invoice"
-            >
-              <option value="">{strings.purchases.pickInvoice}</option>
-              {shownInvoices.map((i) => (
-                <option
-                  key={i.id}
-                  value={i.id}
-                >{`${i.number} — ${i.supplierName} — ${cairoTime(i.issuedAt).slice(0, 10)} — ${formatMoney(i.total as number)}`}</option>
-              ))}
-            </select>
-          )}
-        </FormField>
-      </div>
-      {(data ?? []).map((d) => (
-        <div key={d.line.id} className={styles.section}>
-          <h2>{d.name}</h2>
-          <p>{`${strings.purchases.left}: ${formatQty(d.left)}`}</p>
-          <NumberField
-            label={strings.purchases.returned}
-            value={qty[d.line.id] ?? 0}
-            onChange={(v) => setQty((m) => ({ ...m, [d.line.id]: Math.min(v ?? 0, d.left) }))}
-            parse={toMilli}
-            format={formatQty}
-          />
-        </div>
-      ))}
-      {invoice && (
-        <div className={styles.section}>
-          <h2 data-testid="return-total">{`${strings.purchases.returnTotal}: ${formatMoney(total)}`}</h2>
-          <label className={styles.check}>
-            <input type="checkbox" checked={toCash} onChange={(e) => setToCash(e.target.checked)} />
-            {strings.purchases.refundCash}
-          </label>
-          {!toCash && <p>{strings.purchases.refundCredit}</p>}
-        </div>
-      )}
-      {error && <BigAlert tone="danger" word={error} />}
-      {approvalDialog}
-      <div className={styles.actions}>
-        <ActionButton
-          label={strings.purchases.save}
-          variant="ok"
-          disabled={total <= 0}
-          onClick={() => void save()}
-          testId="save-purchase-return"
         />
       </div>
     </div>

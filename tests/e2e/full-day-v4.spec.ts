@@ -177,8 +177,9 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
   await expect(page.getByTestId('iv-owner')).toContainText('30.00');
   await page.locator('dialog[open]').last().getByRole('button', { name: strings.common.close }).click();
   await page.getByTestId('new-purchase-return').click();
-  await page.getByTestId('return-invoice').selectOption({ index: 1 });
-  await page.getByLabel(strings.purchases.returned).fill('2');
+  await page.getByTestId('purchase-supplier').selectOption({ label: supplier });
+  await page.getByTestId(`rt-plus-${purchase}-1`).click();
+  await page.getByTestId(`rt-plus-${purchase}-1`).click();
   await expect(page.getByTestId('return-total')).toContainText('20.00');
   await page.getByTestId('save-purchase-return').click();
 

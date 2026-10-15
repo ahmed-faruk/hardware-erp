@@ -88,4 +88,12 @@ describe('sections', () => {
     expect(can('storekeeper', 'purchaseReturnAfterPeriod')).toBe('pin');
     expect(can('cashier', 'purchaseReturnAfterPeriod')).toBe('no');
   });
+
+  it('P4: the storekeeper returns purchases without an invoice by default; only a manager edits the value', () => {
+    expect(can('storekeeper', 'purchaseReturnWithoutInvoice')).toBe('yes');
+    expect(can('cashier', 'purchaseReturnWithoutInvoice')).toBe('no');
+    expect(can('manager', 'purchaseReturnWithoutInvoice')).toBe('yes');
+    expect(can('manager', 'editReturnValue')).toBe('yes');
+    expect(can('storekeeper', 'editReturnValue')).toBe('no');
+  });
 });
