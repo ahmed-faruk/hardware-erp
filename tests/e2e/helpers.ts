@@ -92,3 +92,14 @@ export function setSetting(key: string, value: string): void {
     `insert into settings (id, company_id, key, value) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(key)}, ${q(value)}::jsonb) on conflict (company_id, key) do update set value = excluded.value`,
   );
 }
+
+/** A worker of the given role with a known PIN, on the company (any device with a high enough max role can list him). */
+export function addWorker(role: 'cashier' | 'storekeeper' | 'manager'): { name: string; pin: string } {
+  const pin = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 899999));
+  const name = `${role === 'storekeeper' ? 'أمين' : role === 'cashier' ? 'كاشير' : 'مدير'} ${randomUUID().slice(0, 8)}`;
+  const { pinHash, pinSalt } = hashPin(pin) as { pinHash: string; pinSalt: string };
+  sql(
+    `insert into workers (id, company_id, name, role, pin_hash, pin_salt, active) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(name)}, ${q(role)}, ${q(pinHash)}, ${q(pinSalt)}, true)`,
+  );
+  return { name, pin };
+}

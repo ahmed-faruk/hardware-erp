@@ -82,4 +82,10 @@ describe('sections', () => {
     // a group made before this report existed does not have it: a missing action is no
     expect(resolveAccess('manager', { 'report.sales': 'yes' }, 'report.returns')).toBe('no');
   });
+
+  it('P1: a purchase return after the period is a manager approval for a storekeeper', () => {
+    expect(can('manager', 'purchaseReturnAfterPeriod')).toBe('yes');
+    expect(can('storekeeper', 'purchaseReturnAfterPeriod')).toBe('pin');
+    expect(can('cashier', 'purchaseReturnAfterPeriod')).toBe('no');
+  });
 });

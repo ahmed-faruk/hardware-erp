@@ -10,6 +10,7 @@ import {
   postStockAdjustment,
   postSupplierPayment,
 } from '@/db/commands/purchasing';
+import { saveSetting } from '@/db/commands/save-setting';
 import { uuidv7 } from '@/db/ids';
 import type { Supplier, Worker } from '@/db/types';
 import { hashPin } from '@/db/workers';
@@ -210,6 +211,89 @@ describe('purchase return', () => {
       lines: [{ originalLineId: null, productId: k.p1, qtyMilli: 1000, netAmount: 500 }],
     });
     expect(r).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+  });
+});
+
+describe('purchase return period', () => {
+  // a purchase made `daysAgo` days ago, as the storekeeper (the manager can approve with the PIN)
+  async function oldPurchase(daysAgo: number) {
+    const t = await setup('storekeeper');
+    const bought = await t.buy(10000, 500, [{ method: 'credit', amount: 5000 }]);
+    if (!bought.ok) throw new Error(bought.code);
+    await t.ctx.db.purchaseInvoices.update(bought.id, {
+      issuedAt: new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
+    });
+    const line = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(bought.id).first())!;
+    const ret = (extra: Record<string, unknown> = {}) =>
+      postPurchaseReturn(t.ctx, {
+        supplierId: t.supplier.id,
+        originalInvoiceId: bought.id,
+        warehouseId: t.warehouse.id,
+        lines: [{ originalLineId: line.id, qtyMilli: 1000 }],
+        ...extra,
+      });
+    return { ...t, bought, ret };
+  }
+
+  it('inside the period a storekeeper returns alone', async () => {
+    const t = await oldPurchase(10);
+    expect((await t.ret()).ok).toBe(true);
+  });
+
+  it('after the period a storekeeper needs the manager PIN, and the approval is kept on the return', async () => {
+    const t = await oldPurchase(60);
+    expect(await t.ret()).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
+    expect(await t.ctx.db.purchaseReturns.count()).toBe(0);
+    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'purchaseReturnAfterPeriod');
+    if (!a.ok) throw new Error(a.code);
+    const r = await t.ret({ approvalTokens: [a.value.token] });
+    expect(r.ok).toBe(true);
+    expect((await t.ctx.db.purchaseReturns.toArray())[0]?.approvedBy).toBe(t.manager.id);
+  });
+
+  it('a manager is never blocked by the period', async () => {
+    const t = await oldPurchase(400);
+    const m = { ...t.ctx, role: 'manager' as const };
+    const r = await postPurchaseReturn(m, {
+      supplierId: t.supplier.id,
+      originalInvoiceId: t.bought.id,
+      warehouseId: t.warehouse.id,
+      lines: [
+        {
+          originalLineId: (await t.ctx.db.purchaseInvoiceLines
+            .where('invoiceId')
+            .equals(t.bought.id)
+            .first())!.id,
+          qtyMilli: 1000,
+        },
+      ],
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('the period is a setting: 90 days lets 60 days pass, 0 means the same day only', async () => {
+    const t = await oldPurchase(60);
+    await saveSetting({ ...t.ctx, role: 'manager' }, 'return.purchaseDays', 90);
+    expect((await t.ret()).ok).toBe(true);
+    const u = await oldPurchase(1);
+    await saveSetting({ ...u.ctx, role: 'manager' }, 'return.purchaseDays', 0);
+    expect(await u.ret()).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
+    const v = await oldPurchase(0);
+    await saveSetting({ ...v.ctx, role: 'manager' }, 'return.purchaseDays', 0);
+    expect((await v.ret()).ok).toBe(true);
+  });
+
+  it('a group can take the approval away from a storekeeper: without the right the approval is still asked', async () => {
+    const t = await oldPurchase(60);
+    const g = { ...t.ctx, permissions: { receivePurchase: 'yes' as const } };
+    const line = (await t.ctx.db.purchaseInvoiceLines.where('invoiceId').equals(t.bought.id).first())!;
+    const r = await postPurchaseReturn(g, {
+      supplierId: t.supplier.id,
+      originalInvoiceId: t.bought.id,
+      warehouseId: t.warehouse.id,
+      lines: [{ originalLineId: line.id, qtyMilli: 1000 }],
+    });
+    expect(r).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
   });
 });
 

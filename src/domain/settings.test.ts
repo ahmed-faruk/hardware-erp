@@ -80,3 +80,16 @@ describe('priceNeedsApproval', () => {
     expect(priceNeedsApproval(DEFAULT_SETTINGS, 'manager', 1, 1000)).toBe(false);
   });
 });
+
+describe('purchase return period (P1)', () => {
+  it('defaults to 30 days, separate from the sales period', () => {
+    expect(parseSettings([]).purchaseReturnPeriodDays).toBe(30);
+    expect(parseSettings([{ key: 'return.periodDays', value: 7 }]).purchaseReturnPeriodDays).toBe(30);
+  });
+  it('reads the saved days, 0 included, and ignores nonsense', () => {
+    expect(parseSettings([{ key: 'return.purchaseDays', value: 90 }]).purchaseReturnPeriodDays).toBe(90);
+    expect(parseSettings([{ key: 'return.purchaseDays', value: 0 }]).purchaseReturnPeriodDays).toBe(0);
+    for (const bad of [-1, 1.5, '30', null, 100000])
+      expect(parseSettings([{ key: 'return.purchaseDays', value: bad }]).purchaseReturnPeriodDays).toBe(30);
+  });
+});

@@ -9,6 +9,7 @@ import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
 import { computePurchase, splitPurchasePayment } from '@/domain/purchase';
 import { cairoTime } from '@/domain/receipt';
 
+import { useApproval } from '../cashier/ApprovalDialog';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { type Column, DataTable } from '../components/DataTable';
@@ -347,6 +348,8 @@ function PurchaseForm({ onDone }: { onDone: () => void }) {
 function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
   const { db } = useServices();
   const { context } = useSession();
+  const { ask, dialog: approvalDialog } = useApproval();
+  const [find, setFind] = useState('');
   const basics = useBasics();
   const [invoiceId, setInvoiceId] = useState('');
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -356,7 +359,6 @@ function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
     const suppliers = new Map((await db.suppliers.toArray()).map((s) => [s.id, s.name]));
     return (await db.purchaseInvoices.toArray())
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
-      .slice(0, 50)
       .map((p) => ({
         ...p,
         total: p.total as number,
@@ -382,6 +384,13 @@ function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
   }, [db, invoiceId]);
   if (!basics || !invoices) return <Skeleton />;
   const invoice = invoices.find((i) => i.id === invoiceId);
+  // find an invoice by its number, the supplier's name or the date (day/month or day/month/year)
+  const needle = find.trim().toLowerCase();
+  const shownInvoices = needle
+    ? invoices.filter((i) =>
+        `${i.number} ${i.supplierName} ${cairoTime(i.issuedAt)}`.toLowerCase().includes(needle),
+      )
+    : invoices;
   const lineValue = (net: number, orig: number, q: number): number => Math.round((net * q) / orig);
   const total = (data ?? []).reduce(
     (a, d) =>
@@ -395,21 +404,43 @@ function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
       .filter((d) => (qty[d.line.id] ?? 0) > 0)
       .map((d) => ({ originalLineId: d.line.id, qtyMilli: qty[d.line.id]! }));
     if (toCash && !basics.safe) return setError(strings.purchases.noSafe);
-    const r = await postPurchaseReturn(context, {
+    const base = {
       supplierId: invoice.supplierId as string,
       originalInvoiceId: invoice.id,
       warehouseId: basics.warehouse.id,
       lines,
-      refundTo: toCash ? 'cash' : 'credit',
+      refundTo: toCash ? ('cash' as const) : ('credit' as const),
       cashAccountId: toCash ? basics.safe!.id : null,
-    });
+    };
+    let r = await postPurchaseReturn(context, base);
+    if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
+      const token = await ask('purchaseReturnAfterPeriod');
+      if (token) r = await postPurchaseReturn(context, { ...base, approvalTokens: [token] });
+    }
     if (r.ok) onDone();
-    else setError(strings.purchases.returnFailed);
+    else
+      setError(
+        r.code === 'APPROVAL_REQUIRED'
+          ? strings.purchases.returnNeedsManager
+          : strings.purchases.returnFailed,
+      );
   };
 
   return (
     <div className={styles.form}>
       <div className={styles.section}>
+        <FormField label={strings.purchases.findInvoice}>
+          {(id) => (
+            <input
+              id={id}
+              className="control"
+              type="search"
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              data-testid="return-find"
+            />
+          )}
+        </FormField>
         <FormField label={strings.purchases.pickInvoice}>
           {(id) => (
             <select
@@ -423,11 +454,11 @@ function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
               data-testid="return-invoice"
             >
               <option value="">{strings.purchases.pickInvoice}</option>
-              {invoices.map((i) => (
+              {shownInvoices.map((i) => (
                 <option
                   key={i.id}
                   value={i.id}
-                >{`${i.number} — ${i.supplierName} — ${formatMoney(i.total as number)}`}</option>
+                >{`${i.number} — ${i.supplierName} — ${cairoTime(i.issuedAt).slice(0, 10)} — ${formatMoney(i.total as number)}`}</option>
               ))}
             </select>
           )}
@@ -457,6 +488,7 @@ function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       {error && <BigAlert tone="danger" word={error} />}
+      {approvalDialog}
       <div className={styles.actions}>
         <ActionButton
           label={strings.purchases.save}
