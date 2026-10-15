@@ -23,7 +23,7 @@ export interface InvoiceView {
   discount: number;
   total: number;
   payments: { method: string; amount: number; reference: string | null }[];
-  returns: { number: string; total: number }[];
+  returns: { id: string; number: string; total: number }[];
 }
 
 /** One saved sales or purchase invoice with its lines, payments and returns. Never carries cost or profit of a sale. */
@@ -68,7 +68,7 @@ export async function loadInvoiceView(
       discount: inv.lineDiscountTotal + inv.invoiceDiscount,
       total: inv.total,
       payments: payments.map((p) => ({ method: p.method, amount: p.amount, reference: p.reference })),
-      returns: returns.map((r) => ({ number: r.number, total: r.total as number })),
+      returns: returns.map((r) => ({ id: r.id, number: r.number as string, total: r.total as number })),
     };
   }
   const inv = await db.purchaseInvoices.get(id);
@@ -99,6 +99,6 @@ export async function loadInvoiceView(
     discount: lines.reduce((a, l) => a + ((l.discount as number | undefined) ?? 0), 0),
     total: inv.total as number,
     payments: payments.map((p) => ({ method: p.method, amount: p.amount, reference: p.reference })),
-    returns: returns.map((r) => ({ number: r.number as string, total: r.total as number })),
+    returns: returns.map((r) => ({ id: r.id, number: r.number as string, total: r.total as number })),
   };
 }

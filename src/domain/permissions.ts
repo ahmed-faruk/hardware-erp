@@ -15,6 +15,7 @@ export const ACTIONS = [
   'creditOverLimit',
   'noSaleDrawer',
   'void',
+  'voidReturn',
   'customerReceipt',
   'addCustomer',
   // products and stock
@@ -111,6 +112,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       'creditOverLimit',
       'noSaleDrawer',
       'void',
+      'voidReturn',
       'customerReceipt',
       'addCustomer',
     ],

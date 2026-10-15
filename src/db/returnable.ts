@@ -39,3 +39,11 @@ export async function loadSoldReturned(
   });
   return out;
 }
+
+/** Return lines that point at the given invoice lines, counting only returns that are still posted (a voided return gives its quantity back). */
+export async function postedReturnLines(db: HanafyDB, originalLineIds: string[]) {
+  const lines = await db.salesReturnLines.where('originalLineId').anyOf(originalLineIds).toArray();
+  const returns = await db.salesReturns.bulkGet([...new Set(lines.map((l) => l.returnId as string))]);
+  const posted = new Set(returns.filter((r) => r?.status === 'posted').map((r) => r!.id));
+  return lines.filter((l) => posted.has(l.returnId as string));
+}

@@ -77,6 +77,7 @@ export function RecentInvoicesDialog({
   digits,
   onReprint,
   onVoid,
+  onVoidReturn,
   onClose,
 }: {
   open: boolean;
@@ -85,6 +86,8 @@ export function RecentInvoicesDialog({
   onReprint: (id: string) => void;
   /** only passed for a manager */
   onVoid?: (id: string) => void;
+  /** only passed for a manager who may void a return */
+  onVoidReturn?: (returnId: string) => void;
   onClose: () => void;
 }) {
   const { db } = useServices();
@@ -139,7 +142,19 @@ export function RecentInvoicesDialog({
           </ul>
         )}
       </Dialog>
-      <InvoiceViewDialog kind="sale" invoiceId={viewId} onClose={() => setViewId(null)} />
+      <InvoiceViewDialog
+        kind="sale"
+        invoiceId={viewId}
+        onClose={() => setViewId(null)}
+        onVoidReturn={
+          onVoidReturn
+            ? (id) => {
+                setViewId(null);
+                onVoidReturn(id);
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import { approveWithPin } from '@/db/commands/approval';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
-import { postCustomerReceipt, postSalesReturn, voidInvoice } from '@/db/commands/returns';
+import { postCustomerReceipt, postSalesReturn, voidInvoice, voidReturn } from '@/db/commands/returns';
+import { openShift } from '@/db/commands/open-shift';
+import { drawerBalance } from '@/db/cash';
 import { postSale } from '@/db/commands/post-sale';
 import { uuidv7 } from '@/db/ids';
 import type { Worker } from '@/db/types';
@@ -259,6 +261,200 @@ describe('return without invoice with many items (D1..D11)', () => {
       [1, 1000, 2000],
     ]);
     expect(r).toMatchObject({ ok: true, total: 3000 });
+  });
+});
+
+describe('void a sales return (P2)', () => {
+  it('a cash and credit return is reversed exactly: stock, drawer, customer; the return is voided and audited', async () => {
+    const t = await setup('manager');
+    const drawerBefore = await drawerBalance(t.ctx.db, t.s.shiftId);
+    const balanceBefore = await t.balance();
+    const stockBefore = await t.stock(t.main.id);
+    const r = await t.ret(1000);
+    if (!r.ok) throw new Error(r.code);
+    expect(await t.stock(t.main.id)).toBe(stockBefore + 1000);
+    const v = await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: t.s.shiftId });
+    expect(v.ok).toBe(true);
+    expect(await t.stock(t.main.id)).toBe(stockBefore);
+    expect(await drawerBalance(t.ctx.db, t.s.shiftId)).toBe(drawerBefore);
+    expect(await t.balance()).toBe(balanceBefore);
+    expect((await t.ctx.db.salesReturns.get(r.id))?.status).toBe('voided');
+    const doc = (await t.ctx.db.voids.toArray()).find((x) => x.targetType === 'sales_return');
+    expect(doc).toMatchObject({ targetId: r.id, reason: 'mistake' });
+    expect(
+      (await t.ctx.db.auditLog.toArray()).some((a) => a.action === 'return_voided' && a.entityId === r.id),
+    ).toBe(true);
+    expect((await t.ctx.db.outbox.toArray()).filter((o) => o.table === 'voids')).toHaveLength(1);
+  });
+
+  it('damaged goods leave the scrap warehouse again', async () => {
+    const t = await setup('manager');
+    const r = await postSalesReturn(t.ctx, {
+      originalInvoiceId: t.sold.id,
+      lines: [{ originalLineId: t.line.id, qtyMilli: 1000, condition: 'damaged' }],
+      shiftId: t.s.shiftId,
+      cashAccountId: t.s.cashAccountId,
+    });
+    if (!r.ok) throw new Error(r.code);
+    expect(await t.stock(t.scrap.id)).toBe(1000);
+    expect((await voidReturn(t.ctx, { returnId: r.id, reason: 'other', shiftId: t.s.shiftId })).ok).toBe(
+      true,
+    );
+    expect(await t.stock(t.scrap.id)).toBe(0);
+  });
+
+  it('a credit-only return needs no shift: the customer debt comes back', async () => {
+    const t = await setup('manager');
+    const sale = await postSale(t.ctx, {
+      lines: [{ productId: t.s.products[1]!.id, qtyMilli: 1000, unitPrice: 2000 }],
+      payments: [{ method: 'credit', amount: 2000 }],
+      customerId: t.s.customer.id,
+      warehouseId: t.main.id,
+      shiftId: t.s.shiftId,
+      cashAccountId: t.s.cashAccountId,
+    } as never);
+    if (!sale.ok) throw new Error(sale.code);
+    const line = (await t.ctx.db.salesInvoiceLines.where('invoiceId').equals(sale.id).first())!;
+    const before = await t.balance();
+    const r = await postSalesReturn(t.ctx, {
+      originalInvoiceId: sale.id,
+      lines: [{ originalLineId: line.id, qtyMilli: 1000, condition: 'good' }],
+      shiftId: t.s.shiftId,
+      cashAccountId: t.s.cashAccountId,
+    });
+    if (!r.ok) throw new Error(r.code);
+    expect(await t.balance()).toBe(before - 2000);
+    expect((await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: null })).ok).toBe(true);
+    expect(await t.balance()).toBe(before);
+  });
+
+  it('twice is refused, and a void of the void does not exist', async () => {
+    const t = await setup('manager');
+    const r = await t.ret(1000);
+    if (!r.ok) throw new Error(r.code);
+    expect((await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: t.s.shiftId })).ok).toBe(
+      true,
+    );
+    expect(
+      await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'ALREADY_VOIDED',
+    });
+    expect(
+      await voidReturn(t.ctx, { returnId: uuidv7(), reason: 'mistake', shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('the invoice is returnable again in full, and can itself be voided once its only return is voided', async () => {
+    const t = await setup('manager');
+    const all = await t.ret(3000);
+    if (!all.ok) throw new Error(all.code);
+    expect(await t.ret(1000)).toMatchObject({ ok: false, code: 'RETURN_EXCEEDS_SOLD' });
+    expect(
+      await voidInvoice(t.ctx, { invoiceId: t.sold.id, reason: 'mistake', shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'HAS_RETURNS',
+    });
+    expect((await voidReturn(t.ctx, { returnId: all.id, reason: 'mistake', shiftId: t.s.shiftId })).ok).toBe(
+      true,
+    );
+    // all three units are returnable again
+    const again = await t.ret(3000);
+    expect(again.ok).toBe(true);
+    if (!again.ok) return;
+    expect((await voidReturn(t.ctx, { returnId: again.id, reason: 'other', shiftId: t.s.shiftId })).ok).toBe(
+      true,
+    );
+    expect(
+      (await voidInvoice(t.ctx, { invoiceId: t.sold.id, reason: 'mistake', shiftId: t.s.shiftId })).ok,
+    ).toBe(true);
+  });
+
+  it('the free-return limit counts the voided quantity as not returned', async () => {
+    const t = await setup('manager');
+    const free = (q: number) =>
+      postSalesReturn(t.ctx, {
+        originalInvoiceId: null,
+        lines: [
+          {
+            originalLineId: null,
+            productId: t.s.products[0]!.id,
+            qtyMilli: q,
+            unitRefund: 500,
+            condition: 'good',
+          },
+        ],
+        shiftId: t.s.shiftId,
+        cashAccountId: t.s.cashAccountId,
+      });
+    const two = await free(2000);
+    if (!two.ok) throw new Error(two.code);
+    expect(await free(2000)).toMatchObject({ ok: false, code: 'OVER_SOLD' });
+    expect((await voidReturn(t.ctx, { returnId: two.id, reason: 'mistake', shiftId: t.s.shiftId })).ok).toBe(
+      true,
+    );
+    expect((await free(3000)).ok).toBe(true);
+  });
+
+  it('only a manager with voidReturn: a cashier, and a manager whose group says no, are refused', async () => {
+    const t = await setup('manager');
+    const r = await t.ret(1000);
+    if (!r.ok) throw new Error(r.code);
+    const cashier = { ...t.ctx, role: 'cashier' as const };
+    expect(
+      await voidReturn(cashier, { returnId: r.id, reason: 'mistake', shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'E_FORBIDDEN',
+    });
+    const grouped = { ...t.ctx, permissions: { void: 'yes' as const } };
+    expect(
+      await voidReturn(grouped, { returnId: r.id, reason: 'mistake', shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'E_FORBIDDEN',
+    });
+    expect((await t.ctx.db.salesReturns.get(r.id))?.status).toBe('posted');
+  });
+
+  it('a cash refund needs an open shift on the drawer that paid it', async () => {
+    const t = await setup('manager');
+    const r = await t.ret(1000);
+    if (!r.ok) throw new Error(r.code);
+    expect(await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: null })).toMatchObject({
+      ok: false,
+      code: 'NO_SHIFT',
+    });
+    // another drawer's shift is the wrong drawer
+    const other = {
+      ...newCommon(t.ctx),
+      name: 'درج تاني',
+      kind: 'drawer' as const,
+      ownerDeviceId: t.ctx.deviceId,
+    };
+    await t.ctx.db.cashAccounts.put(other);
+    const second = await openShift(t.ctx, { cashAccountId: other.id, openingFloat: 0 });
+    expect(second.ok).toBe(true);
+    if (second.ok)
+      expect(
+        await voidReturn(t.ctx, { returnId: r.id, reason: 'mistake', shiftId: second.id }),
+      ).toMatchObject({
+        ok: false,
+        code: 'WRONG_DRAWER',
+      });
+    expect((await t.ctx.db.salesReturns.get(r.id))?.status).toBe('posted');
+    // a reason outside the list
+    expect(
+      await voidReturn(t.ctx, { returnId: r.id, reason: 'x' as never, shiftId: t.s.shiftId }),
+    ).toMatchObject({
+      ok: false,
+      code: 'E_VALIDATION',
+    });
   });
 });
 

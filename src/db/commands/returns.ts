@@ -6,7 +6,7 @@ import { nowIso, uuidv7 } from '../ids';
 import { validateAllocations } from '../allocations';
 import { drawerBalance } from '../cash';
 import { nextNumber } from '../numbering';
-import { loadSoldReturned } from '../returnable';
+import { loadSoldReturned, postedReturnLines } from '../returnable';
 import { enqueue } from '../outbox';
 import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
@@ -85,10 +85,10 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   const soldLines = invoice ? await db.salesInvoiceLines.where('invoiceId').equals(invoice.id).toArray() : [];
   const prior: PriorReturn[] = invoice
     ? (
-        await db.salesReturnLines
-          .where('originalLineId')
-          .anyOf(soldLines.map((l) => l.id))
-          .toArray()
+        await postedReturnLines(
+          db,
+          soldLines.map((l) => l.id),
+        )
       ).map((r) => ({ originalLineId: r.originalLineId as string, qtyMilli: r.qty as number }))
     : [];
   const warehouses = await db.warehouses.filter((w) => !w.deletedAt).toArray();
@@ -314,7 +314,12 @@ export async function voidInvoice(
   const invoice = await db.salesInvoices.get(input.invoiceId);
   if (!invoice) return err('NOT_FOUND', 'الفاتورة مش موجودة');
   if (invoice.status !== 'posted') return err('ALREADY_VOIDED', 'الفاتورة ملغية');
-  if (await db.salesReturns.where('originalInvoiceId').equals(invoice.id).count())
+  // a voided return does not count: its goods and money are already reversed
+  if (
+    (await db.salesReturns.where('originalInvoiceId').equals(invoice.id).toArray()).some(
+      (r) => r.status === 'posted',
+    )
+  )
     return err('HAS_RETURNS', 'الفاتورة عليها مرتجع');
   const voidId = uuidv7();
   const now = nowIso();
@@ -530,6 +535,131 @@ export async function postCustomerReceipt(
       await enqueue(db, 'auditLog', audit, ctx.workerId);
       const balanceAfter = (await db.partyBalances.get(['customer', customer.id]))?.amount ?? 0;
       return { ok: true as const, id, number, balanceAfter };
+    },
+  );
+}
+
+/**
+ * The manager cancels a posted sales return (permission voidReturn): the goods leave stock again at the same quantity and
+ * cost, a cash refund comes back into the drawer, a credit refund goes back onto the customer's debt. The invoice can be
+ * returned again. Cash only goes back into the drawer of the open shift on this device (the one that paid it out).
+ */
+export async function voidReturn(
+  ctx: DeviceContext,
+  input: { returnId: string; reason: (typeof VOID_REASONS)[number]; shiftId: string | null },
+): Promise<{ ok: true; id: string; number: string } | Err> {
+  if (canCtx(ctx, 'voidReturn') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (!VOID_REASONS.includes(input.reason)) return err('E_VALIDATION', 'السبب مطلوب');
+  const { db } = ctx;
+  const ret = await db.salesReturns.get(input.returnId);
+  if (!ret) return err('NOT_FOUND', 'المرتجع مش موجود');
+  if (ret.status !== 'posted') return err('ALREADY_VOIDED', 'المرتجع ملغي');
+  const voidId = uuidv7();
+  const now = nowIso();
+  const [stock, party, cash] = await Promise.all([
+    db.stockMovements.where('docId').equals(ret.id).toArray(),
+    db.partyLedger.where('docId').equals(ret.id).toArray(),
+    db.cashMovements.where('docId').equals(ret.id).toArray(),
+  ]);
+  if (cash.length > 0) {
+    const shift = input.shiftId ? await db.shifts.get(input.shiftId) : undefined;
+    if (!shift || shift.status !== 'open') return err('NO_SHIFT', 'افتح وردية الأول');
+    if (cash.some((m) => m.cashAccountId !== shift.cashAccountId))
+      return err('WRONG_DRAWER', 'الإلغاء من الجهاز اللي صرف المرتجع');
+  }
+  const stockMovements: StockMovement[] = stock.map((m) => ({
+    ...newCommon(ctx),
+    productId: m.productId,
+    warehouseId: m.warehouseId,
+    qty: -m.qty,
+    unitCost: m.unitCost,
+    docType: 'void',
+    docId: voidId,
+    lineId: null,
+    occurredAt: now,
+  }));
+  const partyLedger: PartyLedgerRow[] = party.map((m) => ({
+    ...newCommon(ctx),
+    partyType: m.partyType,
+    partyId: m.partyId,
+    amount: -m.amount,
+    docType: 'void',
+    docId: voidId,
+    occurredAt: now,
+  }));
+  const cashMovements: CashMovement[] = cash.map((m) => ({
+    ...newCommon(ctx),
+    cashAccountId: m.cashAccountId,
+    shiftId: input.shiftId,
+    amount: -m.amount,
+    method: m.method,
+    docType: 'void',
+    docId: voidId,
+    occurredAt: now,
+  }));
+  return db.transaction(
+    'rw',
+    [
+      db.voids,
+      db.salesReturns,
+      db.stockMovements,
+      db.partyLedger,
+      db.cashMovements,
+      db.auditLog,
+      db.stockBalances,
+      db.partyBalances,
+      db.numberSequences,
+      db.outbox,
+      db.syncState,
+    ],
+    async () => {
+      const number = await nextNumber(db, ctx.devicePrefix, 'VOID');
+      const doc = {
+        ...newCommon(ctx),
+        id: voidId,
+        number,
+        issuedAt: now,
+        workerId: ctx.workerId,
+        shiftId: input.shiftId,
+        status: 'posted' as const,
+        voidedBy: null,
+        notes: null,
+        isLegacy: false,
+        legacy: null,
+        targetType: 'sales_return',
+        targetId: ret.id,
+        reason: input.reason,
+        approvedBy: ctx.workerId,
+      };
+      const audit: AuditRow = {
+        ...newCommon(ctx),
+        action: 'return_voided',
+        entity: 'sales_returns',
+        entityId: ret.id,
+        before: null,
+        after: { number: ret.number, reason: input.reason },
+        workerId: ctx.workerId,
+        approvedBy: null,
+        occurredAt: now,
+      };
+      await db.voids.add(doc);
+      await db.stockMovements.bulkAdd(stockMovements);
+      await db.partyLedger.bulkAdd(partyLedger);
+      await db.cashMovements.bulkAdd(cashMovements);
+      await db.salesReturns.update(ret.id, { status: 'voided', voidedBy: voidId });
+      await db.auditLog.add(audit);
+      await rebuildStockBalances(
+        db,
+        stockMovements.map((m) => [m.productId, m.warehouseId]),
+      );
+      if (partyLedger.length)
+        await rebuildPartyBalances(
+          db,
+          partyLedger.map((p) => [p.partyType, p.partyId]),
+        );
+      await enqueue(db, 'voids', { ...doc, stockMovements, partyLedger, cashMovements }, ctx.workerId);
+      await enqueue(db, 'auditLog', audit, ctx.workerId);
+      return { ok: true as const, id: voidId, number };
     },
   );
 }
