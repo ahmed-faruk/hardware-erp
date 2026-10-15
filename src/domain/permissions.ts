@@ -194,6 +194,7 @@ const storekeeper: Permissions = {
   receivePurchase: 'yes',
   stockAdjustment: 'yes',
   editProductData: 'yes',
+  addProduct: 'yes',
   purchaseReturnAfterPeriod: 'pin',
   purchaseReturnWithoutInvoice: 'yes',
 };

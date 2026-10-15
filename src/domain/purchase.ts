@@ -46,3 +46,42 @@ export function splitPurchasePayment(total: Piasters, safe: Piasters, owner: Pia
   if (safe < 0 || owner < 0 || safe + owner > total) return null;
   return { safe, owner, credit: total - safe - owner };
 }
+
+/** A new cost this far from the last one (in percent, either way) is flagged on the line so a typing slip is noticed. */
+export const PRICE_CHANGE_WARN_PERCENT = 20;
+
+/** Percent change from the last price to the new one, rounded; null when there is no last price to compare with. */
+export function priceChangePercent(last: Piasters | null, now: Piasters): number | null {
+  if (last === null || last <= 0) return null;
+  return Math.round(((now - last) * 100) / last);
+}
+
+export const priceChangeWarns = (last: Piasters | null, now: Piasters): boolean => {
+  const pct = priceChangePercent(last, now);
+  return pct !== null && Math.abs(pct) >= PRICE_CHANGE_WARN_PERCENT;
+};
+
+/**
+ * An invoice discount spread over the lines in proportion to their value (largest remainder, so the parts add up exactly).
+ * The server only knows line discounts; their sum is the invoice's `discount`.
+ */
+export function allocateInvoiceDiscount(grossAmounts: Piasters[], discount: Piasters): Piasters[] {
+  const total = grossAmounts.reduce((a, g) => a + g, 0);
+  if (!Number.isInteger(discount) || discount < 0 || discount > total)
+    throw new RangeError('discount outside the invoice value');
+  if (discount === 0 || total === 0) return grossAmounts.map(() => 0);
+  const exact = grossAmounts.map((g) => (g * discount) / total);
+  const parts = exact.map((e) => Math.floor(e));
+  let left = discount - parts.reduce((a, p) => a + p, 0);
+  const order = exact
+    .map((e, i) => ({ i, frac: e - Math.floor(e) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (const { i } of order) {
+    if (left <= 0) break;
+    if (parts[i]! < grossAmounts[i]!) {
+      parts[i]! += 1;
+      left -= 1;
+    }
+  }
+  return parts;
+}

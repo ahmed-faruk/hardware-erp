@@ -116,6 +116,14 @@ function Body({
             <dd>{view.party}</dd>
           </div>
         )}
+        {view.supplierRef && (
+          <div>
+            <dt>{t.supplierRef}</dt>
+            <dd dir="ltr" data-testid="iv-supplier-ref">
+              {view.supplierRef}
+            </dd>
+          </div>
+        )}
         {view.worker && (
           <div>
             <dt>{t.worker}</dt>

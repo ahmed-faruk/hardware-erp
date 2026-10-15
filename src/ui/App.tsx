@@ -51,6 +51,9 @@ const SuppliersScreen = lazy(() =>
 const ExpensesScreen = lazy(() =>
   import('./screens/ExpensesScreen').then((m) => ({ default: m.ExpensesScreen })),
 );
+const PurchaseNewScreen = lazy(() =>
+  import('./screens/PurchaseNewScreen').then((m) => ({ default: m.PurchaseNewScreen })),
+);
 const ProductFormScreen = lazy(() =>
   import('./screens/ProductFormScreen').then((m) => ({ default: m.ProductFormScreen })),
 );
@@ -199,7 +202,8 @@ function Shell() {
     else if (section === 'products')
       screen = route[1] ? <ProductFormScreen id={route[1]} /> : <ProductsScreen />;
     else if (section === 'categories') screen = <CategoriesScreen />;
-    else if (section === 'purchases') screen = <PurchasesScreen />;
+    else if (section === 'purchases')
+      screen = route[1] === 'new' ? <PurchaseNewScreen /> : <PurchasesScreen />;
     else if (section === 'stock') screen = <StockScreen />;
     else if (section === 'expenses') screen = <ExpensesScreen />;
     else if (section === 'reports') screen = <ReportsScreen />;
