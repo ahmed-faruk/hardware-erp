@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Package, Plus } from 'lucide-react';
+import { Package, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -19,6 +19,7 @@ import { IconView } from '../icons/IconView';
 import { navigate } from '../router';
 import { strings } from '../strings.ar';
 
+import { useProductDelete } from './useProductDelete';
 import styles from './screens.module.css';
 
 const PAGE = 50;
@@ -70,6 +71,8 @@ export function ProductsScreen() {
   const [low, setLow] = useState(false);
   const [archived, setArchived] = useState(false);
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
+  // the delete button of a row: the same flow as inside the product (server check, undo toast; archive when it has history)
+  const remove = useProductDelete();
   const [shown, setShown] = useState(PAGE);
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).toArray(), [db]);
   const rows = useLiveQuery(
@@ -138,9 +141,37 @@ export function ProductsScreen() {
       );
     });
   };
+  const mayRemove = can('editProductData') === 'yes' || can('archiveProduct') === 'yes';
+  const withDelete: Column<Row>[] =
+    mayRemove && !archived
+      ? [
+          ...columns,
+          {
+            key: 'remove',
+            header: '',
+            cell: (r: Row) => (
+              // the row opens the product: the button must not
+              <span
+                role="presentation"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <ActionButton
+                  label={strings.products.deleteProduct}
+                  icon={Trash2}
+                  variant="ghost"
+                  disabled={remove.busy}
+                  onClick={() => void remove.start(r.id, r.name)}
+                  testId={`row-delete-${r.id}`}
+                />
+              </span>
+            ),
+          },
+        ]
+      : columns;
   const columnsAll: Column<Row>[] = archived
     ? [
-        ...columns,
+        ...withDelete,
         {
           key: 'restore',
           header: '',
@@ -154,7 +185,7 @@ export function ProductsScreen() {
           ),
         },
       ]
-    : columns;
+    : withDelete;
 
   return (
     <section>
@@ -220,6 +251,7 @@ export function ProductsScreen() {
           />
         </div>
       </div>
+      {remove.view}
       {restoreNote && <BigAlert tone="ok" word={restoreNote} sound={false} />}
       {!rows ? (
         <Skeleton />

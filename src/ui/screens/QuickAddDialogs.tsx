@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
+import { generateBarcode } from '@/db/barcode';
 import { addSupplier } from '@/db/commands/save-master';
 import { saveProduct } from '@/db/commands/save-product';
 import type { Product } from '@/db/types';
@@ -11,6 +12,7 @@ import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { Dialog } from '../components/Dialog';
 import { FormField } from '../components/FormField';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { strings } from '../strings.ar';
 
 import { errorWord } from './useSaver';
@@ -50,7 +52,17 @@ function ProductBody({
   const { context, can } = useSession();
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).toArray(), [db]);
   const [name, setName] = useState('');
+  // a scanned unknown code is kept as typed; otherwise the system makes a barcode, or the user writes his own
+  const [barcodeMode, setBarcodeMode] = useState<'system' | 'manual'>(barcode ? 'manual' : 'system');
   const [code, setCode] = useState(barcode);
+  const regenerate = (): void => {
+    void generateBarcode(db).then(setCode);
+  };
+  useEffect(() => {
+    if (!barcode) regenerate();
+    // once, when the dialog opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [unit, setUnit] = useState<string>(strings.common.pieces);
   const [categoryId, setCategoryId] = useState('');
   const [price, setPrice] = useState('');
@@ -97,16 +109,39 @@ function ProductBody({
           />
         )}
       </FormField>
-      <FormField label={strings.products.barcode}>
+      <SegmentedControl
+        label={t.barcodeSource}
+        options={[
+          { key: 'system', label: t.barcodeFromSystem },
+          { key: 'manual', label: t.barcodeByHand },
+        ]}
+        value={barcodeMode}
+        onChange={(m) => {
+          setBarcodeMode(m);
+          if (m === 'system') regenerate();
+          else setCode('');
+        }}
+        testIdPrefix="qa-barcode-mode-"
+      />
+      <FormField
+        label={strings.products.barcode}
+        hint={barcodeMode === 'system' ? t.barcodeSystemHint : undefined}
+      >
         {(id) => (
-          <input
-            id={id}
-            className="control"
-            dir="ltr"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            data-testid="qa-barcode"
-          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--space-2)' }}>
+            <input
+              id={id}
+              className="control"
+              dir="ltr"
+              value={code}
+              readOnly={barcodeMode === 'system'}
+              onChange={(e) => setCode(e.target.value)}
+              data-testid="qa-barcode"
+            />
+            {barcodeMode === 'system' && (
+              <ActionButton label={t.barcodeNew} variant="ghost" onClick={regenerate} testId="qa-regen" />
+            )}
+          </div>
         )}
       </FormField>
       <div className={styles.pair}>

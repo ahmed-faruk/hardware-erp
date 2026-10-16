@@ -202,3 +202,24 @@ describe('the numbers under a purchase line (P5b)', () => {
     expect(h.currentCost).toBeGreaterThan(0);
   });
 });
+
+describe('barcodes made by the system (P5b polish)', () => {
+  it('gives a valid shop barcode and never one a live barcode already has', async () => {
+    const ctx = newDevice('K1', 'manager');
+    const { generateBarcode } = await import('@/db/barcode');
+    const { isEan13 } = await import('@/domain/barcode');
+    // the first number the generator would pick is already taken: it picks another
+    const first = (await generateBarcode(ctx.db, () => 0.5)) as string;
+    expect(isEan13(first)).toBe(true);
+    expect(first.startsWith('990')).toBe(true);
+    const made = await saveProduct(ctx, {
+      fields: { name: 'يحمل الباركود', baseUnitName: 'قطعة', qtyDecimals: 0 },
+      barcodes: [first],
+    });
+    expect(made.ok).toBe(true);
+    let n = 0;
+    const next = await generateBarcode(ctx.db, () => (n++ === 0 ? 0.5 : 0.25));
+    expect(next).not.toBe(first);
+    expect(isEan13(next)).toBe(true);
+  });
+});
