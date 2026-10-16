@@ -1,18 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
-import { archiveProduct } from '@/db/commands/archive-product';
-import { deleteProduct } from '@/db/commands/delete-product';
 import { saveProduct } from '@/db/commands/save-product';
-import { localProductUsage } from '@/db/product-usage';
 import type { Barcode, Product, ProductUnit } from '@/db/types';
 import { formatMoney, formatQty, toMilli, toPiasters } from '@/domain/money';
-import { mergeUsage, usageFromServer, usageReasons, type UsageReason } from '@/domain/product-usage';
-import { callRpc } from '@/sync/errors';
 
-import { UndoToast } from '../cashier/UndoToast';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { Dialog } from '../components/Dialog';
@@ -27,6 +21,7 @@ import { strings } from '../strings.ar';
 
 import { ProductHistory } from './ProductHistory';
 import styles from './screens.module.css';
+import { useProductDelete } from './useProductDelete';
 import { useSaver } from './useSaver';
 
 interface Loaded {
@@ -50,7 +45,7 @@ export function ProductFormScreen({ id }: { id: string }) {
 }
 
 function ProductForm({ loaded }: { loaded: Loaded }) {
-  const { db, client } = useServices();
+  const { db } = useServices();
   const { context, worker, can } = useSession();
   const { product } = loaded;
   const [view, setView] = useState<'form' | 'history'>('form');
@@ -92,47 +87,8 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
 
   const saver = useSaver(() => navigate('products'));
 
-  // delete: the server is asked first (the old history lives there), then the manager has 5 seconds to undo
-  const [blocked, setBlocked] = useState<UsageReason[] | null>(null);
-  const [deleteNote, setDeleteNote] = useState<string | null>(null);
-  // a product that never moved is deleted; one with history is archived (only at stock 0, only for archiveProduct)
-  const [pendingDelete, setPendingDelete] = useState<'delete' | 'archive' | null>(null);
-  const deleting = useRef(false);
-  const askDelete = async (): Promise<void> => {
-    if (!product) return;
-    setBlocked(null);
-    setDeleteNote(null);
-    const r = await callRpc<Record<string, unknown>>(client, 'product_usage', { p_product_id: product.id });
-    if (!r.ok) return setDeleteNote(r.network ? strings.products.deleteNeedsNet : strings.errors.saveFailed);
-    const reasons = usageReasons(
-      mergeUsage(await localProductUsage(db, product.id), usageFromServer(r.data)),
-    );
-    if (reasons.length === 0) return setPendingDelete('delete');
-    if (can('archiveProduct') !== 'yes') return setBlocked(reasons);
-    if (reasons.includes('stock')) {
-      setDeleteNote(strings.products.archiveNeedsZeroStock);
-      return setBlocked(reasons);
-    }
-    setPendingDelete('archive');
-  };
-  const runDelete = (): void => {
-    const mode = pendingDelete;
-    setPendingDelete(null);
-    if (!context || !product || !mode || deleting.current) return;
-    deleting.current = true;
-    const done = (r: { ok: boolean; code?: string; reasons?: string[] }): void => {
-      deleting.current = false;
-      if (r.ok) return navigate('products');
-      if (r.reasons) setBlocked(r.reasons as UsageReason[]);
-      else
-        setDeleteNote(
-          r.code === 'HAS_STOCK' ? strings.products.archiveNeedsZeroStock : strings.errors.saveFailed,
-        );
-    };
-    void (mode === 'archive' ? archiveProduct(context, product.id) : deleteProduct(context, product.id)).then(
-      done,
-    );
-  };
+  // delete or archive (the same flow as the delete button of the products grid)
+  const remove = useProductDelete(() => navigate('products'));
 
   const submit = (): void => {
     if (!context) return;
@@ -460,22 +416,7 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
                 <BigAlert tone="danger" word={saver.error} />
               </div>
             )}
-            {deleteNote && (
-              <div className={styles.span}>
-                <BigAlert tone="warn" word={deleteNote} sound={false} />
-              </div>
-            )}
-            {blocked && (
-              <div className={styles.span} data-testid="delete-blocked">
-                <BigAlert
-                  tone="warn"
-                  word={`${strings.products.deleteBlocked}: ${blocked
-                    .map((x) => strings.products.deleteReasons[x])
-                    .join(strings.cash.listSeparator)}`}
-                  sound={false}
-                />
-              </div>
-            )}
+            <div className={styles.span}>{remove.view}</div>
             <div className={styles.actions}>
               <ActionButton
                 label={strings.common.save}
@@ -495,21 +436,14 @@ function ProductForm({ loaded }: { loaded: Loaded }) {
                   label={strings.products.deleteProduct}
                   icon={Trash2}
                   variant="danger"
-                  onClick={() => void askDelete()}
-                  disabled={pendingDelete !== null}
+                  onClick={() => product && void remove.start(product.id, '')}
+                  disabled={remove.busy}
                   testId="delete-product"
                 />
               )}
             </div>
           </form>
         </>
-      )}
-      {pendingDelete && (
-        <UndoToast
-          message={pendingDelete === 'archive' ? strings.products.archiving : strings.products.deleting}
-          onUndo={() => setPendingDelete(null)}
-          onExpire={runDelete}
-        />
       )}
       <Dialog title={strings.products.icon} open={picking} onClose={() => setPicking(false)}>
         <IconPicker

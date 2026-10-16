@@ -14,6 +14,7 @@ import { allocateInvoiceDiscount, computePurchase, splitPurchasePayment } from '
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
+import { Combobox } from '../components/Combobox';
 import { FormField } from '../components/FormField';
 import { NumberField } from '../components/NumberField';
 import { SegmentedControl } from '../components/SegmentedControl';
@@ -295,23 +296,18 @@ export function PurchaseNewScreen() {
             <div className={styles.supplier}>
               <FormField label={t.supplier}>
                 {(id) => (
-                  <>
-                    <input
-                      id={id}
-                      className="control"
-                      list="purchase-suppliers"
-                      value={supplierText}
-                      onChange={(e) => chooseSupplier(e.target.value)}
-                      placeholder={t.pickSupplier}
-                      autoComplete="off"
-                      data-testid="purchase-supplier"
-                    />
-                    <datalist id="purchase-suppliers">
-                      {basics.suppliers.map((s) => (
-                        <option key={s.id} value={s.name} />
-                      ))}
-                    </datalist>
-                  </>
+                  <Combobox
+                    id={id}
+                    value={supplierText}
+                    options={basics.suppliers.map((x) => ({ id: x.id, label: x.name }))}
+                    onText={chooseSupplier}
+                    onPick={(o) => {
+                      setSupplierId(o.id);
+                      setSupplierText(o.label);
+                    }}
+                    placeholder={t.pickSupplier}
+                    testId="purchase-supplier"
+                  />
                 )}
               </FormField>
               {can('addSupplier') === 'yes' && (
@@ -376,7 +372,21 @@ export function PurchaseNewScreen() {
                   />
                 )}
               </FormField>
-              <ActionButton label={t.scanAdd} onClick={() => void submitScan()} testId="purchase-scan-add" />
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <ActionButton
+                  label={t.scanAdd}
+                  onClick={() => void submitScan()}
+                  testId="purchase-scan-add"
+                />
+                {can('addProduct') === 'yes' && (
+                  <ActionButton
+                    label={`+ ${t.newProductButton}`}
+                    variant="ghost"
+                    onClick={() => setQuickProduct('')}
+                    testId="purchase-new-product"
+                  />
+                )}
+              </div>
             </div>
             <div className={styles.hint}>{t.scanHint}</div>
             {scanError && <BigAlert tone="warn" word={scanError} sound={false} />}

@@ -1,0 +1,40 @@
+.root {
+  position: relative;
+  min-inline-size: 0;
+}
+
+.list {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 4px);
+  z-index: 20;
+  max-block-size: 264px;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-dialog);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--target-min);
+  padding-inline: var(--space-3);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.active {
+  background: var(--tint-primary);
+  font-weight: 700;
+}
+
+.empty {
+  padding: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}
