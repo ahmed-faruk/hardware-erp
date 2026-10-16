@@ -230,6 +230,7 @@ export function ReportsScreen() {
               <label>
                 {strings.reports.oneSupplier}{' '}
                 <select
+                  className="control"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                   data-testid="report-supplier"
