@@ -53,6 +53,20 @@ export function PurchaseNewScreen() {
   const [ownerPaid, setOwnerPaid] = useState<number | null>(null);
   const [scan, setScan] = useState('');
   const [scanError, setScanError] = useState<string | null>(null);
+  // suggestions while typing: the products matching the text (the answer is only used for the text it was asked for)
+  const [suggest, setSuggest] = useState<{ text: string; products: Product[] }>({ text: '', products: [] });
+  useEffect(() => {
+    const text = scan.trim();
+    if (text.length < 2) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void searchProducts(db, text, { limit: 8 }).then((products) => live && setSuggest({ text, products }));
+    }, 150);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [db, scan]);
   const [quickProduct, setQuickProduct] = useState<string | null>(null);
   const [quickSupplier, setQuickSupplier] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -214,6 +228,26 @@ export function PurchaseNewScreen() {
     setScanError(t.unknownItem);
   };
 
+  const suggestOptions =
+    suggest.text === scan.trim()
+      ? suggest.products.map((p) => ({ id: p.id, label: p.sku ? `${p.name} · ${p.sku}` : p.name }))
+      : [];
+  const pickSuggestion = async (productId: string): Promise<void> => {
+    const product = suggest.products.find((p) => p.id === productId);
+    setScan('');
+    setScanError(null);
+    if (product) await addProduct(product, null);
+    scanRef.current?.focus();
+  };
+  /** Enter in the product box: a code (6+ digits) goes the scanner way; with no highlighted suggestion the text is searched; else the highlighted one is picked */
+  const onScanEnter = (text: string, hasActiveOption: boolean): boolean => {
+    if (/^\d{6,}$/.test(text.trim()) || !hasActiveOption) {
+      void submitScan();
+      return true;
+    }
+    return false;
+  };
+
   const chooseSupplier = (text: string): void => {
     setSupplierText(text);
     const match = basics.suppliers.find((s) => s.name.trim().toLowerCase() === text.trim().toLowerCase());
@@ -355,20 +389,19 @@ export function PurchaseNewScreen() {
             <div className={styles.scan}>
               <FormField label={t.scanLabel}>
                 {(id) => (
-                  <input
+                  <Combobox
                     id={id}
-                    ref={scanRef}
-                    className={`control ${styles.scanInput}`}
+                    inputRef={scanRef}
+                    className={styles.scanInput}
                     value={scan}
-                    autoComplete="off"
-                    onChange={(e) => setScan(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void submitScan();
-                      }
-                    }}
-                    data-testid="purchase-scan"
+                    options={suggestOptions}
+                    filter={false}
+                    minChars={2}
+                    max={8}
+                    onText={(text) => setScan(text)}
+                    onPick={(o) => void pickSuggestion(o.id)}
+                    onEnterText={onScanEnter}
+                    testId="purchase-scan"
                   />
                 )}
               </FormField>
