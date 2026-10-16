@@ -4,7 +4,7 @@ import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { validateAllocations } from '../allocations';
-import { drawerBalance } from '../cash';
+import { drawerBalance, openShiftOfDevice } from '../cash';
 import { nextNumber } from '../numbering';
 import { loadSoldReturned, postedReturnLines } from '../returnable';
 import { enqueue } from '../outbox';
@@ -308,6 +308,9 @@ export async function voidInvoice(
     db.partyLedger.where('docId').equals(invoice.id).toArray(),
     db.cashMovements.where('docId').equals(invoice.id).toArray(),
   ]);
+  // the cash share goes back out of the drawer of the shift open on this device now, whatever the age or device of the invoice
+  const shift = cash.length > 0 ? await openShiftOfDevice(db, ctx.deviceId) : null;
+  if (cash.length > 0 && !shift) return err('NO_SHIFT', 'افتح وردية الأول');
   const stockMovements: StockMovement[] = stock.map((m) => ({
     ...newCommon(ctx),
     productId: m.productId,
@@ -330,8 +333,8 @@ export async function voidInvoice(
   }));
   const cashMovements: CashMovement[] = cash.map((m) => ({
     ...newCommon(ctx),
-    cashAccountId: m.cashAccountId,
-    shiftId: input.shiftId,
+    cashAccountId: shift!.cashAccountId as string,
+    shiftId: shift!.id,
     amount: -m.amount,
     method: m.method,
     docType: 'void',
@@ -361,7 +364,7 @@ export async function voidInvoice(
         number,
         issuedAt: now,
         workerId: ctx.workerId,
-        shiftId: input.shiftId,
+        shiftId: shift?.id ?? input.shiftId,
         status: 'posted' as const,
         voidedBy: null,
         notes: null,

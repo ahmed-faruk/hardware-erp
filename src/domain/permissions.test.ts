@@ -83,6 +83,12 @@ describe('sections', () => {
     expect(resolveAccess('manager', { 'report.sales': 'yes' }, 'report.returns')).toBe('no');
   });
 
+  it('R2: only a manager deletes a purchase invoice', () => {
+    expect(can('manager', 'voidPurchase')).toBe('yes');
+    expect(can('storekeeper', 'voidPurchase')).toBe('no');
+    expect(can('cashier', 'voidPurchase')).toBe('no');
+  });
+
   it('P4: the storekeeper returns purchases without an invoice by default; only a manager edits the value', () => {
     expect(can('storekeeper', 'purchaseReturnWithoutInvoice')).toBe('yes');
     expect(can('cashier', 'purchaseReturnWithoutInvoice')).toBe('no');

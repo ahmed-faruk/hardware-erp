@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Eye } from 'lucide-react';
+import { Eye, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useServices } from '@/app/session';
@@ -19,6 +19,7 @@ import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import { InvoiceFilters, statusChipClass } from './InvoiceFilters';
+import { useInvoiceDelete } from './useInvoiceDelete';
 import styles from './screens.module.css';
 
 const t = strings.invoiceSearch;
@@ -55,6 +56,7 @@ export function SalesInvoicesScreen() {
   const [legacyBusy, setLegacyBusy] = useState(false);
   const [offset, setOffset] = useState(0);
   const [detail, setDetail] = useState<LegacyDetail | null>(null);
+  const del = useInvoiceDelete('sale', () => setViewId(null));
 
   // the product box means the products matching a name or a barcode
   useEffect(() => {
@@ -161,6 +163,20 @@ export function SalesInvoicesScreen() {
         />
       ),
     },
+    {
+      key: 'delete',
+      header: '',
+      cell: (r) =>
+        del.allowed && r.status === 'posted' ? (
+          <ActionButton
+            label={strings.voidInvoice.button}
+            icon={Trash2}
+            variant="danger"
+            onClick={() => del.request(r.id)}
+            testId={`delete-${r.number}`}
+          />
+        ) : null,
+    },
   ];
   const oldColumns: Column<LegacyRow>[] = [
     { key: 'number', header: t.number, cell: (r) => <span dir="ltr">{r.number}</span> },
@@ -208,6 +224,7 @@ export function SalesInvoicesScreen() {
   return (
     <section>
       <h1 className={styles.title}>{t.title}</h1>
+      {del.notice}
       <div className={styles.toolbar}>
         <div className={styles.fixed}>
           <SegmentedControl
@@ -297,7 +314,13 @@ export function SalesInvoicesScreen() {
           )}
         </>
       )}
-      <InvoiceViewDialog kind="sale" invoiceId={viewId} onClose={() => setViewId(null)} />
+      <InvoiceViewDialog
+        kind="sale"
+        invoiceId={viewId}
+        onClose={() => setViewId(null)}
+        onDelete={del.allowed ? del.request : undefined}
+      />
+      {del.dialog}
       <Dialog
         title={detail ? detail.number : t.oldDetail}
         open={detail !== null}

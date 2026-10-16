@@ -51,6 +51,8 @@ create function pg_temp.ret(p_actor uuid, p_number text, p_inv uuid, q bigint, n
 $$;
 
 -- fixtures as the superuser (the seed has the scrap warehouse): an old invoice (60 days ago) with a line
+insert into shifts (id, company_id, number, cash_account_id, opened_at, opening_float, status, worker_id) values
+  ('0190f000-0000-7000-8000-0000000000b9', 'a0000000-0000-7000-8000-000000000001', 'K1-SHF-940001', 'a0000000-0000-7000-8000-000000000a11', now(), 10000, 'open', 'a0000000-0000-7000-8000-0000000000d3');
 insert into sales_invoices (id, company_id, number, issued_at, total, subtotal) values ('0190f000-0000-7000-8000-0000000000e0', 'a0000000-0000-7000-8000-000000000001', 'K1-INV-000900', now() - interval '60 days', 1000, 1000);
 insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost)
 values (md5('0190f000-0000-7000-8000-0000000000e0a')::uuid, 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000e0', 1, 'a0000000-0000-7000-8000-000000000001', 1000, 1000, 1000, 1000, 650);
@@ -83,7 +85,7 @@ reset role;
 create function pg_temp.void(p_actor uuid, p_number text, p_inv uuid, p_sign int default -1) returns jsonb language sql as $$
   with v as (select gen_random_uuid() vid)
   select pg_temp.row_of('voids', p_actor, jsonb_build_object(
-    'id', vid, 'number', p_number, 'issued_at', now(), 'worker_id', p_actor, 'created_by', p_actor, 'target_type', 'sales_invoice', 'target_id', p_inv, 'reason', 'x',
+    'id', vid, 'number', p_number, 'issued_at', now(), 'worker_id', p_actor, 'created_by', p_actor, 'shift_id', '0190f000-0000-7000-8000-0000000000b9', 'target_type', 'sales_invoice', 'target_id', p_inv, 'reason', 'x',
     'stock_movements', (select coalesce(jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'created_by', p_actor, 'product_id', product_id, 'warehouse_id', warehouse_id, 'qty', -qty * p_sign * -1, 'unit_cost', unit_cost, 'doc_type', 'void', 'doc_id', vid, 'occurred_at', now())), '[]') from stock_movements where doc_id = p_inv),
     'party_ledger', (select coalesce(jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'created_by', p_actor, 'party_type', party_type, 'party_id', party_id, 'amount', -amount, 'doc_type', 'void', 'doc_id', vid, 'occurred_at', now())), '[]') from party_ledger where doc_id = p_inv),
     'cash_movements', (select coalesce(jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'created_by', p_actor, 'cash_account_id', cash_account_id, 'amount', -amount, 'method', method, 'doc_type', 'void', 'doc_id', vid, 'occurred_at', now())), '[]') from cash_movements where doc_id = p_inv)))
