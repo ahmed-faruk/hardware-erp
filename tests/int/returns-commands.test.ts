@@ -2,7 +2,6 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it } from 'vitest';
 
-import { approveWithPin } from '@/db/commands/approval';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
 import { postCustomerReceipt, postSalesReturn, voidInvoice, voidReturn } from '@/db/commands/returns';
 import { openShift } from '@/db/commands/open-shift';
@@ -101,15 +100,12 @@ describe('sales return', () => {
     expect(await t.stock(t.scrap.id)).toBe(1000);
   });
 
-  it('after the return period a cashier needs the manager PIN; a manager does not', async () => {
+  it('there is no return period: a cashier returns a 400-day-old invoice with no PIN', async () => {
     const t = await setup();
     await t.ctx.db.salesInvoices.update(t.sold.id, {
-      issuedAt: new Date(Date.now() - 60 * 86_400_000).toISOString(),
+      issuedAt: new Date(Date.now() - 400 * 86_400_000).toISOString(),
     });
-    expect(await t.ret(1000)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'returnAfterPeriod');
-    if (!a.ok) throw new Error(a.code);
-    expect((await t.ret(1000, { approvalTokens: [a.value.token] })).ok).toBe(true);
+    expect((await t.ret(1000)).ok).toBe(true);
   });
 
   it('a cashier cannot return without an invoice', async () => {

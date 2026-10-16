@@ -6,7 +6,7 @@
 
 ## Incident log
 
-| Date       | Item                                                                                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-10-09 | A Supabase database password was written in chat. The project that password belonged to was deleted and both projects (staging, production) were recreated with generated passwords stored only in GitHub secrets. |
+| Date       | Item                                                                                                                                                                                                                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-09 | A Supabase database password was written in chat. The project that password belonged to was deleted and both projects (staging, production) were recreated with generated passwords stored only in GitHub secrets.                                                                                        |
 | 2026-10-16 | Plan v5 P6–P8 done: invoice search, reports by supplier, smart-report returns, two-device day test (`full-day-v5`), agent flow 22, one Chrome session on localhost with fixture PIN (GIF `p6-sales-invoices-filter.gif` in Downloads). Full local e2e: only the known Firefox category-report spec fails. |

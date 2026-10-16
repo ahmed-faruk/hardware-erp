@@ -36,8 +36,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
   const [phone, setPhone] = useState(initial.phone);
   const [address, setAddress] = useState(initial.address);
   const [footer, setFooter] = useState(initial.footer);
-  const [returnDays, setReturnDays] = useState(String(initial.returnPeriodDays));
-  const [purchaseReturnDays, setPurchaseReturnDays] = useState(String(initial.purchaseReturnPeriodDays));
   const [stockLimit, setStockLimit] = useState<number | null>(initial.stockApprovalAbove);
   const [scaleOn, setScaleOn] = useState(initial.scaleEnabled);
   const [scalePrefix, setScalePrefix] = useState(initial.scalePrefix);
@@ -63,10 +61,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
       scaleMode,
       shiftVarianceAbove: varianceLimit ?? DEFAULT_SETTINGS.shiftVarianceAbove,
       stockApprovalAbove: stockLimit ?? DEFAULT_SETTINGS.stockApprovalAbove,
-      returnPeriodDays: /^\d{1,4}$/.test(returnDays) ? Number(returnDays) : DEFAULT_SETTINGS.returnPeriodDays,
-      purchaseReturnPeriodDays: /^\d{1,4}$/.test(purchaseReturnDays)
-        ? Number(purchaseReturnDays)
-        : DEFAULT_SETTINGS.purchaseReturnPeriodDays,
     };
     for (const name of Object.keys(values) as (keyof Settings)[])
       await saveSetting(context, SETTING_KEYS[name], values[name]);
@@ -109,32 +103,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
             />
             {strings.settings.mayChangePrice}
           </label>
-          <FormField label={strings.settings.returnDays}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                inputMode="numeric"
-                dir="ltr"
-                value={returnDays}
-                onChange={(e) => setReturnDays(e.target.value.replace(/\D/g, ''))}
-                data-testid="return-days"
-              />
-            )}
-          </FormField>
-          <FormField label={strings.settings.purchaseReturnDays}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                inputMode="numeric"
-                dir="ltr"
-                value={purchaseReturnDays}
-                onChange={(e) => setPurchaseReturnDays(e.target.value.replace(/\D/g, ''))}
-                data-testid="purchase-return-days"
-              />
-            )}
-          </FormField>
         </div>
         <div className={styles.section}>
           <h2>{strings.settings.stockRules}</h2>

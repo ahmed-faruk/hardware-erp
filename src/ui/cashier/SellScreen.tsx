@@ -762,7 +762,6 @@ export function SellScreen() {
         shiftId={shift.id}
         cashAccountId={sale.cashAccountId}
         digits={digits}
-        ask={ask}
         scanned={scannedReceipt}
         onClose={() => {
           setReturnOpen(false);

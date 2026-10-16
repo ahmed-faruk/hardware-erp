@@ -76,96 +76,85 @@ test.describe('return periods and finding any invoice', () => {
     }
   });
 
-  test('a purchase return after the period needs the manager PIN; inside it a storekeeper returns alone', async ({
+  test('there is no return period: a storekeeper returns a 400-day-old purchase alone, no PIN', async ({
     page,
   }) => {
     const f = newCashierFixture();
     const keeper = addWorker('storekeeper');
-    const oldOne = purchaseOnServer(60);
-    const recent = purchaseOnServer(2);
+    const oldOne = purchaseOnServer(400);
     await login(page, f, keeper);
-    // inside the period: no PIN
-    await startPurchaseReturn(page, recent.number, recent.supplier);
-    await expect
-      .poll(
-        () =>
-          sql(
-            `select count(*) from purchase_returns r join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${recent.number}'`,
-          ),
-        {
-          timeout: 60_000,
-        },
-      )
-      .toBe('1');
-    // after the period: the PIN of a manager is asked and kept on the return
-    await startPurchaseReturn(page, oldOne.number, oldOne.supplier);
-    await expect(page.getByText(strings.sell.approve).first()).toBeVisible();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
-    await expect
-      .poll(
-        () =>
-          sql(
-            `select (r.approved_by is not null) from purchase_returns r join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${oldOne.number}'`,
-          ),
-        { timeout: 60_000 },
-      )
-      .toBe('t');
-  });
-
-  test('the manager sets the period to 90 days in Settings: then 60 days old needs no PIN, and the manager is never asked', async ({
-    page,
-    browser,
-  }) => {
-    const f = newCashierFixture();
-    const keeper = addWorker('storekeeper');
-    const oldOne = purchaseOnServer(60);
-    await login(page, f, { name: f.managerName, pin: f.pin });
-    // the manager returns a 60 day old purchase without any PIN
     await startPurchaseReturn(page, oldOne.number, oldOne.supplier);
     await expect(page.getByText(strings.sell.approve)).toHaveCount(0);
     await expect
       .poll(
         () =>
           sql(
-            `select count(*) from purchase_returns r join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${oldOne.number}'`,
+            `select count(*) || ':' || bool_and(r.approved_by is null) from purchase_returns r join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${oldOne.number}'`,
           ),
-        {
-          timeout: 60_000,
-        },
+        { timeout: 60_000 },
       )
-      .toBe('1');
-    // set the period to 90 days
-    await page.getByRole('button', { name: strings.nav.settings }).click();
-    await page.getByTestId('purchase-return-days').fill('90');
-    await page.getByTestId('save-settings').click();
-    await expect
-      .poll(
-        () =>
-          sql(`select value from settings where key = 'return.purchaseDays' and company_id = '${COMPANY}'`),
-        {
-          timeout: 60_000,
-        },
-      )
-      .toBe('90');
-    // a storekeeper on another device returns the same 60 day old purchase's second unit alone
-    const page2 = await (await browser.newContext()).newPage();
-    const second = newCashierFixture();
-    await login(page2, second, keeper);
-    await startPurchaseReturn(page2, oldOne.number, oldOne.supplier);
-    await expect(page2.getByText(strings.sell.approve)).toHaveCount(0);
+      .toBe('1:true');
+  });
+
+  test('the whole-invoice button returns every line of a purchase at once', async ({ page }) => {
+    const f = newCashierFixture();
+    const keeper = addWorker('storekeeper');
+    const one = purchaseOnServer(5);
+    await login(page, f, keeper);
+    await page.getByRole('button', { name: strings.nav.purchases }).click();
+    await page.getByTestId('new-purchase-return').click();
+    await page.getByTestId('purchase-supplier').selectOption({ label: one.supplier });
+    await page.getByTestId(`rt-all-${one.number}`).click();
+    await expect(page.getByTestId(`rt-qty-${one.number}-1`)).toHaveText('10');
+    await page.getByTestId('save-purchase-return').click();
     await expect
       .poll(
         () =>
           sql(
-            `select count(*) from purchase_returns r join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${oldOne.number}'`,
+            `select coalesce(sum(l.qty), 0) from purchase_return_lines l join purchase_returns r on r.id = l.return_id join purchase_invoices i on i.id = r.original_invoice_id where i.number = '${one.number}'`,
           ),
-        {
-          timeout: 60_000,
-        },
+        { timeout: 60_000 },
       )
-      .toBe('2');
-    sql(`delete from settings where key = 'return.purchaseDays' and company_id = '${COMPANY}'`);
+      .toBe('10000');
+  });
+
+  test('a cashier returns a 400-day-old sales invoice with no PIN, using the whole-invoice button', async ({
+    page,
+  }) => {
+    const f = newCashierFixture();
+    const id = randomUUID();
+    const number = `ZO${randomUUID().slice(0, 4).toUpperCase()}-INV-900001`;
+    sql(
+      `insert into sales_invoices (id, company_id, number, issued_at, total, subtotal) values ('${id}', '${COMPANY}', '${number}', now() - interval '400 days', 3500, 3500)`,
+    );
+    sql(
+      `insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost) values ('${randomUUID()}', '${COMPANY}', '${id}', 1, '${productId(2)}', 1000, 2000, 1500, 3000, 100)`,
+    );
+    sql(
+      `insert into sales_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_price, net_amount, unit_cost) values ('${randomUUID()}', '${COMPANY}', '${id}', 2, '${productId(3)}', 1000, 1000, 500, 500, 100)`,
+    );
+    sql(
+      `insert into payments (id, company_id, document_type, document_id, method, amount) values ('${randomUUID()}', '${COMPANY}', 'sales_invoice', '${id}', 'cash', 3500)`,
+    );
+    await login(page, f, { name: f.cashierName, pin: f.cashierPin });
+    await page.getByTestId('open-shift').click();
+    await page.keyboard.type('100');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('return').click();
+    await page.getByTestId('return-find').fill(number);
+    await page.getByTestId(`return-${number}`).click();
+    await page.getByTestId('return-all').click();
+    await expect(page.getByTestId('qty-1')).toHaveText('2');
+    await expect(page.getByTestId('qty-2')).toHaveText('1');
+    await page.getByTestId('confirm-return').click();
+    await expect
+      .poll(
+        () =>
+          sql(
+            `select count(*) || ':' || coalesce(sum(total), 0) from sales_returns where original_invoice_id = '${id}'`,
+          ),
+        { timeout: 60_000 },
+      )
+      .toBe('1:3500');
   });
 });

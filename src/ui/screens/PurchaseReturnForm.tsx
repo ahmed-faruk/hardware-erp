@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { ListChecks, Minus, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -10,7 +10,6 @@ import { formatMoney, formatQty, mulDivRound, toPiasters } from '@/domain/money'
 import { defaultReturnValue } from '@/domain/purchase-return';
 import { cairoTime } from '@/domain/receipt';
 
-import { useApproval } from '../cashier/ApprovalDialog';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { FormField } from '../components/FormField';
@@ -41,7 +40,6 @@ const t = strings.purchases;
 export function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
   const { db } = useServices();
   const { context, can } = useSession();
-  const { ask, dialog: approvalDialog } = useApproval();
   const basics = useBasics();
   const [supplierId, setSupplierId] = useState('');
   const [mode, setMode] = useState<Mode>('invoices');
@@ -136,14 +134,10 @@ export function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
               netAmount: x.net,
             })),
     };
-    let r = await postPurchaseReturn(context, base);
-    if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
-      const token = await ask('purchaseReturnAfterPeriod');
-      if (token) r = await postPurchaseReturn(context, { ...base, approvalTokens: [token] });
-    }
+    const r = await postPurchaseReturn(context, base);
     setBusy(false);
     if (r.ok) onDone();
-    else setError(r.code === 'APPROVAL_REQUIRED' ? t.returnNeedsManager : t.returnFailed);
+    else setError(t.returnFailed);
   };
 
   return (
@@ -194,6 +188,19 @@ export function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
                 <span dir="ltr">{cairoTime(inv.issuedAt).slice(0, 10)}</span> —{' '}
                 {formatMoney(inv.total as number)}
               </h2>
+              <ActionButton
+                icon={ListChecks}
+                variant="ghost"
+                label={t.returnAll}
+                disabled={lines.every((l) => l.left === 0)}
+                onClick={() =>
+                  setQty((m) => ({
+                    ...m,
+                    ...Object.fromEntries(lines.filter((l) => l.left > 0).map((l) => [l.id, l.left])),
+                  }))
+                }
+                testId={`rt-all-${inv.number}`}
+              />
               {lines.map((l) => (
                 <div key={l.id} className={styles.row}>
                   <span>
@@ -285,7 +292,6 @@ export function PurchaseReturnForm({ onDone }: { onDone: () => void }) {
         </div>
       )}
       {error && <BigAlert tone="danger" word={error} />}
-      {approvalDialog}
       <div className={styles.actions}>
         <ActionButton
           big

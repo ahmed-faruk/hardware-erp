@@ -64,7 +64,7 @@ Legacy (migrated OSPOS) documents have `legacy: true` and produce NO movements.
 - Refund value per unit = line `final_line / qtyMilli` (includes its share of invoice discount); cost back = original unitCost.
 - Refund method: cash (≤ drawer balance), reduce customer debt, store credit, or exchange.
 - Return without invoice: manager only, price entered, reason required.
-- Return period: setting in days; past it → manager PIN.
+- No return period (owner decision 2026-10-16): a return by invoice is allowed at any age; quantity caps only.
 
 ## 7. Costing
 - Moving weighted average per product (company level): on purchase
@@ -87,7 +87,7 @@ Open with counted float. Close: cashier enters counted cash by denomination BEFO
 The table below is the default of each role. A manager can build permission groups (every screen and button is an action; yes / pin / no) and give one to a worker: a worker with a group gets exactly the group, without a group he gets his role. Use `canCtx(ctx, action)` in commands and `useSession().can(action)` in screens, never `role ===`. Server: `worker_can()`.
 | Action | cashier | storekeeper | manager |
 | --- | --- | --- | --- |
-| Sell, hold carts, return with invoice within period | ✓ | ✗ | ✓ |
+| Sell, hold carts, return with invoice | ✓ | ✗ | ✓ |
 | Discount within role limit | ✓ | ✗ | ✓ |
 | Discount over limit, price override, credit over limit, no-sale drawer open | PIN | ✗ | ✓ |
 | See cost / profit | ✗ | ✗ | ✓ |

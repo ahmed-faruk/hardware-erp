@@ -31,7 +31,6 @@ import { computePurchase, costPerBase } from '@/domain/purchase';
 import { err, type Err } from '@/domain/result';
 import { defaultReturnValue } from '@/domain/purchase-return';
 import { computeReturnLine, type PriorReturn } from '@/domain/returns';
-import { isWithinReturnPeriod } from '@/domain/returnWindow';
 
 const id = z.string().min(1);
 const PAY_METHODS = ['cash', 'credit', 'card', 'instapay', 'wallet', 'other', 'owner'] as const;
@@ -347,7 +346,6 @@ const purchaseReturnInput = z.object({
   /** the refund is one payment of the whole value: off what we owe, or cash back into an account */
   refundTo: z.enum(['credit', 'cash']).default('credit'),
   cashAccountId: id.nullable().default(null),
-  approvalTokens: z.array(z.string()).default([]),
 });
 
 /** A purchase return: goods leave at the cost they came in; the refund lowers what we owe (credit) or comes back as cash. */
@@ -398,21 +396,6 @@ export async function postPurchaseReturn(
         qtyMilli: r.qty as number,
       }))
     : [];
-  // after the purchase return period, whoever may not return alone needs a manager's PIN (his approval is kept on the document);
-  // one approval covers every old invoice in the return
-  let approver: string | null = null;
-  const tokens: string[] = [];
-  if (linked && canCtx(ctx, 'purchaseReturnAfterPeriod') !== 'yes') {
-    const { purchaseReturnPeriodDays } = await loadSettings(db);
-    const nowAt = nowIso();
-    if (invoices.some((i) => !isWithinReturnPeriod(i!.issuedAt, nowAt, purchaseReturnPeriodDays))) {
-      const token = input.approvalTokens.find((t) => peekApproval(t, 'purchaseReturnAfterPeriod'));
-      const approval = token ? peekApproval(token, 'purchaseReturnAfterPeriod') : null;
-      if (!token || !approval) return err('APPROVAL_REQUIRED', 'purchaseReturnAfterPeriod');
-      approver = approval.approvedBy;
-      tokens.push(token);
-    }
-  }
   const returnId = uuidv7();
   const at = nowIso();
   const lines: LooseRow[] = [];
@@ -546,7 +529,7 @@ export async function postPurchaseReturn(
         subtotal: total,
         discount: 0,
         total,
-        approvedBy: approver,
+        approvedBy: null,
       };
       const audit = auditRow(
         ctx,
@@ -556,7 +539,6 @@ export async function postPurchaseReturn(
         { number, total },
         at,
       );
-      for (const t of tokens) spendApproval(t);
       await db.purchaseReturns.add(doc);
       await db.purchaseReturnLines.bulkAdd(lines);
       await db.payments.bulkAdd(payments);

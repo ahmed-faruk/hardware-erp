@@ -78,9 +78,9 @@ select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d3', 'K1-PRT-940008', 
 select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d1', 'K1-PRT-940009', 'a0000000-0000-7000-8000-000000000501',
   '[[null, "1", 1000, 500]]'), 'E_FORBIDDEN', 'a cashier cannot return purchases');
 select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-940010', 'a0000000-0000-7000-8000-000000000501',
-  '[["0190f000-0000-7000-8000-0000000000a1", "1", 1000, 500], ["0190f000-0000-7000-8000-0000000000a3", "3", 1000, 100]]'), 'E_FORBIDDEN', 'an old invoice among the lines needs the approval, for the whole return');
+  '[["0190f000-0000-7000-8000-0000000000a1", "1", 1000, 500], ["0190f000-0000-7000-8000-0000000000a3", "3", 1000, 100]]'), null, 'an old invoice among the lines needs no approval');
 select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-940011', 'a0000000-0000-7000-8000-000000000501',
-  '[["0190f000-0000-7000-8000-0000000000a1", "1", 1000, 500], ["0190f000-0000-7000-8000-0000000000a3", "3", 1000, 100]]', 'a0000000-0000-7000-8000-0000000000d3'), null, 'one manager approval covers both invoices');
+  '[["0190f000-0000-7000-8000-0000000000a1", "1", 1000, 500], ["0190f000-0000-7000-8000-0000000000a3", "3", 1000, 100]]', 'a0000000-0000-7000-8000-0000000000d3'), null, 'an approval is harmless');
 reset role;
 select is((select unit_cost from stock_movements where doc_id = (select id from purchase_returns where number = 'K1-PRT-940006') and doc_type = 'purchase_return'), 500::bigint, 'the goods of a return without invoice leave at the value they are returned for (10.00 for 2 = 5.00 each)');
 

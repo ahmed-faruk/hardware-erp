@@ -8,13 +8,10 @@ import { drawerBalance } from '../cash';
 import { nextNumber } from '../numbering';
 import { loadSoldReturned, postedReturnLines } from '../returnable';
 import { enqueue } from '../outbox';
-import { loadSettings } from '../settings';
-import { peekApproval, spendApproval } from './approval';
 import type { AuditRow, CashMovement, LooseRow, PartyLedgerRow, Payment, StockMovement } from '../types';
 import { mulDivRound } from '@/domain/money';
 import { err, type Err } from '@/domain/result';
 import { allocateRefund, checkFreeReturn, computeReturnLine, type PriorReturn } from '@/domain/returns';
-import { isWithinReturnPeriod } from '@/domain/returnWindow';
 
 const uuid = z.string().min(1);
 
@@ -40,7 +37,6 @@ const returnInput = z.object({
   reason: z.enum(RETURN_REASONS).nullable().default(null),
   shiftId: uuid,
   cashAccountId: uuid,
-  approvalTokens: z.array(z.string()).default([]),
 });
 export type ReturnInput = z.input<typeof returnInput>;
 
@@ -67,21 +63,6 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   const invoice = byInvoice ? await db.salesInvoices.get(input.originalInvoiceId!) : undefined;
   if (byInvoice && (!invoice || invoice.status !== 'posted'))
     return err('NOT_FOUND', 'الفاتورة مش موجودة أو ملغية');
-  const settings = await loadSettings(db);
-  let approver: string | null = null;
-  const tokens: string[] = [];
-  if (
-    invoice &&
-    ctx.role !== 'manager' &&
-    !isWithinReturnPeriod(invoice.issuedAt, now, settings.returnPeriodDays)
-  ) {
-    const token = input.approvalTokens.find((t) => peekApproval(t, 'returnAfterPeriod'));
-    const approval = token ? peekApproval(token, 'returnAfterPeriod') : null;
-    if (!token || !approval) return err('APPROVAL_REQUIRED', 'returnAfterPeriod');
-    approver = approval.approvedBy;
-    tokens.push(token);
-  }
-
   const soldLines = invoice ? await db.salesInvoiceLines.where('invoiceId').equals(invoice.id).toArray() : [];
   const prior: PriorReturn[] = invoice
     ? (
@@ -193,7 +174,6 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   if (split.cash > (await drawerBalance(db, input.shiftId)))
     return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
 
-  for (const t of tokens) spendApproval(t);
   const row = () => newCommon(ctx);
   const payments: Payment[] = [
     ...(split.cash > 0
@@ -266,7 +246,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
         total,
         refundMethod: split.cash > 0 ? 'cash' : 'credit',
         reason: input.reason,
-        approvedBy: approver,
+        approvedBy: null,
       };
       const audit: AuditRow = {
         ...row(),
@@ -276,7 +256,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
         before: null,
         after: { number, total },
         workerId: ctx.workerId,
-        approvedBy: approver,
+        approvedBy: null,
         occurredAt: now,
       };
       await db.salesReturns.add(doc);
