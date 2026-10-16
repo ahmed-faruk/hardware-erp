@@ -16,6 +16,7 @@ export interface PartyLine {
 const CUSTOMER_SHEET = 'العملاء';
 const SUPPLIER_SHEET = 'الموردين';
 const GUIDE_SHEET = 'تعليمات';
+const CASH_SHEET = 'النقدية';
 
 /** Suggested balance = credit amounts on history, returns subtracted. OSPOS has no receipts, so the owner corrects every row. */
 export function suggest(result: TransformResult): { customers: PartyLine[]; suppliers: PartyLine[] } {
@@ -65,6 +66,7 @@ export async function writeSheet(
     'العملاء: الرقم الموجب = العميل عليه فلوس لينا. الموردين: الرقم الموجب = إحنا عليه فلوس للمورد.',
     'عمود "المقترح" محسوب من النظام القديم، وهو دايمًا صفر تقريبًا لأن النظام القديم ماكانش بيسجل التحصيل.',
     'لا تغيّر عمود "المعرّف" ولا تحذف صفوف. القيمة بالجنيه، وحد أقصى رقمين بعد العلامة العشرية.',
+    'ورقة "النقدية": اكتب الفلوس اللي معاك فعلاً في الخزنة يوم بدء التشغيل (جنيه). صفر أو فاضي = مفيش رصيد افتتاحي للنقدية.',
   ].forEach((t, i) => (guide.getCell(`A${i + 1}`).value = t));
   guide.getColumn(1).width = 110;
   guide.getCell('A1').font = { bold: true, size: 14 };
@@ -93,12 +95,20 @@ export async function writeSheet(
     ws.getColumn('suggested').numFmt = '#,##0.00';
     ws.getColumn('approved').numFmt = '#,##0.00';
   }
+  const cash = wb.addWorksheet(CASH_SHEET, { views: [{ rightToLeft: true }] });
+  cash.getCell('A1').value = 'الفلوس اللي في الخزنة يوم بدء التشغيل (جنيه)';
+  cash.getCell('B1').value = 0;
+  cash.getCell('B1').numFmt = '#,##0.00';
+  cash.getColumn(1).width = 50;
+  cash.getColumn(2).width = 18;
   await wb.xlsx.writeFile(file);
 }
 
 export interface Approved {
   customers: Map<string, number>;
   suppliers: Map<string, number>;
+  /** the cash counted in the shop on the cutover day, piasters (0 or missing = no cash opening) */
+  cash?: number;
 }
 
 /** Reads the owner's sheet. Every problem is reported; nothing is guessed. */
@@ -133,13 +143,19 @@ export async function readSheet(
     for (const id of ids) if (!out.has(id)) problems.push(`${sheet}: ناقص صف للمعرّف ${id}`);
     return out;
   };
-  return {
-    approved: {
-      customers: read(CUSTOMER_SHEET, known.customers),
-      suppliers: read(SUPPLIER_SHEET, known.suppliers),
-    },
-    problems,
-  };
+  const customers = read(CUSTOMER_SHEET, known.customers);
+  const suppliers = read(SUPPLIER_SHEET, known.suppliers);
+  let cash = 0;
+  const cashSheet = wb.getWorksheet(CASH_SHEET);
+  const rawCash = cashSheet?.getCell('B1').value;
+  if (rawCash !== null && rawCash !== undefined && rawCash !== '') {
+    const v = typeof rawCash === 'object' && 'result' in rawCash ? Number(rawCash.result) : Number(rawCash);
+    if (!Number.isFinite(v) || v < 0) problems.push(`${CASH_SHEET}: القيمة مش رقم صحيح`);
+    else if (Math.abs(v * 100 - Math.round(v * 100)) > 1e-6)
+      problems.push(`${CASH_SHEET}: أكتر من رقمين عشريين`);
+    else cash = Math.round(v * 100);
+  }
+  return { approved: { customers, suppliers, cash }, problems };
 }
 
 /** Opening documents + ledger rows. Customers: + = owes us. Suppliers: ledger is negative when we owe them. */
@@ -147,7 +163,8 @@ export function openingRows(
   companyId: string,
   exportedAt: string,
   approved: Approved,
-): { openings: Row[]; party_ledger: Row[] } {
+  safeAccountId: string | null = null,
+): { openings: Row[]; party_ledger: Row[]; cash_movements: Row[] } {
   const common = (id: string) => ({
     id,
     company_id: companyId,
@@ -193,5 +210,34 @@ export function openingRows(
       });
     }
   }
-  return { openings, party_ledger };
+  // the cash counted on the cutover day goes into the main safe as one opening movement (money in)
+  const cash_movements: Row[] = [];
+  if ((approved.cash ?? 0) > 0 && safeAccountId) {
+    const id = legacyId('opening', 'cash');
+    openings.push({
+      ...common(id),
+      number: `LG-OPN-${String(n++).padStart(6, '0')}`,
+      issued_at: exportedAt,
+      worker_id: null,
+      shift_id: null,
+      status: 'posted',
+      voided_by: null,
+      notes: 'رصيد افتتاحي للنقدية معتمد من المالك',
+      is_legacy: false,
+      legacy: null,
+      kind: 'cash',
+      approved_by: null,
+    });
+    cash_movements.push({
+      ...common(legacyId('opening-balance', 'cash')),
+      cash_account_id: safeAccountId,
+      shift_id: null,
+      amount: approved.cash!,
+      method: 'cash',
+      doc_type: 'opening',
+      doc_id: id,
+      occurred_at: exportedAt,
+    });
+  }
+  return { openings, party_ledger, cash_movements };
 }

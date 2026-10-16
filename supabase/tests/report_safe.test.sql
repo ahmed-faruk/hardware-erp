@@ -1,5 +1,5 @@
 begin;
-select plan(23);
+select plan(24);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -33,6 +33,10 @@ insert into cash_movements (id, company_id, cash_account_id, amount, method, doc
   (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'a0000000-0000-7000-8000-000000000a13', 5000, 'cash', 'cash_transfer', '0190f000-0000-7000-8000-0000000000f9', now()),
   -- outside the period
   (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'a0000000-0000-7000-8000-000000000a11', 7777, 'cash', 'sales_invoice', gen_random_uuid(), now() - interval '10 days');
+-- a bank account also counts in cash now (one box)
+insert into cash_accounts (id, company_id, name, kind) values ('0190f000-0000-7000-8000-0000000000ba', 'a0000000-0000-7000-8000-000000000001', 'Bank', 'bank');
+insert into cash_movements (id, company_id, cash_account_id, amount, method, doc_type, doc_id, occurred_at) values
+  (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', '0190f000-0000-7000-8000-0000000000ba', 1000, 'cash', 'cash_transfer', gen_random_uuid(), now());
 -- sales invoices: a card sale 30.00 and an InstaPay sale 20.00 (posted), a voided card sale, an old one
 insert into sales_invoices (id, company_id, number, issued_at, total, subtotal, status) values
   ('0190f000-0000-7000-8000-0000000000c1', 'a0000000-0000-7000-8000-000000000001', 'K1-INV-960001', now(), 3000, 3000, 'posted'),
@@ -104,7 +108,8 @@ select is(
   (pg_temp.r() ->> 'total_in')::bigint - (pg_temp.r() ->> 'total_out')::bigint + (pg_temp.r() ->> 'adjust_total')::bigint,
   'net = in - out + adjustments');
 -- cards
-select is((pg_temp.r() -> 'cash_now' ->> 'total')::bigint, (select coalesce(sum(m.amount), 0)::bigint from cash_movements m join cash_accounts a on a.id = m.cash_account_id where a.kind in ('safe', 'drawer') and a.company_id = 'a0000000-0000-7000-8000-000000000001'), 'cash now = the safe plus every drawer, all time (the transfer and the old row included)');
+select is((pg_temp.r() -> 'cash_now' ->> 'total')::bigint, (select coalesce(sum(m.amount), 0)::bigint from cash_movements m where m.company_id = 'a0000000-0000-7000-8000-000000000001'), 'cash now = every cash movement of the company, all time (any account)');
+select is(pg_temp.r() -> 'cash_now' -> 'accounts', null, 'no list of accounts');
 select is((pg_temp.r() -> 'returns_today' ->> 'returns_total')::bigint, 1200::bigint, 'today: sales returns');
 select is((pg_temp.r() -> 'returns_today' ->> 'today_total')::bigint, 9200::bigint, 'today: returns 12.00 + deleted invoice 80.00');
 -- permission

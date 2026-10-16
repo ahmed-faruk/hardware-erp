@@ -7,7 +7,7 @@ import { strings } from '../../src/ui/strings.ar';
 import { login, newCashierFixture, sql } from './helpers';
 
 describe('the safe report', () => {
-  test('the manager opens «الخزنة» and the cash-now card equals the safe and drawers in the database', async ({
+  test('the manager opens «الخزنة» and the cash-now card equals every cash movement in the database', async ({
     app,
     screen,
     browser,
@@ -19,7 +19,7 @@ describe('the safe report', () => {
     await screen.getByTestId('report-tab-safe').tap();
     const now = Number(
       sql(
-        `select coalesce(sum(m.amount), 0) from cash_movements m join cash_accounts a on a.id = m.cash_account_id where a.kind in ('safe', 'drawer') and a.company_id = 'a0000000-0000-7000-8000-000000000001'`,
+        `select coalesce(sum(m.amount), 0) from cash_movements m where m.company_id = 'a0000000-0000-7000-8000-000000000001'`,
       ),
     );
     await expect(screen.getByTestId('safe-cash-now')).toBeVisible();

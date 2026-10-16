@@ -6,7 +6,7 @@ import styles from './SmartReport.module.css';
 
 export interface SafeCardsData {
   net: number;
-  cash_now: { total: number; accounts: { name: string; kind: string; balance: number }[] };
+  cash_now: { total: number };
   returns_today: {
     returns_count: number;
     returns_total: number;
@@ -29,11 +29,6 @@ export function SafeCards({ data }: { data: SafeCardsData }) {
       <div className={styles.kpi} data-testid="safe-cash-now-card">
         <span>{t.cashNow}</span>
         <strong data-testid="safe-cash-now">{formatMoney(data.cash_now.total)}</strong>
-        {data.cash_now.accounts.map((a) => (
-          <small key={`${a.kind}-${a.name}`} data-testid={`safe-account-${a.name}`}>
-            {`${a.kind === 'safe' ? t.safe : t.drawer} ${a.name}: ${formatMoney(a.balance)}`}
-          </small>
-        ))}
       </div>
       <div
         className={`${styles.kpi} ${r.today_total > 0 ? styles.kpiWarn : ''}`}

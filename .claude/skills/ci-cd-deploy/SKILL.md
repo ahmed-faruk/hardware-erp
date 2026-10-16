@@ -52,3 +52,6 @@ The `service_role` key is never stored in GitHub.
 - [ ] Secrets/variables above added.
 - [ ] Branch protection and environment reviewers on PRIVATE repos need a paid GitHub plan. On GitHub Free,
       `deploy.yml` re-runs unit tests and the build and deploys only if they pass; merge only PRs whose `ci` is green.
+
+## Wiping staging (owner's request, 2026-10-17)
+`staging-reset.yml` is a manual workflow, staging only: `confirm=staging` and `action=reset` (drops all staging data, applies the migrations, no test seed) or `action=inspect` (database and table sizes). It refuses when the staging ref equals the production ref. Never use it, or anything like it, for production.
