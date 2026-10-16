@@ -124,6 +124,53 @@ export function supplierDetailTables(d: SupplierDetailData, t: ReportLabels): Re
   }));
 }
 
+export interface SafeData {
+  in: { key: string; amount: number }[];
+  out: { key: string; amount: number }[];
+  adjust: { key: string; amount: number }[];
+  total_in: number;
+  total_out: number;
+  adjust_total: number;
+  net: number;
+  owner_paid: number;
+  legacy_count: number;
+}
+
+/** «الخزنة»: the money that came in, the money that went out, and the summary (adjustments carry their sign). */
+export function safeTables(d: SafeData, t: ReportLabels, keyName: (k: string) => string): ReportTable[] {
+  const lines = (rows: { key: string; amount: number }[]): string[][] =>
+    rows.map((r) => [keyName(r.key), m(r.amount)]);
+  const notes = [
+    d.owner_paid > 0 ? `${t.safeOwnerNote}: ${m(d.owner_paid)}` : '',
+    d.legacy_count > 0 ? `${t.legacy}: ${d.legacy_count}` : '',
+  ].filter(Boolean);
+  return [
+    {
+      title: t.safeIn!,
+      headers: [t.item!, t.amount!],
+      rows: lines(d.in),
+      totals: [t.total!, m(d.total_in)],
+    },
+    {
+      title: t.safeOut!,
+      headers: [t.item!, t.amount!],
+      rows: lines(d.out),
+      totals: [t.total!, m(d.total_out)],
+    },
+    {
+      title: t.safeSummary!,
+      headers: [t.item!, t.amount!],
+      rows: [
+        [t.safeIn!, m(d.total_in)],
+        [t.safeOut!, m(d.total_out)],
+        ...(d.adjust.length > 0 ? [[t.safeAdjust!, m(d.adjust_total)]] : []),
+        [t.safeNet!, m(d.net)],
+      ],
+      note: notes.length > 0 ? notes.join(' · ') : undefined,
+    },
+  ];
+}
+
 interface ProfitData {
   days: { day: string; revenue: number; cost: number; profit: number }[];
   total: { revenue: number; cost: number; profit: number };
