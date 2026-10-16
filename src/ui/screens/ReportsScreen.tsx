@@ -13,6 +13,8 @@ import {
   returnsTables,
   type ReturnsData,
   purchasesTables,
+  safeTables,
+  type SafeData,
   salesTables,
   stockTable,
   supplierDetailTables,
@@ -34,10 +36,12 @@ import { CategoryReport } from './CategoryReport';
 import { PeriodBar } from './PeriodBar';
 import { ReportActions, ReportTableView } from './ReportParts';
 import { ProductHistory } from './ProductHistory';
+import { SafeCards, type SafeCardsData } from './SafeCards';
 import { SmartReport } from './SmartReport';
 
 type Tab =
   | 'smart'
+  | 'safe'
   | 'sales'
   | 'profit'
   | 'purchases'
@@ -51,6 +55,7 @@ type Tab =
   | 'stock';
 const TABS: Tab[] = [
   'smart',
+  'safe',
   'sales',
   'profit',
   'purchases',
@@ -67,6 +72,8 @@ const TABS: Tab[] = [
 interface Loaded {
   key: string;
   tables: ReportTable[] | null;
+  /** the server's answer, for tabs that show cards besides the tables */
+  raw?: unknown;
   error: 'offline' | 'failed' | null;
 }
 
@@ -80,6 +87,7 @@ const reasonName = (r: string): string =>
   r;
 const methodName = (k: string): string => (strings.receipt.pay as Record<string, string>)[k] ?? k;
 const returnReason = (k: string): string => (strings.reports.returnReasons as Record<string, string>)[k] ?? k;
+const safeKeyName = (k: string): string => strings.reports.safeKeys[k] ?? k;
 const returnMethod = (k: string): string => (strings.reports.returnMethods as Record<string, string>)[k] ?? k;
 
 /** Manager reports: sales, profit, exceptions and devices come from the server (they include the old OpenSourcePOS history); stock comes from this device. */
@@ -107,6 +115,7 @@ export function ReportsScreen() {
     if (tab === 'stock' || tab === 'smart' || tab === 'productHistory' || tab === 'categories') return;
     let live = true;
     const name = {
+      safe: 'report_safe',
       sales: 'report_sales_summary',
       profit: 'report_profit',
       purchases: 'report_purchases',
@@ -141,30 +150,32 @@ export function ReportsScreen() {
             : strings.reports.tabs[tab],
       };
       const tables =
-        tab === 'sales'
-          ? salesTables(d, t, methodName)
-          : tab === 'profit'
-            ? [profitTable(d, t)]
-            : tab === 'purchases'
-              ? [
-                  ...purchasesTables(d, t),
-                  ...supplierDetailTables((r2 as { data: SupplierDetailData }).data, t),
-                ]
-              : tab === 'expenses'
-                ? expensesTables(d, t, time)
-                : tab === 'payroll'
-                  ? payrollTables(
-                      d,
-                      t,
-                      time,
-                      (k) => (strings.payroll.kinds as Record<string, string>)[k] ?? k,
-                    )
-                  : tab === 'returns'
-                    ? returnsTables(d as ReturnsData, retKind, t, time, returnReason, returnMethod)
-                    : tab === 'exceptions'
-                      ? exceptionsTables(d, t, time, reasonName)
-                      : [devicesTable(d, t, time)];
-      const value: Loaded = { key, tables, error: null };
+        tab === 'safe'
+          ? safeTables(d as SafeData, t, (k) => safeKeyName(k))
+          : tab === 'sales'
+            ? salesTables(d, t, methodName)
+            : tab === 'profit'
+              ? [profitTable(d, t)]
+              : tab === 'purchases'
+                ? [
+                    ...purchasesTables(d, t),
+                    ...supplierDetailTables((r2 as { data: SupplierDetailData }).data, t),
+                  ]
+                : tab === 'expenses'
+                  ? expensesTables(d, t, time)
+                  : tab === 'payroll'
+                    ? payrollTables(
+                        d,
+                        t,
+                        time,
+                        (k) => (strings.payroll.kinds as Record<string, string>)[k] ?? k,
+                      )
+                    : tab === 'returns'
+                      ? returnsTables(d as ReturnsData, retKind, t, time, returnReason, returnMethod)
+                      : tab === 'exceptions'
+                        ? exceptionsTables(d, t, time, reasonName)
+                        : [devicesTable(d, t, time)];
+      const value: Loaded = { key, tables, raw: d, error: null };
       RESULTS.set(key, { at: Date.now(), value });
       setLoaded(value);
     });
@@ -184,6 +195,10 @@ export function ReportsScreen() {
           ? loaded.tables
           : // the last answer for this tab and period shows at once while a fresh one loads
             (RESULTS.get(key)?.value.tables ?? null);
+  const safeRaw =
+    tab === 'safe'
+      ? ((loaded?.key === key ? loaded.raw : RESULTS.get(key)?.value.raw) as SafeCardsData | undefined)
+      : undefined;
   const error =
     tab !== 'stock' &&
     tab !== 'smart' &&
@@ -266,6 +281,7 @@ export function ReportsScreen() {
           <p data-testid="report-up-to">{upTo}</p>
           {error === 'offline' && <BigAlert tone="warn" word={strings.reports.needsNet} sound={false} />}
           {error === 'failed' && <BigAlert tone="danger" word={strings.reports.failed} sound={false} />}
+          {tab === 'safe' && safeRaw && <SafeCards data={safeRaw} />}
           {!tables && !error && <Skeleton />}
           {tables && (
             <>

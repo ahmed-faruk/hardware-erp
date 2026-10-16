@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   devicesTable,
+  safeTables,
   supplierDetailTables,
   expensesTables,
   historyTable,
@@ -477,5 +478,58 @@ describe('exceptions report: deleted documents', () => {
       ['R', 'B'],
       ['P', 'C'],
     ]);
+  });
+});
+
+describe('safeTables', () => {
+  const labels = {
+    safeIn: 'in',
+    safeOut: 'out',
+    safeSummary: 'summary',
+    safeAdjust: 'adjust',
+    safeNet: 'net',
+    safeOwnerNote: 'owner',
+    legacy: 'old',
+    item: 'item',
+    amount: 'amount',
+    total: 'total',
+  } as Record<string, string>;
+  const base = {
+    in: [
+      { key: 'cash_sales', amount: 10000 },
+      { key: 'card_sales', amount: 2500 },
+    ],
+    out: [{ key: 'expenses', amount: 4000 }],
+    adjust: [{ key: 'voids', amount: -1000 }],
+    total_in: 12500,
+    total_out: 4000,
+    adjust_total: -1000,
+    net: 7500,
+    owner_paid: 0,
+    legacy_count: 0,
+  };
+  it('lists money in and out with totals, and a summary whose net counts the signed adjustments', () => {
+    const [inT, outT, sum] = safeTables(base, labels, (k) => `k:${k}`);
+    expect(inT!.rows).toEqual([
+      ['k:cash_sales', '100.00'],
+      ['k:card_sales', '25.00'],
+    ]);
+    expect(inT!.totals).toEqual(['total', '125.00']);
+    expect(outT!.rows).toEqual([['k:expenses', '40.00']]);
+    expect(sum!.rows).toEqual([
+      ['in', '125.00'],
+      ['out', '40.00'],
+      ['adjust', '-10.00'],
+      ['net', '75.00'],
+    ]);
+    expect(sum!.note).toBeUndefined();
+  });
+  it('says what was paid from the owner pocket and how many old documents are in', () => {
+    const [, , sum] = safeTables({ ...base, owner_paid: 6000, legacy_count: 3 }, labels, (k) => k);
+    expect(sum!.note).toBe('owner: 60.00 · old: 3');
+  });
+  it('hides the adjustment row when there is none', () => {
+    const [, , sum] = safeTables({ ...base, adjust: [], adjust_total: 0, net: 8500 }, labels, (k) => k);
+    expect(sum!.rows.map((r) => r[0])).toEqual(['in', 'out', 'net']);
   });
 });

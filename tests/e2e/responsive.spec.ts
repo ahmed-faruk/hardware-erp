@@ -109,6 +109,7 @@ test('responsive: every report tab fits every width (no horizontal scroll, targe
     await page.setViewportSize({ width, height });
     for (const tab of [
       'smart',
+      'safe',
       'sales',
       'profit',
       'purchases',

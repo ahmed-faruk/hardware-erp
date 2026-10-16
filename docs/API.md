@@ -137,6 +137,10 @@ Read-only search over the imported OpenSourcePOS sales (`legacy_sales`), 100 row
 
 Per supplier with purchases in the period (device invoices and the imported archive): `invoices`, `total`, `list` (the newest 100 invoices: number, day, total) and `top` (5 products by net amount). `p_supplier` limits it to one supplier. Same period limit as the other reports.
 
+### `report_safe(p_from date, p_to date)` — manager devices only
+
+«الخزنة»: all the money in minus all the money out for the period (Cairo days, ≤ 400), on a cash basis. Money is cash, card, InstaPay, wallet and other; credit and owner-paid parts are not money (the owner-paid amount comes back as a note, `owner_paid`). Cash comes from the cash ledger of every account (transfers between accounts are left out; adjustments and deletes come back as signed `adjust` lines); non-cash money comes from posted sales and purchase payments, customer receipts and supplier payments; the old OpenSourcePOS sales and purchases count with their cash, card and other columns. Also returns `cash_now` (the safe and every drawer, all time, with each account's balance) and `returns_today` (today's posted sales returns plus the sales invoices deleted today). Needs the permission `report.safe`.
+
 ### `product_usage(p_product_id uuid)` — manager devices only
 
 What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`, except an **archive**: a product with history is accepted at stock 0 for a worker with `archiveProduct` (otherwise `E_FORBIDDEN`; with stock `E_IN_USE`). Clearing `deleted_at` on a product with history (restore) also needs `archiveProduct`.

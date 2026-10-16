@@ -57,6 +57,7 @@ export const ACTIONS = [
   // reports
   'view.reports',
   'report.smart',
+  'report.safe',
   'report.sales',
   'report.profit',
   'report.exceptions',
