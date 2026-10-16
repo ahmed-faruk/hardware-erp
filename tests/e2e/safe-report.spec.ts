@@ -104,8 +104,8 @@ test.describe('the safe report', () => {
     await expect(tables).toContainText(strings.reports.safeKeys.cash_sales!);
     await expect(tables).toContainText(strings.reports.safeKeys.card_sales!);
     await expect(tables).toContainText(strings.reports.safeNet);
-    // this device's drawer is listed among the accounts
-    await expect(page.locator('[data-testid^="safe-account-"]').first()).toBeVisible();
+    // one number, no list of accounts
+    await expect(page.locator('[data-testid^="safe-account-"]')).toHaveCount(0);
   });
 
   test('a cashier has no safe tab (and no reports at all)', async ({ page }) => {

@@ -640,12 +640,10 @@ export const strings = {
     } as Record<string, string>,
     safe: {
       net: 'الصافي في الفترة',
-      cashNow: 'فلوس الخزنة والأدراج دلوقتي',
+      cashNow: 'فلوس الخزنة دلوقتي',
       returnsToday: 'مرتجعات النهارده',
       returnsLine: 'مرتجع مبيعات',
       voidedLine: 'فواتير محذوفة',
-      drawer: 'درج',
-      safe: 'خزنة',
     },
     bySupplier: 'حسب المورد',
     allSuppliers: 'كل الموردين',

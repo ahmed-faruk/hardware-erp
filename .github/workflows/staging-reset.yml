@@ -1,0 +1,44 @@
+# Manual, STAGING ONLY (owner's request, 2026-10-17): wipe the staging database, or look at its size. Never touches production.
+name: staging-reset
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'type "staging" to confirm'
+        required: true
+      action:
+        description: 'reset (wipes ALL staging data) or inspect (read-only sizes)'
+        required: true
+        default: inspect
+        type: choice
+        options: [inspect, reset]
+permissions:
+  contents: read
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }}
+      STAGING_REF: ${{ secrets.SUPABASE_PROJECT_REF_STAGING }}
+      PROD_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+    steps:
+      - name: Guard
+        run: |
+          [ "${{ inputs.confirm }}" = "staging" ] || { echo "confirm must be: staging"; exit 1; }
+          [ -n "$STAGING_REF" ] || { echo "no staging ref"; exit 1; }
+          [ "$STAGING_REF" != "$PROD_REF" ] || { echo "REFUSED: the staging ref equals the production ref"; exit 1; }
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link staging
+        run: supabase link --project-ref "$STAGING_REF"
+      - name: Reset (wipes all staging data, no test seed)
+        if: ${{ inputs.action == 'reset' }}
+        run: supabase db reset --linked --no-seed
+      - name: Sizes
+        run: |
+          supabase inspect db db-size --linked
+          supabase inspect db table-sizes --linked

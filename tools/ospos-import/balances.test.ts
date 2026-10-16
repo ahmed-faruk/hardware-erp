@@ -79,3 +79,47 @@ describe('opening balances sheet', () => {
     expect(rows.party_ledger.every((l) => l.doc_type === 'opening')).toBe(true);
   });
 });
+
+describe('opening cash', () => {
+  const none = { customers: new Map<string, number>(), suppliers: new Map<string, number>() };
+  it('one cash opening of 1,234.50 goes into the safe as money in', () => {
+    const rows = openingRows(
+      result.stats.companyId,
+      data.meta.exportedAt,
+      { ...none, cash: 123450 },
+      'safe-1',
+    );
+    expect(rows.openings.map((o) => o.kind)).toEqual(['customers', 'suppliers', 'cash']);
+    expect(rows.cash_movements).toHaveLength(1);
+    expect(rows.cash_movements[0]).toMatchObject({
+      cash_account_id: 'safe-1',
+      amount: 123450,
+      doc_type: 'opening',
+      method: 'cash',
+    });
+  });
+  it('zero or no cash gives no cash opening', () => {
+    for (const cash of [0, undefined]) {
+      const rows = openingRows(result.stats.companyId, data.meta.exportedAt, { ...none, cash }, 'safe-1');
+      expect(rows.openings.map((o) => o.kind)).toEqual(['customers', 'suppliers']);
+      expect(rows.cash_movements).toEqual([]);
+    }
+  });
+  it('the sheet carries the cash: written as 0, read back in piasters, a bad value is reported', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'ospos-')), 'cash.xlsx');
+    const known = {
+      customers: new Set(result.tables.customers.map((r) => String(r.id))),
+      suppliers: new Set(result.tables.suppliers.filter((r) => r.active).map((r) => String(r.id))),
+    };
+    await writeSheet(file, suggest(result));
+    expect((await readSheet(file, known)).approved.cash).toBe(0);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    wb.getWorksheet('النقدية')!.getCell('B1').value = 1234.5;
+    await wb.xlsx.writeFile(file);
+    expect((await readSheet(file, known)).approved.cash).toBe(123450);
+    wb.getWorksheet('النقدية')!.getCell('B1').value = 'abc';
+    await wb.xlsx.writeFile(file);
+    expect((await readSheet(file, known)).problems.join('\n')).toMatch(/النقدية/);
+  });
+});

@@ -131,8 +131,30 @@ async function main(): Promise<void> {
         process.exitCode = 1;
         return;
       }
-      const rows = openingRows(result.stats.companyId, data.meta.exportedAt, approved);
-      await loadAll(db, { openings: rows.openings, party_ledger: rows.party_ledger }, console.log);
+      let safeId: string | null = null;
+      if ((approved.cash ?? 0) > 0) {
+        const { data: safe } = await db
+          .from('cash_accounts')
+          .select('id')
+          .eq('company_id', result.stats.companyId)
+          .eq('kind', 'safe')
+          .is('deleted_at', null)
+          .limit(1);
+        safeId = (safe?.[0]?.id as string | undefined) ?? null;
+        if (!safeId) {
+          console.error(
+            'There is no main safe yet: run "npm run device:add" for the first device, then apply the balances.',
+          );
+          process.exitCode = 1;
+          return;
+        }
+      }
+      const rows = openingRows(result.stats.companyId, data.meta.exportedAt, approved, safeId);
+      await loadAll(
+        db,
+        { openings: rows.openings, cash_movements: rows.cash_movements, party_ledger: rows.party_ledger },
+        console.log,
+      );
       writeFileSync(
         appliedFile(t.host),
         JSON.stringify({

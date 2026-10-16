@@ -90,6 +90,7 @@ export const TABLE_ORDER = [
   'barcodes',
   'openings',
   'stock_movements',
+  'cash_movements',
   'sales_invoices',
   'sales_invoice_lines',
   'sales_returns',

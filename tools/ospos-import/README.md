@@ -12,15 +12,15 @@ TARGET_SUPABASE_SERVICE_ROLE_KEY=<service_role key from the Supabase dashboard>
 
 Local database: values from `supabase status`. Any non-local target needs `--confirm <host>` on every write step.
 
-| Step | Command                            | What it does                                                                  |
-| ---- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| 1    | `npm run import -- read`           | checks the export format and prints counts                                    |
-| 2    | `npm run import -- transform`      | parse + match + transform → `out/rows/*.jsonl`, prints counts and warnings    |
-| 3    | `npm run import -- balances`       | writes `migration-data/opening-balances.xlsx` for the owner to fill           |
-| 4    | `npm run import -- load`           | `import_batch` in batches of 500, idempotent (safe to re-run)                 |
-| 5    | `npm run import -- apply-balances` | reads the owner's xlsx and loads the opening documents (refuses to run twice) |
-| 6    | `npm run import -- validate`       | writes `out/validation-report.md`; exit 1 if a blocking check fails           |
-| –    | `npm run import -- images`         | skipped: the first export has no product photos                               |
+| Step | Command                            | What it does                                                                                                                                                                                                                                                           |
+| ---- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `npm run import -- read`           | checks the export format and prints counts                                                                                                                                                                                                                             |
+| 2    | `npm run import -- transform`      | parse + match + transform → `out/rows/*.jsonl`, prints counts and warnings                                                                                                                                                                                             |
+| 3    | `npm run import -- balances`       | writes `migration-data/opening-balances.xlsx` for the owner to fill                                                                                                                                                                                                    |
+| 4    | `npm run import -- load`           | `import_batch` in batches of 500, idempotent (safe to re-run)                                                                                                                                                                                                          |
+| 5    | `npm run import -- apply-balances` | reads the owner's xlsx and loads the opening documents (refuses to run twice). The sheet «النقدية» holds the cash counted on the cutover day: it becomes one cash opening in the main safe (run `npm run device:add` for the first device before, it creates the safe) |
+| 6    | `npm run import -- validate`       | writes `out/validation-report.md`; exit 1 if a blocking check fails                                                                                                                                                                                                    |
+| –    | `npm run import -- images`         | skipped: the first export has no product photos                                                                                                                                                                                                                        |
 
 Order for a new environment: local → staging → production, each `load` then `validate`. Production: `--confirm <host>`.
 A re-run never duplicates (ids are UUID v5 of `ospos:<kind>:<id>`), but it also never changes a row that already exists: to
