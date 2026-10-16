@@ -51,6 +51,15 @@ export function SmartReport() {
   const kpis: [string, string, boolean?][] = [
     [t.kpiSales, formatMoney(k.todayNet)],
     [t.kpiInvoices, String(k.todayInvoices)],
+    [
+      t.kpiSalesBack,
+      `${formatMoney(data.returnsToday.sales.value)} (${data.returnsToday.sales.count})`,
+      data.returnsToday.sales.count > 0,
+    ],
+    [
+      t.kpiPurchasesBack,
+      `${formatMoney(data.returnsToday.purchases.value)} (${data.returnsToday.purchases.count})`,
+    ],
     [t.kpiBasket, formatMoney(k.avgBasket)],
     [t.kpiStock, formatMoney(k.stockValue)],
     [t.kpiReceivables, formatMoney(k.receivables), k.receivables > 0],
@@ -169,6 +178,28 @@ export function SmartReport() {
                       animationDelay: `${i * 90}ms`,
                     }}
                   />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.block} data-testid="smart-returned">
+          <h2>
+            {t.returnedTitle} <small>{t.returnedHint}</small>
+          </h2>
+          <div className={styles.card}>
+            {data.returned.length === 0 && <span>{t.returnedNone}</span>}
+            {data.returned.map((r, i) => (
+              <div key={r.productId} className={styles.item}>
+                <span>
+                  {r.name}
+                  <br />
+                  <small className={styles.note}>{`${r.sharePct}% ${t.returnedShare}`}</small>
+                </span>
+                <strong>{formatQty(r.returnedMilli)}</strong>
+                <div className={styles.bar}>
+                  <i style={{ width: `${Math.min(100, r.sharePct)}%`, animationDelay: `${i * 90}ms` }} />
                 </div>
               </div>
             ))}

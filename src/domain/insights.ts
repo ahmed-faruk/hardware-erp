@@ -200,3 +200,35 @@ export function hourHeat(events: SaleEvent[]): Heat {
     busiest: at,
   };
 }
+
+export interface ReturnedRow {
+  productId: string;
+  name: string;
+  returnedMilli: Milli;
+  soldMilli: Milli;
+  /** whole percent of what was sold (before returns) that came back */
+  sharePct: number;
+}
+
+/** The products customers send back most (by quantity), with the share of what was sold; products never returned are left out. */
+export function mostReturned(
+  returned: Map<string, Milli>,
+  soldGross: Map<string, Milli>,
+  names: Map<string, string>,
+  limit = 5,
+): ReturnedRow[] {
+  return [...returned.entries()]
+    .filter(([, qty]) => qty > 0)
+    .map(([productId, returnedMilli]) => {
+      const soldMilli = soldGross.get(productId) ?? 0;
+      return {
+        productId,
+        name: names.get(productId) ?? '',
+        returnedMilli,
+        soldMilli,
+        sharePct: soldMilli > 0 ? Math.round((returnedMilli * 100) / soldMilli) : 100,
+      };
+    })
+    .sort((a, b) => b.returnedMilli - a.returnedMilli || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   devicesTable,
+  supplierDetailTables,
   expensesTables,
   historyTable,
   payrollTables,
@@ -375,5 +376,51 @@ describe('returns report (F5)', () => {
     const t = returnsTables({ sales: empty, purchases: empty }, 'sales', labels, time, name, name);
     expect(t[0]).toMatchObject({ rows: [['0', '0.00']], note: undefined });
     expect(t[1]?.totals).toEqual(['الإجمالي', '0', '0.00', '0%']);
+  });
+});
+
+describe('supplierDetailTables', () => {
+  const t = {
+    invoices: 'inv',
+    invoiceNumber: 'no',
+    day: 'day',
+    amount: 'amt',
+    total: 'tot',
+    topProducts: 'top',
+  };
+  it('makes one table per supplier with the count, the invoices, the total and the top products', () => {
+    const out = supplierDetailTables(
+      {
+        suppliers: [
+          {
+            supplier_id: 'a',
+            name: 'S',
+            invoices: 2,
+            total: 4000,
+            list: [
+              { number: 'P-2', day: '2026-03-02', total: 1000 },
+              { number: 'P-1', day: '2026-03-01', total: 3000 },
+            ],
+            top: [{ name: 'Paint', net: 3000 }],
+          },
+        ],
+      },
+      t,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]!.title).toBe('S · inv: 2');
+    expect(out[0]!.rows).toEqual([
+      ['P-2', '2026-03-02', '10.00'],
+      ['P-1', '2026-03-01', '30.00'],
+    ]);
+    expect(out[0]!.totals).toEqual(['tot', '', '40.00']);
+    expect(out[0]!.note).toBe('top: Paint (30.00)');
+  });
+  it('has no note without products', () => {
+    const out = supplierDetailTables(
+      { suppliers: [{ supplier_id: 'a', name: 'S', invoices: 0, total: 0, list: [], top: [] }] },
+      t,
+    );
+    expect(out[0]!.note).toBeUndefined();
   });
 });
