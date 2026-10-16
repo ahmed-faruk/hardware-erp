@@ -27,7 +27,7 @@ jobs:
       - run: npm run test:int
       - run: npm run build
       - run: npx size-limit
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ hashFiles('package-lock.json') }}
