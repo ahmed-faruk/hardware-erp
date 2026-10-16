@@ -85,7 +85,7 @@ test.describe("today's invoices on the sale screen", () => {
       `insert into devices (id, company_id, name, prefix, kind, max_role) select device_id, company_id, 'other', 'O${run.slice(0, 2)}', 'pc', 'manager' from sales_invoices where number = '${other}' on conflict do nothing`,
     );
     await login(page, f);
-    await page.getByRole('button', { name: strings.nav.sell }).first().click();
+    await page.getByRole('button', { name: strings.nav.sell }).click();
     await page.getByTestId('open-shift').click();
     await page.keyboard.type('100');
     await page.keyboard.press('Enter');
@@ -229,7 +229,7 @@ test.describe('the sales invoices screen', () => {
   }) => {
     const f = newCashierFixture();
     await login(page, f);
-    await page.getByRole('button', { name: strings.nav.sell }).first().click();
+    await page.getByRole('button', { name: strings.nav.sell }).click();
     await page.getByTestId('open-shift').click();
     await page.keyboard.type('100');
     await page.keyboard.press('Enter');

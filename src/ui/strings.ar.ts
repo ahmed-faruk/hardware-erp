@@ -14,7 +14,7 @@ export const strings = {
     reports: 'التقارير',
     stock: 'تسوية المخزون',
     payroll: 'المرتبات',
-    salesInvoices: 'فواتير البيع',
+    salesInvoices: 'فواتير المبيعات',
   },
   common: {
     save: 'حفظ',
