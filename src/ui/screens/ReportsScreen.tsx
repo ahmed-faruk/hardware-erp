@@ -15,6 +15,8 @@ import {
   purchasesTables,
   salesTables,
   stockTable,
+  supplierDetailTables,
+  type SupplierDetailData,
   type ReportTable,
 } from '@/domain/reports';
 import type { Action } from '@/domain/permissions';
@@ -91,6 +93,8 @@ export function ReportsScreen() {
   const [from, setFrom] = useState(() => monthStart(cairoDay()));
   const [to, setTo] = useState(() => cairoDay());
   const [retKind, setRetKind] = useState<'sales' | 'purchases'>('sales');
+  const [supplier, setSupplier] = useState('');
+  const supplierList = useLiveQuery(() => db.suppliers.toArray(), [db]);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // the stock rows are read from this device only when the stock tab is open
   const stockRows = useLiveQuery(
@@ -98,7 +102,7 @@ export function ReportsScreen() {
     [db, tab],
   );
 
-  const key = `${tab}|${from}|${to}${tab === 'returns' ? `|${retKind}` : ''}`;
+  const key = `${tab}|${from}|${to}${tab === 'returns' ? `|${retKind}` : ''}${tab === 'purchases' ? `|${supplier}` : ''}`;
   useEffect(() => {
     if (tab === 'stock' || tab === 'smart' || tab === 'productHistory' || tab === 'categories') return;
     let live = true;
@@ -113,9 +117,19 @@ export function ReportsScreen() {
       devices: 'report_devices',
     }[tab];
     const args = tab === 'devices' ? {} : { p_from: from, p_to: to };
-    void callRpc<never>(client, name, args).then((r) => {
+    const detail =
+      tab === 'purchases'
+        ? callRpc<SupplierDetailData>(client, 'report_purchases_suppliers', {
+            ...args,
+            p_supplier: supplier || null,
+          })
+        : Promise.resolve(null);
+    void Promise.all([callRpc<never>(client, name, args), detail]).then(([r, r2]) => {
       if (!live) return;
-      if (!r.ok) return setLoaded({ key, tables: null, error: r.network ? 'offline' : 'failed' });
+      if (!r.ok || (r2 && !r2.ok)) {
+        const bad = !r.ok ? r : (r2 as { network: boolean });
+        return setLoaded({ key, tables: null, error: bad.network ? 'offline' : 'failed' });
+      }
       const d = r.data as never;
       const t = {
         ...labels,
@@ -132,7 +146,10 @@ export function ReportsScreen() {
           : tab === 'profit'
             ? [profitTable(d, t)]
             : tab === 'purchases'
-              ? purchasesTables(d, t)
+              ? [
+                  ...purchasesTables(d, t),
+                  ...supplierDetailTables((r2 as { data: SupplierDetailData }).data, t),
+                ]
               : tab === 'expenses'
                 ? expensesTables(d, t, time)
                 : tab === 'payroll'
@@ -154,7 +171,7 @@ export function ReportsScreen() {
     return () => {
       live = false;
     };
-  }, [client, tab, from, to, key, retKind]);
+  }, [client, tab, from, to, key, retKind, supplier]);
 
   const tables: ReportTable[] | null =
     tab === 'stock'
@@ -208,6 +225,27 @@ export function ReportsScreen() {
       ) : (
         <>
           {tab !== 'stock' && tab !== 'devices' && <PeriodBar from={from} to={to} onChange={preset} />}
+          {tab === 'purchases' && (
+            <div className={styles.toolbar}>
+              <label>
+                {strings.reports.oneSupplier}{' '}
+                <select
+                  value={supplier}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  data-testid="report-supplier"
+                >
+                  <option value="">{strings.reports.allSuppliers}</option>
+                  {(supplierList ?? [])
+                    .filter((x) => !x.deletedAt)
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
+          )}
           {tab === 'returns' && (
             <div className={styles.toolbar}>
               <div className={styles.fixed}>

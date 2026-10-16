@@ -100,6 +100,30 @@ export function purchasesTables(d: PurchasesData, t: ReportLabels): ReportTable[
   ];
 }
 
+export interface SupplierDetailData {
+  suppliers: {
+    supplier_id: string;
+    name: string;
+    invoices: number;
+    total: number;
+    list: { number: string; day: string; total: number }[];
+    top: { name: string; net: number }[];
+  }[];
+}
+
+/** One table per supplier: its invoices (number, day, amount) with the count in the title and the top products in the note. */
+export function supplierDetailTables(d: SupplierDetailData, t: ReportLabels): ReportTable[] {
+  return d.suppliers.map((s) => ({
+    title: `${s.name} · ${t.invoices}: ${s.invoices}`,
+    headers: [t.invoiceNumber!, t.day!, t.amount!],
+    rows: s.list.map((r) => [r.number, r.day, m(r.total)]),
+    totals: [t.total!, '', m(s.total)],
+    note: s.top.length
+      ? `${t.topProducts}: ${s.top.map((x) => `${x.name} (${m(x.net)})`).join(' · ')}`
+      : undefined,
+  }));
+}
+
 interface ProfitData {
   days: { day: string; revenue: number; cost: number; profit: number }[];
   total: { revenue: number; cost: number; profit: number };

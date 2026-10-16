@@ -132,6 +132,9 @@ A new product is accepted only from a worker with `addProduct` (manager always, 
 ### `search_legacy_sales(p_from, p_to, p_number, p_customer, p_min, p_max, p_method, p_product, p_kind, p_offset)` — manager devices only
 Read-only search over the imported OpenSourcePOS sales (`legacy_sales`), 100 rows a page, newest first. Returns `{matched, rows[]}` with numbers `LG-INV-<id>` / `LG-RET-<id>`. `legacy_sale_detail(p_id)` returns one sale with its lines. Used by the «التاريخ القديم» switch of the sales invoices screen (needs the internet).
 
+### `report_purchases_suppliers(p_from date, p_to date, p_supplier uuid default null)` — manager devices only
+Per supplier with purchases in the period (device invoices and the imported archive): `invoices`, `total`, `list` (the newest 100 invoices: number, day, total) and `top` (5 products by net amount). `p_supplier` limits it to one supplier. Same period limit as the other reports.
+
 ### `product_usage(p_product_id uuid)` — manager devices only
 
 What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`, except an **archive**: a product with history is accepted at stock 0 for a worker with `archiveProduct` (otherwise `E_FORBIDDEN`; with stock `E_IN_USE`). Clearing `deleted_at` on a product with history (restore) also needs `archiveProduct`.

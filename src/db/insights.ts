@@ -1,5 +1,5 @@
 import type { Milli, Piasters } from '@/domain/money';
-import type { ProductFacts, SaleEvent } from '@/domain/insights';
+import { mostReturned, type ProductFacts, type ReturnedRow, type SaleEvent } from '@/domain/insights';
 
 import type { HanafyDB } from './schema';
 
@@ -14,8 +14,16 @@ export interface Kpis {
   monthExpenses: Piasters;
 }
 
+export interface ReturnsToday {
+  count: number;
+  value: Piasters;
+}
+
 export interface InsightsData {
   today: string;
+  returnsToday: { sales: ReturnsToday; purchases: ReturnsToday };
+  /** the most returned products of the last 30 days */
+  returned: ReturnedRow[];
   kpis: Kpis;
   products: ProductFacts[];
   events: SaleEvent[];
@@ -47,24 +55,36 @@ export function cairoParts(iso: string): { day: string; hour: number; weekday: n
 
 /**
  * Everything the smart report needs, read from this device (so it works offline and includes the imported history).
- * Sales speed uses the last 30 days of posted invoices, gross of returns.
+ * Sales speed and revenue use the last 30 days of posted invoices net of the returns; today's sales are net of today's returns.
  */
 export async function loadInsights(db: HanafyDB, now = new Date()): Promise<InsightsData> {
   const today = cairoParts(now.toISOString()).day;
   const since = (days: number): string => new Date(now.getTime() - days * 86_400_000).toISOString();
   const cut30 = since(30);
   const monthFirst = `${today.slice(0, 8)}01`;
-  const [invoices, products, balances, suppliers, customers, parties, expenses, categories] =
-    await Promise.all([
-      db.salesInvoices.where('issuedAt').aboveOrEqual(since(90)).toArray(),
-      db.products.toArray(),
-      db.stockBalances.toArray(),
-      db.suppliers.toArray(),
-      db.customers.toArray(),
-      db.partyBalances.toArray(),
-      db.expenses.where('issuedAt').aboveOrEqual(`${monthFirst}T00:00:00`).toArray(),
-      db.categories.toArray(),
-    ]);
+  const [
+    invoices,
+    products,
+    balances,
+    suppliers,
+    customers,
+    parties,
+    expenses,
+    categories,
+    salesReturns,
+    purchaseReturns,
+  ] = await Promise.all([
+    db.salesInvoices.where('issuedAt').aboveOrEqual(since(90)).toArray(),
+    db.products.toArray(),
+    db.stockBalances.toArray(),
+    db.suppliers.toArray(),
+    db.customers.toArray(),
+    db.partyBalances.toArray(),
+    db.expenses.where('issuedAt').aboveOrEqual(`${monthFirst}T00:00:00`).toArray(),
+    db.categories.toArray(),
+    db.salesReturns.filter((r) => r.status === 'posted' && (r.issuedAt as string) >= cut30).toArray(),
+    db.purchaseReturns.filter((r) => r.status === 'posted' && (r.issuedAt as string) >= cut30).toArray(),
+  ]);
   const posted = invoices.filter((i) => i.status === 'posted');
   const parts = new Map(posted.map((i) => [i.id, cairoParts(i.issuedAt)]));
   const events: SaleEvent[] = posted.map((i) => ({
@@ -90,6 +110,28 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
     sold.set(l.productId, e);
   }
 
+  // returns of the last 30 days: speed and revenue are net of them, the most returned products show their share
+  const retLines = await db.salesReturnLines
+    .where('returnId')
+    .anyOf(salesReturns.map((r) => r.id))
+    .toArray();
+  const originals = await db.salesInvoiceLines.bulkGet(
+    retLines.map((l) => (l.originalLineId as string | null) ?? ''),
+  );
+  const soldGross = new Map<string, Milli>();
+  for (const [id, e] of sold) soldGross.set(id, e.milli);
+  const returnedMilli = new Map<string, Milli>();
+  retLines.forEach((l, i) => {
+    const id = l.productId as string | null;
+    if (!id) return;
+    const milli = Math.round(((l.qty as number) * (originals[i]?.unitFactor ?? 1000)) / 1000);
+    returnedMilli.set(id, (returnedMilli.get(id) ?? 0) + milli);
+    const e = sold.get(id) ?? { milli: 0, revenue: 0, last: '' };
+    e.milli -= milli;
+    e.revenue -= l.netAmount as number;
+    sold.set(id, e);
+  });
+
   const stock = new Map<string, Milli>();
   for (const b of balances) stock.set(b.productId, (stock.get(b.productId) ?? 0) + b.qty);
   const supplierName = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -111,11 +153,20 @@ export async function loadInsights(db: HanafyDB, now = new Date()): Promise<Insi
     });
 
   const todays = posted.filter((i) => parts.get(i.id)!.day === today);
-  const todayNet = todays.reduce((a, i) => a + i.total, 0);
+  const salesBackToday = salesReturns.filter((r) => cairoParts(r.issuedAt as string).day === today);
+  const purchasesBackToday = purchaseReturns.filter((r) => cairoParts(r.issuedAt as string).day === today);
+  const sumTotal = (rows: Record<string, unknown>[]): Piasters =>
+    rows.reduce((a, r) => a + Number(r.total ?? 0), 0);
+  const todayNet = todays.reduce((a, i) => a + i.total, 0) - sumTotal(salesBackToday);
   const sumParty = (type: 'customer' | 'supplier', sign: 1 | -1): Piasters =>
     parties.filter((p) => p.partyType === type).reduce((a, p) => a + Math.max(0, sign * p.amount), 0);
   return {
     today,
+    returnsToday: {
+      sales: { count: salesBackToday.length, value: sumTotal(salesBackToday) },
+      purchases: { count: purchasesBackToday.length, value: sumTotal(purchasesBackToday) },
+    },
+    returned: mostReturned(returnedMilli, soldGross, new Map(products.map((p) => [p.id, p.name]))),
     kpis: {
       todayNet,
       todayInvoices: todays.length,

@@ -118,5 +118,47 @@ describe('loadInsights', () => {
     expect(p.lastSoldDay).toBe('2026-10-10');
     expect(d.events).toHaveLength(3); // the 90-day window
     expect(reorderPlan(d.products, 30)).toHaveLength(0); // 3 units / 30 days with 24 on the shelf: nothing to buy
+    expect(d.returned).toEqual([]);
+
+    // one unit comes back today (and a voided return does not count); a purchase goes back too
+    const doc = (id: string, status: string, total: number) => ({
+      ...stamp,
+      id,
+      number: id,
+      issuedAt: at(0),
+      status,
+      total,
+    });
+    await db.salesReturns.bulkAdd([doc('r1', 'posted', 92_500), doc('r2', 'voided', 92_500)] as never);
+    await db.salesReturnLines.bulkAdd([
+      {
+        ...stamp,
+        id: 'rl1',
+        returnId: 'r1',
+        productId: 'p1',
+        originalLineId: 'l1',
+        qty: 1000,
+        netAmount: 92_500,
+      },
+      {
+        ...stamp,
+        id: 'rl2',
+        returnId: 'r2',
+        productId: 'p1',
+        originalLineId: 'l1',
+        qty: 1000,
+        netAmount: 92_500,
+      },
+    ] as never);
+    await db.purchaseReturns.bulkAdd([doc('pr1', 'posted', 30_000)] as never);
+    const back = await loadInsights(db, NOW);
+    expect(back.returnsToday.sales).toEqual({ count: 1, value: 92_500 });
+    expect(back.returnsToday.purchases).toEqual({ count: 1, value: 30_000 });
+    expect(back.kpis.todayNet).toBe(185_000 - 92_500);
+    expect(back.kpis.avgBasket).toBe(185_000 - 92_500);
+    expect(back.products[0]!.sold30Milli).toBe(2000); // 3 sold, 1 returned
+    expect(back.returned).toEqual([
+      { productId: 'p1', name: 'دهان', returnedMilli: 1000, soldMilli: 3000, sharePct: 33 },
+    ]);
   });
 });

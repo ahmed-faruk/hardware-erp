@@ -4,6 +4,7 @@ import {
   customerCadence,
   deadStock,
   hourHeat,
+  mostReturned,
   reorderPlan,
   topSellers,
   type ProductFacts,
@@ -141,5 +142,34 @@ describe('hourHeat', () => {
   });
   it('is empty when nothing was sold', () => {
     expect(hourHeat([]).busiest).toBeNull();
+  });
+});
+
+describe('mostReturned', () => {
+  it('ranks by returned quantity with the share of what was sold, and drops products never returned', () => {
+    const rows = mostReturned(
+      new Map([
+        ['a', 2000],
+        ['b', 5000],
+        ['c', 0],
+      ]),
+      new Map([
+        ['a', 8000],
+        ['b', 10_000],
+        ['c', 1000],
+      ]),
+      new Map([
+        ['a', 'A'],
+        ['b', 'B'],
+      ]),
+    );
+    expect(rows.map((r) => [r.productId, r.sharePct])).toEqual([
+      ['b', 50],
+      ['a', 25],
+    ]);
+  });
+  it('keeps only the limit', () => {
+    const ret = new Map(Array.from({ length: 8 }, (_, i) => [`p${i}`, 1000 + i] as [string, number]));
+    expect(mostReturned(ret, new Map(), new Map(), 5)).toHaveLength(5);
   });
 });
