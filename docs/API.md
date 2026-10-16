@@ -129,6 +129,9 @@ Posted returns of the period (Cairo days, voided ones left out), device document
 
 A new product is accepted only from a worker with `addProduct` (manager always, storekeeper by default, a permission group can take it away). A supplier row is accepted from a worker with `addSupplier` when it is new; changing an existing supplier needs `settings`. The purchase invoice carries `supplier_ref` (the supplier's paper number) and the invoice discount as line discounts (their sum is `purchase_invoices.discount`).
 
+### `search_legacy_sales(p_from, p_to, p_number, p_customer, p_min, p_max, p_method, p_product, p_kind, p_offset)` — manager devices only
+Read-only search over the imported OpenSourcePOS sales (`legacy_sales`), 100 rows a page, newest first. Returns `{matched, rows[]}` with numbers `LG-INV-<id>` / `LG-RET-<id>`. `legacy_sale_detail(p_id)` returns one sale with its lines. Used by the «التاريخ القديم» switch of the sales invoices screen (needs the internet).
+
 ### `product_usage(p_product_id uuid)` — manager devices only
 
 What touches a product, as counts: `sales`, `sales_returns`, `purchases`, `purchase_returns`, `movements`, `adjustments`, `legacy_sales`, `legacy_purchases` (imported history, found through `products.legacy_item_id`) and `stock_milli`. The product screen asks it (internet needed) before offering «حذف الصنف». A push that sets `deleted_at` on a product with any count or stock is refused with `E_IN_USE`, except an **archive**: a product with history is accepted at stock 0 for a worker with `archiveProduct` (otherwise `E_FORBIDDEN`; with stock `E_IN_USE`). Clearing `deleted_at` on a product with history (restore) also needs `archiveProduct`.

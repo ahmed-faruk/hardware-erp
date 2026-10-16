@@ -4,6 +4,7 @@ export type Role = 'cashier' | 'storekeeper' | 'manager';
 export const ACTIONS = [
   // sale screen
   'view.sell',
+  'view.salesInvoices',
   'sell',
   'holdCart',
   'returnWithInvoice',
@@ -104,6 +105,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     key: 'sell',
     actions: [
       'view.sell',
+      'view.salesInvoices',
       'sell',
       'holdCart',
       'returnWithInvoice',
