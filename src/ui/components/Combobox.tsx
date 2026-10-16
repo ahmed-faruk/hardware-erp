@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type Ref } from 'react';
 
 import { cx } from '../cx';
 import { strings } from '../strings.ar';
@@ -23,6 +23,11 @@ export function Combobox({
   placeholder,
   testId,
   max = 50,
+  filter = true,
+  minChars = 0,
+  onEnterText,
+  inputRef,
+  className,
 }: {
   id: string;
   value: string;
@@ -32,12 +37,24 @@ export function Combobox({
   placeholder?: string;
   testId?: string;
   max?: number;
+  /** false: `options` are shown as given (the caller already searched); default: they are narrowed by the text */
+  filter?: boolean;
+  /** the list opens only once the text has this many characters */
+  minChars?: number;
+  /** Enter was pressed: return true when the caller handled it (nothing is picked then) */
+  onEnterText?: (text: string, hasActiveOption: boolean) => boolean;
+  inputRef?: Ref<HTMLInputElement>;
+  className?: string;
 }) {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const needle = value.trim().toLowerCase();
-  const shown = options.filter((o) => !needle || o.label.toLowerCase().includes(needle)).slice(0, max);
+  const shown = options
+    .filter((o) => !filter || !needle || o.label.toLowerCase().includes(needle))
+    .slice(0, max);
+  // a caller that searched for itself shows nothing (rather than "no matches") until it has results
+  const listOpen = open && value.trim().length >= minChars && (filter || shown.length > 0);
   const pick = (o: ComboOption): void => {
     onPick(o);
     setOpen(false);
@@ -46,12 +63,13 @@ export function Combobox({
     <div className={styles.root}>
       <input
         id={id}
-        className="control"
+        ref={inputRef}
+        className={cx('control', className)}
         role="combobox"
-        aria-expanded={open}
+        aria-expanded={listOpen}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && shown[active] ? `${listId}-${active}` : undefined}
+        aria-activedescendant={listOpen && shown[active] ? `${listId}-${active}` : undefined}
         autoComplete="off"
         value={value}
         placeholder={placeholder}
@@ -71,7 +89,9 @@ export function Combobox({
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setActive((a) => Math.max(a - 1, 0));
-          } else if (e.key === 'Enter' && open && shown[active]) {
+          } else if (e.key === 'Enter' && onEnterText?.(value, listOpen && !!shown[active]) === true) {
+            e.preventDefault();
+          } else if (e.key === 'Enter' && listOpen && shown[active]) {
             e.preventDefault();
             pick(shown[active]);
           } else if (e.key === 'Escape') {
@@ -79,7 +99,7 @@ export function Combobox({
           }
         }}
       />
-      {open && (
+      {listOpen && (
         <ul
           className={styles.list}
           role="listbox"
