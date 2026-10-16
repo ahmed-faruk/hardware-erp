@@ -21,7 +21,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.PROD_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.PROD_SUPABASE_ANON_KEY }}
       # e2e already ran on the PR against local Supabase; never run e2e against production data
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.120.0
       - name: migrate production (before frontend)
