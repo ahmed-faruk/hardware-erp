@@ -11,7 +11,7 @@ jobs:
       matrix: { browser: [chromium, firefox, webkit] }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - uses: supabase/setup-cli@v1
@@ -29,7 +29,7 @@ jobs:
       E2E_TELEMETRY_DISABLED: 1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - uses: supabase/setup-cli@v1
@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm }
       - run: npm ci && npm run build
       - uses: supabase/setup-cli@v1
