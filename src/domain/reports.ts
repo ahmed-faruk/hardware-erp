@@ -140,7 +140,14 @@ export function profitTable(d: ProfitData, t: ReportLabels): ReportTable {
 }
 
 interface ExceptionsData {
-  voids: { number: string; at: string; reason: string; worker: string }[];
+  voids: {
+    number: string;
+    at: string;
+    reason: string;
+    worker: string;
+    target_type?: string;
+    target_number?: string;
+  }[];
   reprints: number;
   no_sales: { at: string; worker: string; approved_by: string }[];
   discounts: { lines: number; amount: number };
@@ -183,8 +190,19 @@ export function exceptionsTables(
     },
     {
       title: t.voids!,
-      headers: [t.number!, t.time!, t.reason!, t.worker!],
-      rows: d.voids.map((r) => [r.number, time(r.at), reasonName(r.reason), r.worker]),
+      headers: [t.number!, t.voidKind!, t.voidTarget!, t.time!, t.reason!, t.worker!],
+      rows: d.voids.map((r) => [
+        r.number,
+        (r.target_type === 'sales_return'
+          ? t.voidSalesReturn
+          : r.target_type === 'purchase_invoice'
+            ? t.voidPurchaseInvoice
+            : t.voidSalesInvoice) ?? '',
+        r.target_number ?? '—',
+        time(r.at),
+        reasonName(r.reason),
+        r.worker,
+      ]),
     },
     {
       title: t.noSales!,

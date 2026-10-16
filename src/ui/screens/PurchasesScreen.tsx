@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Eye, Plus, Printer, Undo2 } from 'lucide-react';
+import { Eye, Plus, Printer, Trash2, Undo2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useServices } from '@/app/session';
@@ -13,6 +13,7 @@ import { type Column, DataTable } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
 import { InvoiceViewDialog } from '../components/InvoiceView';
+import { useInvoiceDelete } from './useInvoiceDelete';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
@@ -63,6 +64,7 @@ export function PurchasesScreen() {
       }));
   }, [db]);
   const [viewId, setViewId] = useState<string | null>(null);
+  const del = useInvoiceDelete('purchase', () => setViewId(null));
   const print = async (id: string): Promise<void> => {
     const [{ loadPurchaseDocument }, render, { printHtml, cairoFontFaces }] = await Promise.all([
       import('@/db/purchase-document'),
@@ -111,6 +113,18 @@ export function PurchasesScreen() {
             onClick={() => void print(p.id)}
             testId={`print-${p.number}`}
           />
+          {del.allowed && p.status === 'posted' && (
+            <ActionButton
+              label={strings.voidPurchase.button}
+              icon={Trash2}
+              variant="danger"
+              onClick={() => del.request(p.id)}
+              testId={`delete-purchase-${p.number}`}
+            />
+          )}
+          {p.status === 'voided' && (
+            <strong data-testid={`purchase-voided-${p.number}`}>{strings.voidInvoice.deleted}</strong>
+          )}
         </>
       ),
     },
@@ -118,6 +132,7 @@ export function PurchasesScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.purchases.title}</h1>
+      {del.notice}
       <div className={styles.toolbar}>
         <div className={styles.fixed}>
           <ActionButton
@@ -176,7 +191,13 @@ export function PurchasesScreen() {
           )}
         </>
       )}
-      <InvoiceViewDialog kind="purchase" invoiceId={viewId} onClose={() => setViewId(null)} />
+      <InvoiceViewDialog
+        kind="purchase"
+        invoiceId={viewId}
+        onClose={() => setViewId(null)}
+        onDelete={del.allowed ? del.request : undefined}
+      />
+      {del.dialog}
       <Dialog title={strings.purchases.newReturn} open={returnOpen} onClose={() => setReturnOpen(false)}>
         <PurchaseReturnForm onDone={() => setReturnOpen(false)} />
       </Dialog>

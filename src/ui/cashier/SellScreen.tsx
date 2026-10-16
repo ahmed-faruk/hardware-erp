@@ -47,7 +47,8 @@ import { ChangeDisplay } from './ChangeDisplay';
 import { DiscountDialog } from './DiscountDialog';
 import { NumEntry } from './NumEntry';
 import { PayScreen } from './PayScreen';
-import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog, VoidReasonDialog } from './SellDialogs';
+import { VoidReasonDialog } from '../components/VoidReasonDialog';
+import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
 import { CollectionDialog } from './CollectionDialog';
 import { ReturnDialog } from './ReturnDialog';
 import {

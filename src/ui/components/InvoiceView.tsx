@@ -25,17 +25,21 @@ interface Props {
   onClose: () => void;
   /** a manager may void a return from here (only passed on the sell screen, where the shift is known) */
   onVoidReturn?: (returnId: string) => void;
+  /** a manager may delete the invoice from here (only passed where the permission is held) */
+  onDelete?: (invoiceId: string) => void;
 }
 
 /** The data of a sales or purchase invoice on the screen, with the same print as the list's print button. */
-export function InvoiceViewDialog({ kind, invoiceId, onClose, onVoidReturn }: Props) {
+export function InvoiceViewDialog({ kind, invoiceId, onClose, onVoidReturn, onDelete }: Props) {
   return (
     <Dialog
       title={kind === 'sale' ? t.saleTitle : t.purchaseTitle}
       open={invoiceId !== null}
       onClose={onClose}
     >
-      {invoiceId && <Body kind={kind} invoiceId={invoiceId} onVoidReturn={onVoidReturn} />}
+      {invoiceId && (
+        <Body kind={kind} invoiceId={invoiceId} onVoidReturn={onVoidReturn} onDelete={onDelete} />
+      )}
     </Dialog>
   );
 }
@@ -44,10 +48,12 @@ function Body({
   kind,
   invoiceId,
   onVoidReturn,
+  onDelete,
 }: {
   kind: InvoiceKind;
   invoiceId: string;
   onVoidReturn?: (returnId: string) => void;
+  onDelete?: (invoiceId: string) => void;
 }) {
   const { db } = useServices();
   const view = useLiveQuery(() => loadInvoiceView(db, kind, invoiceId), [db, kind, invoiceId]);
@@ -182,6 +188,15 @@ function Body({
             ))}
           </ul>
         </>
+      )}
+      {onDelete && view.status === 'posted' && (
+        <ActionButton
+          big
+          label={strings.voidInvoice.button}
+          variant="danger"
+          onClick={() => onDelete(invoiceId)}
+          testId="iv-delete"
+        />
       )}
       <ActionButton
         big

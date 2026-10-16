@@ -10,6 +10,7 @@ import { lastPurchaseLine } from '../purchase-return';
 import { loadSettings } from '../settings';
 import { peekApproval, spendApproval } from './approval';
 import { upsertRow } from './save-master';
+import { VOID_REASONS } from './returns';
 import type {
   AuditRow,
   CashMovement,
@@ -25,7 +26,7 @@ import {
   ADJUSTMENT_REASONS,
   reasonFitsDelta,
 } from '@/domain/adjustment';
-import { baseQty, movingAverage } from '@/domain/costing';
+import { baseQty, movingAverage, reverseMovingAverage } from '@/domain/costing';
 import { mulDivRound } from '@/domain/money';
 import { computePurchase, costPerBase } from '@/domain/purchase';
 import { err, type Err } from '@/domain/result';
@@ -793,6 +794,166 @@ export async function postStockAdjustment(
       await enqueue(db, 'stockAdjustments', { ...doc, lines, stockMovements: stock }, ctx.workerId);
       await enqueue(db, 'auditLog', audit, ctx.workerId);
       return { ok: true, id: adjId, number, total: value };
+    },
+  );
+}
+
+/**
+ * The manager deletes a purchase invoice (permission voidPurchase): the goods leave stock again, the supplier's credit and the
+ * cash from a safe go back, and the product's average cost is worked out again without this purchase. Refused when the
+ * invoice is old-system history, has a posted return, or when some of its goods are no longer on the shelf.
+ */
+export async function voidPurchaseInvoice(
+  ctx: DeviceContext,
+  input: { invoiceId: string; reason: (typeof VOID_REASONS)[number] },
+): Promise<{ ok: true; id: string; number: string } | Err> {
+  if (canCtx(ctx, 'voidPurchase') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
+  if (!VOID_REASONS.includes(input.reason)) return err('E_VALIDATION', 'السبب مطلوب');
+  const { db } = ctx;
+  const invoice = await db.purchaseInvoices.get(input.invoiceId);
+  if (!invoice) return err('NOT_FOUND', 'الفاتورة مش موجودة');
+  if (invoice.status !== 'posted') return err('ALREADY_VOIDED', 'الفاتورة محذوفة');
+  if (invoice.isLegacy) return err('LEGACY', 'فاتورة قديمة');
+  const lineIds = (await db.purchaseInvoiceLines.where('invoiceId').equals(invoice.id).toArray()).map(
+    (l) => l.id,
+  );
+  const returnLines = await db.purchaseReturnLines.where('originalLineId').anyOf(lineIds).toArray();
+  if (returnLines.length > 0) {
+    const returns = await db.purchaseReturns.bulkGet([
+      ...new Set(returnLines.map((l) => l.returnId as string)),
+    ]);
+    if (returns.some((r) => r?.status === 'posted')) return err('HAS_RETURNS', 'الفاتورة عليها مرتجع');
+  }
+  const [stock, party, cash] = await Promise.all([
+    db.stockMovements.where('docId').equals(invoice.id).toArray(),
+    db.partyLedger.where('docId').equals(invoice.id).toArray(),
+    db.cashMovements.where('docId').equals(invoice.id).toArray(),
+  ]);
+  // every product must still have at least what this invoice brought, in the warehouse it went to
+  const balances = await db.stockBalances.toArray();
+  const onHand = (productId: string): number =>
+    balances.filter((b) => b.productId === productId).reduce((a, b) => a + b.qty, 0);
+  for (const m of stock) {
+    const here =
+      balances.find((b) => b.productId === m.productId && b.warehouseId === m.warehouseId)?.qty ?? 0;
+    const brought = stock
+      .filter((x) => x.productId === m.productId && x.warehouseId === m.warehouseId)
+      .reduce((a, x) => a + x.qty, 0);
+    if (here < brought) return err('STOCK_SOLD', 'جزء من البضاعة اتباع');
+  }
+  const voidId = uuidv7();
+  const now = nowIso();
+  const stockMovements: StockMovement[] = stock.map((m) => ({
+    ...newCommon(ctx),
+    productId: m.productId,
+    warehouseId: m.warehouseId,
+    qty: -m.qty,
+    unitCost: m.unitCost,
+    docType: 'void',
+    docId: voidId,
+    lineId: null,
+    occurredAt: now,
+  }));
+  const partyLedger: PartyLedgerRow[] = party.map((m) => ({
+    ...newCommon(ctx),
+    partyType: m.partyType,
+    partyId: m.partyId,
+    amount: -m.amount,
+    docType: 'void',
+    docId: voidId,
+    occurredAt: now,
+  }));
+  const cashMovements: CashMovement[] = cash.map((m) => ({
+    ...newCommon(ctx),
+    cashAccountId: m.cashAccountId,
+    shiftId: null,
+    amount: -m.amount,
+    method: m.method,
+    docType: 'void',
+    docId: voidId,
+    occurredAt: now,
+  }));
+  // the average cost without this purchase, product by product
+  const newCosts = new Map<string, number>();
+  for (const productId of new Set(stock.map((m) => m.productId))) {
+    const product = await db.products.get(productId);
+    if (!product) continue;
+    const mine = stock.filter((m) => m.productId === productId);
+    const outQty = mine.reduce((a, m) => a + m.qty, 0);
+    const outValue = mine.reduce((a, m) => a + m.qty * m.unitCost, 0);
+    newCosts.set(
+      productId,
+      reverseMovingAverage({
+        qtyMilli: onHand(productId),
+        avg: product.unitCost,
+        outQtyMilli: outQty,
+        outCost: outQty > 0 ? mulDivRound(outValue, 1, outQty) : product.unitCost,
+      }),
+    );
+  }
+  return db.transaction(
+    'rw',
+    [
+      db.voids,
+      db.purchaseInvoices,
+      db.stockMovements,
+      db.partyLedger,
+      db.cashMovements,
+      db.auditLog,
+      db.stockBalances,
+      db.partyBalances,
+      db.products,
+      db.numberSequences,
+      db.outbox,
+      db.syncState,
+    ],
+    async () => {
+      const number = await nextNumber(db, ctx.devicePrefix, 'VOID');
+      const doc = {
+        ...newCommon(ctx),
+        id: voidId,
+        number,
+        issuedAt: now,
+        workerId: ctx.workerId,
+        shiftId: null,
+        status: 'posted' as const,
+        voidedBy: null,
+        notes: null,
+        isLegacy: false,
+        legacy: null,
+        targetType: 'purchase_invoice',
+        targetId: invoice.id,
+        reason: input.reason,
+        approvedBy: ctx.workerId,
+      };
+      const audit = auditRow(
+        ctx,
+        'purchase_voided',
+        'purchase_invoices',
+        invoice.id,
+        { number: invoice.number, reason: input.reason },
+        now,
+      );
+      await db.voids.add(doc);
+      await db.stockMovements.bulkAdd(stockMovements);
+      await db.partyLedger.bulkAdd(partyLedger);
+      await db.cashMovements.bulkAdd(cashMovements);
+      await db.purchaseInvoices.update(invoice.id, { status: 'voided', voidedBy: voidId });
+      await db.auditLog.add(audit);
+      await rebuildStockBalances(
+        db,
+        stockMovements.map((m) => [m.productId, m.warehouseId]),
+      );
+      if (partyLedger.length)
+        await rebuildPartyBalances(
+          db,
+          partyLedger.map((p) => [p.partyType, p.partyId]),
+        );
+      // the server works the average out itself; this local copy keeps this manager's screens in step until the next pull
+      for (const [productId, unitCost] of newCosts) await db.products.update(productId, { unitCost });
+      await enqueue(db, 'voids', { ...doc, stockMovements, partyLedger, cashMovements }, ctx.workerId);
+      await enqueue(db, 'auditLog', audit, ctx.workerId);
+      return { ok: true as const, id: voidId, number };
     },
   );
 }

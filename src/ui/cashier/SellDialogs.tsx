@@ -6,7 +6,6 @@ import { useServices } from '@/app/session';
 import { discardCart, listHeldCarts, type HeldCartRow } from '@/db/commands/carts';
 import { todaysInvoices } from '@/db/invoice-search';
 import { NO_SALE_REASONS, type NoSaleReason } from '@/db/commands/receipts';
-import { VOID_REASONS } from '@/db/commands/returns';
 import { formatMoney } from '@/domain/money';
 
 import { ActionButton } from '../components/ActionButton';
@@ -191,31 +190,3 @@ export function NoSaleDialog({
 }
 
 /** The manager picks why the invoice is cancelled from a fixed list: no typing, no "are you sure" (UX-09). */
-export function VoidReasonDialog({
-  open,
-  onPick,
-  onClose,
-}: {
-  open: boolean;
-  onPick: (reason: (typeof VOID_REASONS)[number]) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog title={strings.voidInvoice.title} open={open} onClose={onClose}>
-      <div className={styles.reasons}>
-        {VOID_REASONS.map((r) => (
-          <button
-            key={r}
-            type="button"
-            className={styles.reason}
-            onClick={() => onPick(r)}
-            data-testid={`void-reason-${r}`}
-          >
-            <Ban size={32} aria-hidden="true" />
-            <span>{strings.voidInvoice.reasons[r]}</span>
-          </button>
-        ))}
-      </div>
-    </Dialog>
-  );
-}

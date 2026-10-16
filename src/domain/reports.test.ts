@@ -424,3 +424,58 @@ describe('supplierDetailTables', () => {
     expect(out[0]!.note).toBeUndefined();
   });
 });
+
+describe('exceptions report: deleted documents', () => {
+  it('says what each delete targeted', async () => {
+    const { exceptionsTables } = await import('./reports');
+    const labels = {
+      title: 'T',
+      number: 'n',
+      voidKind: 'kind',
+      voidTarget: 'target',
+      time: 'time',
+      reason: 'reason',
+      worker: 'worker',
+      voidSalesInvoice: 'S',
+      voidSalesReturn: 'R',
+      voidPurchaseInvoice: 'P',
+    } as Record<string, string>;
+    const base = {
+      reprints: 0,
+      no_sales: [],
+      discounts: { lines: 0, amount: 0 },
+      stock_adjustments: [],
+      shift_variances: [],
+      negative_stock: 0,
+      price_overrides: 0,
+      discount_overrides: 0,
+      pin_failures: 0,
+      cart_removals: 0,
+      settings_changes: [],
+      clock_warnings: [],
+    };
+    const row = (target_type: string, target_number: string) => ({
+      number: 'V',
+      at: '2026-10-10T09:00:00Z',
+      reason: 'mistake',
+      worker: 'w',
+      target_type,
+      target_number,
+    });
+    const tables = exceptionsTables(
+      {
+        ...base,
+        voids: [row('sales_invoice', 'A'), row('sales_return', 'B'), row('purchase_invoice', 'C')],
+      },
+      labels,
+      (x) => x,
+      (x) => x,
+    );
+    const voids = tables.find((x) => x.headers.includes('kind'))!;
+    expect(voids.rows.map((r) => [r[1], r[2]])).toEqual([
+      ['S', 'A'],
+      ['R', 'B'],
+      ['P', 'C'],
+    ]);
+  });
+});
