@@ -37,8 +37,8 @@ jobs:
         run: supabase link --project-ref "$STAGING_REF"
       - name: Reset (wipes all staging data, no test seed)
         if: ${{ inputs.action == 'reset' }}
-        run: supabase db reset --linked --no-seed
+        run: supabase db reset --linked --no-seed --yes
       - name: Sizes
         run: |
-          supabase inspect db db-size --linked
-          supabase inspect db table-sizes --linked
+          supabase inspect db db-stats --linked
+          supabase inspect db table-stats --linked
