@@ -125,7 +125,7 @@ label printing, scale integration, multiple branches. Ask before building any of
 1. Is the shop registered for VAT / obligated to issue ETA e-receipts? (check by tax registration number)
 2. Upgrade path for the Windows 7 PCs before Firefox ESR 115 support ends (announced: March 2027).
 3. Offline credit-limit policy: allow / reduce by % / block.
-4. Return period in days and who approves after it.
+4. No return period (owner decision 2026-10-16): any invoice can be returned at any age; the quantity caps stay.
 5. Cash rounding: none / 0.25 / 0.50 EGP.
 6. Opening balances for each customer and supplier: OSPOS has none, the owner enters them in the import sheet.
 7. Which products to photograph first (none have photos); suggestion: the 100 best sellers from the export.

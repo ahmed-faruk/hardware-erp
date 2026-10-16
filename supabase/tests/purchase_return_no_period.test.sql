@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(5);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -42,27 +42,18 @@ select pg_temp.purchase_on('0190f000-0000-7000-8000-0000000000a2', 'K1-PUR-92000
 select pg_temp.purchase_on('0190f000-0000-7000-8000-0000000000a3', 'K1-PUR-920003', now() - interval '1 day');
 select pg_temp.purchase_on('0190f000-0000-7000-8000-0000000000a4', 'K1-PUR-920004', now() - interval '60 days');
 
+-- there is no return period: a storekeeper returns any old purchase alone, with no approval
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920001', '0190f000-0000-7000-8000-0000000000a2'), null, 'inside the period a storekeeper returns alone');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920002', '0190f000-0000-7000-8000-0000000000a1'), 'E_FORBIDDEN', 'after 30 days a storekeeper alone is refused');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920003', '0190f000-0000-7000-8000-0000000000a1', 'a0000000-0000-7000-8000-0000000000d1'), 'E_FORBIDDEN', 'a cashier is not a valid approver');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920004', '0190f000-0000-7000-8000-0000000000a1', 'a0000000-0000-7000-8000-0000000000d3'), null, 'with a manager approving it is accepted');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d3', 'K1-PRT-920005', '0190f000-0000-7000-8000-0000000000a4'), null, 'a manager is never blocked by the period');
+select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920001', '0190f000-0000-7000-8000-0000000000a2'), null, 'today: a storekeeper returns alone');
+select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920002', '0190f000-0000-7000-8000-0000000000a1'), null, '60 days old: a storekeeper returns alone, no approval');
 reset role;
-select is((select approved_by from purchase_returns where number = 'K1-PRT-920004'), 'a0000000-0000-7000-8000-0000000000d3'::uuid, 'the approving manager is kept on the return');
-
--- a longer period lets the storekeeper return the 60 day old purchase alone
-insert into settings (id, company_id, key, value) values (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'return.purchaseDays', '90');
+-- an old period setting left in the database is ignored
+insert into settings (id, company_id, key, value) values (gen_random_uuid(), 'a0000000-0000-7000-8000-000000000001', 'return.purchaseDays', '0');
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920006', '0190f000-0000-7000-8000-0000000000a1'), null, 'period 90: 60 days old is inside');
+select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920003', '0190f000-0000-7000-8000-0000000000a3'), null, 'a leftover period of 0 days changes nothing');
+select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920004', '0190f000-0000-7000-8000-0000000000a4'), null, 'another old purchase, also accepted');
 reset role;
--- period 0: only the same Cairo day
-update settings set value = '0' where key = 'return.purchaseDays' and company_id = 'a0000000-0000-7000-8000-000000000001';
-select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920007', '0190f000-0000-7000-8000-0000000000a3'), 'E_FORBIDDEN', 'period 0: yesterday is outside');
-select is(pg_temp.push('a0000000-0000-7000-8000-0000000000d2', 'K1-PRT-920008', '0190f000-0000-7000-8000-0000000000a2'), null, 'period 0: today is inside');
-reset role;
-select is((select count(*)::int from purchase_returns where number like 'K1-PRT-9200%'), 5, 'only the accepted returns were stored');
+select is((select count(*)::int from purchase_returns where number like 'K1-PRT-9200%'), 4, 'all four returns were stored');
 
 select * from finish();
 rollback;

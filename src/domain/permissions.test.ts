@@ -83,12 +83,6 @@ describe('sections', () => {
     expect(resolveAccess('manager', { 'report.sales': 'yes' }, 'report.returns')).toBe('no');
   });
 
-  it('P1: a purchase return after the period is a manager approval for a storekeeper', () => {
-    expect(can('manager', 'purchaseReturnAfterPeriod')).toBe('yes');
-    expect(can('storekeeper', 'purchaseReturnAfterPeriod')).toBe('pin');
-    expect(can('cashier', 'purchaseReturnAfterPeriod')).toBe('no');
-  });
-
   it('P4: the storekeeper returns purchases without an invoice by default; only a manager edits the value', () => {
     expect(can('storekeeper', 'purchaseReturnWithoutInvoice')).toBe('yes');
     expect(can('cashier', 'purchaseReturnWithoutInvoice')).toBe('no');

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Minus, PackageCheck, PackageX, Plus, Receipt, Trash2 } from 'lucide-react';
+import { ListChecks, Minus, PackageCheck, PackageX, Plus, Receipt, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -8,7 +8,6 @@ import { loadSoldReturned, postedReturnLines } from '@/db/returnable';
 import { searchProducts } from '@/db/search';
 import type { Product } from '@/db/types';
 import { formatMoney, formatQty, toPiasters } from '@/domain/money';
-import type { Action } from '@/domain/permissions';
 import { cairoTime } from '@/domain/receipt';
 import { computeReturnLine, returnableOf, type PriorReturn } from '@/domain/returns';
 
@@ -31,7 +30,6 @@ interface Props {
   shiftId: string;
   cashAccountId: string;
   digits: Digits;
-  ask: (action: Action) => Promise<string | null>;
   /** a receipt barcode the scanner read while this dialog is open */
   scanned: string | null;
   onClose: () => void;
@@ -48,7 +46,7 @@ export function ReturnDialog(props: Props) {
   );
 }
 
-function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }: Props) {
+function Body({ shiftId, cashAccountId, digits, scanned, onClose, onDone }: Props) {
   const { db } = useServices();
   const { worker } = useSession();
   const isManager = worker?.role === 'manager';
@@ -92,7 +90,6 @@ function Body({ shiftId, cashAccountId, digits, ask, scanned, onClose, onDone }:
         shiftId={shiftId}
         cashAccountId={cashAccountId}
         digits={digits}
-        ask={ask}
         onDone={onDone}
         onBack={() => {
           setInvoiceId(null);
@@ -188,10 +185,9 @@ function InvoiceReturn({
   shiftId,
   cashAccountId,
   digits,
-  ask,
   onDone,
   onBack,
-}: Pick<Props, 'shiftId' | 'cashAccountId' | 'digits' | 'ask' | 'onDone'> & {
+}: Pick<Props, 'shiftId' | 'cashAccountId' | 'digits' | 'onDone'> & {
   invoiceId: string;
   onBack: () => void;
 }) {
@@ -248,24 +244,14 @@ function InvoiceReturn({
       .filter((r) => r.q > 0)
       .map((r) => ({ originalLineId: r.l.id, qtyMilli: r.q, condition: cond[r.l.id] ?? 'good' }));
     const base = { originalInvoiceId: invoiceId, lines, shiftId, cashAccountId };
-    let r = await postSalesReturn(context, base);
-    if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
-      const token = await ask('returnAfterPeriod');
-      if (token) r = await postSalesReturn(context, { ...base, approvalTokens: [token] });
-    }
+    const r = await postSalesReturn(context, base);
     setBusy(false);
     if (r.ok) {
       play('done');
       onDone(r);
     } else {
       play('error');
-      setError(
-        r.code === 'DRAWER_SHORT'
-          ? strings.returns.drawerShort
-          : r.code === 'APPROVAL_REQUIRED'
-            ? strings.returns.needsManager
-            : strings.returns.failed,
-      );
+      setError(r.code === 'DRAWER_SHORT' ? strings.returns.drawerShort : strings.returns.failed);
     }
   };
 
@@ -274,6 +260,17 @@ function InvoiceReturn({
       {rows.every((r) => r.left === 0) && (
         <BigAlert tone="warn" word={strings.returns.noneLeft} sound={false} />
       )}
+      <ActionButton
+        big
+        icon={ListChecks}
+        variant="ghost"
+        label={strings.returns.all}
+        disabled={rows.every((r) => r.left === 0)}
+        onClick={() =>
+          setQty(Object.fromEntries(rows.filter((r) => r.left > 0).map((r) => [r.l.id, r.left])))
+        }
+        testId="return-all"
+      />
       <ul className={styles.list}>
         {rows.map((r) => (
           <li key={r.l.id} className={styles.item} data-testid={`return-line-${r.l.lineNo}`}>

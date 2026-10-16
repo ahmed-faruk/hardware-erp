@@ -7,7 +7,3 @@ const cairoDay = (d: Date): number => {
 /** Whole Cairo calendar days between two instants (the server counts the same way). */
 export const cairoDaysBetween = (fromIso: string, toIso: string): number =>
   cairoDay(new Date(toIso)) - cairoDay(new Date(fromIso));
-
-/** RET-02: a return inside the period needs no approval; day `days` still counts as inside. */
-export const isWithinReturnPeriod = (issuedAt: string, now: string, days: number): boolean =>
-  cairoDaysBetween(issuedAt, now) <= days;

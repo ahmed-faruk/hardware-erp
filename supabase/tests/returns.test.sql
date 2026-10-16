@@ -74,9 +74,9 @@ select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0',
 -- good goods must go to the main warehouse, damaged to scrap
 select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000004', '0190f000-0000-7000-8000-0000000000e1', 1000, 1000, 714, 286, 'a0000000-0000-7000-8000-0000000000c2')))), 'E_VALIDATION', 'good goods cannot go to the scrap warehouse');
 select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000005', '0190f000-0000-7000-8000-0000000000e1', 1000, 1000, 714, 286, 'a0000000-0000-7000-8000-0000000000c2', 'damaged')))), null, 'damaged goods go to scrap');
--- a return after the period needs a manager approval
-select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000006', '0190f000-0000-7000-8000-0000000000e0', 1000, 1000, 1000, 0, 'a0000000-0000-7000-8000-0000000000c1')))), 'E_FORBIDDEN', 'after the return period a cashier needs the manager');
-select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000007', '0190f000-0000-7000-8000-0000000000e0', 1000, 1000, 1000, 0, 'a0000000-0000-7000-8000-0000000000c1', 'good', 'a0000000-0000-7000-8000-0000000000d3')))), null, 'with a manager approval it is accepted');
+-- there is no return period: an old invoice is returned with or without an approval
+select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000006', '0190f000-0000-7000-8000-0000000000e0', 1000, 1000, 1000, 0, 'a0000000-0000-7000-8000-0000000000c1')))), null, 'an old invoice: a cashier returns alone');
+select is(pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f3', '0', jsonb_build_array(pg_temp.ret('a0000000-0000-7000-8000-0000000000d1', 'M1-RET-000007', '0190f000-0000-7000-8000-0000000000e0', 1000, 1000, 1000, 0, 'a0000000-0000-7000-8000-0000000000c1', 'good', 'a0000000-0000-7000-8000-0000000000d3')))), 'E_VALIDATION', 'the quantity cap still applies to an old invoice');
 reset role;
 
 -- void: manager only, exact reversal, once, and never after a return

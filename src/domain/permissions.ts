@@ -9,7 +9,6 @@ export const ACTIONS = [
   'holdCart',
   'returnWithInvoice',
   'returnWithoutInvoice',
-  'returnAfterPeriod',
   'discountWithinLimit',
   'discountOverLimit',
   'priceOverride',
@@ -36,7 +35,6 @@ export const ACTIONS = [
   'view.purchases',
   'receivePurchase',
   'purchaseReturn',
-  'purchaseReturnAfterPeriod',
   'purchaseReturnWithoutInvoice',
   'editReturnValue',
   'payFromOwner',
@@ -110,7 +108,6 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       'holdCart',
       'returnWithInvoice',
       'returnWithoutInvoice',
-      'returnAfterPeriod',
       'discountWithinLimit',
       'discountOverLimit',
       'priceOverride',
@@ -143,7 +140,6 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       'view.purchases',
       'receivePurchase',
       'purchaseReturn',
-      'purchaseReturnAfterPeriod',
       'purchaseReturnWithoutInvoice',
       'editReturnValue',
       'payFromOwner',
@@ -184,7 +180,6 @@ const cashier: Permissions = {
   noSaleDrawer: 'pin',
   customerReceipt: 'yes',
   addCustomer: 'yes',
-  returnAfterPeriod: 'pin',
   recordExpense: 'yes',
   cashTransfer: 'yes',
 };
@@ -197,7 +192,6 @@ const storekeeper: Permissions = {
   stockAdjustment: 'yes',
   editProductData: 'yes',
   addProduct: 'yes',
-  purchaseReturnAfterPeriod: 'pin',
   purchaseReturnWithoutInvoice: 'yes',
 };
 
