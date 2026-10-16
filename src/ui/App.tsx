@@ -5,6 +5,7 @@ import {
   Banknote,
   Package,
   PackagePlus,
+  Receipt,
   Settings,
   ShoppingCart,
   Tags,
@@ -50,6 +51,9 @@ const SuppliersScreen = lazy(() =>
 );
 const ExpensesScreen = lazy(() =>
   import('./screens/ExpensesScreen').then((m) => ({ default: m.ExpensesScreen })),
+);
+const SalesInvoicesScreen = lazy(() =>
+  import('./screens/SalesInvoicesScreen').then((m) => ({ default: m.SalesInvoicesScreen })),
 );
 const PurchaseNewScreen = lazy(() =>
   import('./screens/PurchaseNewScreen').then((m) => ({ default: m.PurchaseNewScreen })),
@@ -144,6 +148,7 @@ export function App() {
 
 const NAV: (NavItem & { action: Action })[] = [
   { path: 'sell', label: strings.nav.sell, icon: ShoppingCart, action: 'view.sell' },
+  { path: 'sales-invoices', label: strings.nav.salesInvoices, icon: Receipt, action: 'view.salesInvoices' },
   { path: 'products', label: strings.nav.products, icon: Package, action: 'view.products' },
   { path: 'categories', label: strings.nav.categories, icon: Tags, action: 'view.categories' },
   { path: 'purchases', label: strings.nav.purchases, icon: PackagePlus, action: 'view.purchases' },
@@ -202,6 +207,7 @@ function Shell() {
     else if (section === 'products')
       screen = route[1] ? <ProductFormScreen id={route[1]} /> : <ProductsScreen />;
     else if (section === 'categories') screen = <CategoriesScreen />;
+    else if (section === 'sales-invoices') screen = <SalesInvoicesScreen />;
     else if (section === 'purchases')
       screen = route[1] === 'new' ? <PurchaseNewScreen /> : <PurchasesScreen />;
     else if (section === 'stock') screen = <StockScreen />;

@@ -741,7 +741,6 @@ export function SellScreen() {
       />
       <RecentInvoicesDialog
         open={recentOpen}
-        shiftId={shift.id}
         digits={digits}
         onClose={() => setRecentOpen(false)}
         onReprint={(id) => void printInvoice(id, true)}

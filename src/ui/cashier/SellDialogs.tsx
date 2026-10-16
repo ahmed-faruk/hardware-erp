@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useServices } from '@/app/session';
 import { discardCart, listHeldCarts, type HeldCartRow } from '@/db/commands/carts';
+import { todaysInvoices } from '@/db/invoice-search';
 import { NO_SALE_REASONS, type NoSaleReason } from '@/db/commands/receipts';
 import { VOID_REASONS } from '@/db/commands/returns';
 import { formatMoney } from '@/domain/money';
@@ -73,7 +74,6 @@ export function HeldCartsDialog({
 
 export function RecentInvoicesDialog({
   open,
-  shiftId,
   digits,
   onReprint,
   onVoid,
@@ -81,7 +81,6 @@ export function RecentInvoicesDialog({
   onClose,
 }: {
   open: boolean;
-  shiftId: string | null;
   digits: (t: string) => string;
   onReprint: (id: string) => void;
   /** only passed for a manager */
@@ -90,27 +89,23 @@ export function RecentInvoicesDialog({
   onVoidReturn?: (returnId: string) => void;
   onClose: () => void;
 }) {
-  const { db } = useServices();
+  const { db, identity } = useServices();
   const [viewId, setViewId] = useState<string | null>(null);
-  const invoices = useLiveQuery(
-    async () =>
-      shiftId
-        ? (await db.salesInvoices.where('shiftId').equals(shiftId).toArray())
-            .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
-            .slice(0, 30)
-        : [],
-    [db, shiftId, open],
-  );
+  // every invoice of today (Cairo day) made on THIS device, from any shift, newest first
+  const invoices = useLiveQuery(() => todaysInvoices(db, identity.deviceId), [db, identity.deviceId, open]);
   return (
     <>
-      <Dialog title={strings.sell.recent} open={open} onClose={onClose}>
+      <Dialog title={strings.invoiceSearch.todayTitle} open={open} onClose={onClose}>
         {invoices && invoices.length === 0 ? (
-          <EmptyState icon={Receipt} word={strings.sell.noRecent} />
+          <EmptyState icon={Receipt} word={strings.invoiceSearch.todayNone} />
         ) : (
           <ul className={styles.list}>
             {invoices?.map((inv) => (
               <li key={inv.id} className={styles.item} data-testid={`recent-${inv.number}`}>
                 <span dir="ltr">{digits(inv.number)}</span>
+                {inv.status === 'voided' && (
+                  <strong data-testid={`voided-${inv.number}`}>{strings.invoiceSearch.voidedMark}</strong>
+                )}
                 <strong>{digits(formatMoney(inv.total))}</strong>
                 <ActionButton
                   big

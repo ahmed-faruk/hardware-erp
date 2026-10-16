@@ -1,0 +1,62 @@
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: var(--space-3) var(--space-4);
+}
+
+.panel > summary {
+  min-block-size: var(--target-min);
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+  font-weight: 600;
+  min-inline-size: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summary {
+  color: var(--text-muted);
+  font-size: var(--fs-label);
+}
+
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-round);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  background: var(--surface-2);
+}
+
+.voided {
+  background: var(--tint-danger);
+  color: var(--danger);
+}
+
+.returned {
+  background: var(--tint-warn);
+  color: var(--warn);
+}

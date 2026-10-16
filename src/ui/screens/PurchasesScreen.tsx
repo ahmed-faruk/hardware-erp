@@ -1,8 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Eye, Plus, Printer, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useServices } from '@/app/session';
+import { resolveProductIds, searchPurchaseInvoices } from '@/db/invoice-search';
+import { EMPTY_FILTER, type InvoiceFilter } from '@/domain/invoice-filter';
 import { formatMoney } from '@/domain/money';
 import { cairoTime } from '@/domain/receipt';
 
@@ -15,12 +17,33 @@ import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import { navigate } from '../router';
+import { InvoiceFilters } from './InvoiceFilters';
 import { PurchaseReturnForm } from './PurchaseReturnForm';
 import styles from './screens.module.css';
 
 export function PurchasesScreen() {
   const { db } = useServices();
   const [returnOpen, setReturnOpen] = useState(false);
+  const [filter, setFilter] = useState<InvoiceFilter>(EMPTY_FILTER);
+  const [productText, setProductText] = useState('');
+  const [productIds, setProductIds] = useState<string[] | null>(null);
+  const [limit, setLimit] = useState(100);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(() => {
+      void resolveProductIds(db, productText).then((ids) => live && setProductIds(ids));
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [db, productText]);
+  const effective: InvoiceFilter = { ...filter, productIds };
+  const filterKey = JSON.stringify(effective);
+  // which invoices the filters keep; the list below shows those, newest first
+  const kept = useLiveQuery(() => searchPurchaseInvoices(db, effective, 100_000), [db, filterKey]);
+  const workers = useLiveQuery(() => db.workers.filter((w) => !w.deletedAt).toArray(), [db]) ?? [];
+  const keptIds = new Set((kept?.rows ?? []).map((k) => k.id));
   const rows = useLiveQuery(async () => {
     const suppliers = new Map((await db.suppliers.toArray()).map((s) => [s.id, s.name]));
     const owner = new Map<string, number>();
@@ -31,7 +54,6 @@ export function PurchasesScreen() {
       if (pay.method === 'owner') owner.set(pay.documentId, (owner.get(pay.documentId) ?? 0) + pay.amount);
     return (await db.purchaseInvoices.toArray())
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
-      .slice(0, 100)
       .map((p) => ({
         ...p,
         ownerPaid: owner.get(p.id) ?? 0,
@@ -115,12 +137,44 @@ export function PurchasesScreen() {
           />
         </div>
       </div>
-      {!rows ? (
+      <InvoiceFilters
+        kind="purchase"
+        value={filter}
+        productText={productText}
+        onChange={(f) => {
+          setFilter(f);
+          setLimit(100);
+        }}
+        onProductText={(x) => {
+          setProductText(x);
+          setLimit(100);
+        }}
+        options={{ workers: workers.map((w) => ({ id: w.id, name: w.name })), devices: [], shifts: [] }}
+      />
+      {!rows || !kept ? (
         <Skeleton />
       ) : rows.length === 0 ? (
         <EmptyState icon={Plus} word={strings.purchases.noPurchases} />
+      ) : kept.matched === 0 ? (
+        <EmptyState icon={Plus} word={strings.invoiceSearch.none} />
       ) : (
-        <DataTable label={strings.purchases.title} rows={rows} columns={columns} rowKey={(p) => p.id} />
+        <>
+          <p data-testid="result-count">{`${strings.invoiceSearch.count}: ${kept.matched} · ${strings.invoiceSearch.showing}: ${Math.min(limit, kept.matched)}`}</p>
+          <DataTable
+            label={strings.purchases.title}
+            rows={rows.filter((p) => keptIds.has(p.id)).slice(0, limit)}
+            columns={columns}
+            rowKey={(p) => p.id}
+          />
+          {kept.matched > limit && (
+            <ActionButton
+              label={strings.invoiceSearch.more}
+              variant="ghost"
+              onClick={() => setLimit((n) => n + 100)}
+              testId="more-rows"
+            />
+          )}
+        </>
       )}
       <InvoiceViewDialog kind="purchase" invoiceId={viewId} onClose={() => setViewId(null)} />
       <Dialog title={strings.purchases.newReturn} open={returnOpen} onClose={() => setReturnOpen(false)}>
