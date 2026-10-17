@@ -193,6 +193,11 @@ describe('receivings and expenses', () => {
       supplier_id: legacyId('supplier', 30),
     });
   });
+  it('expense types: only «مشتريات» and «مصروفات محل» are active, every imported type is retired', () => {
+    const active = t.expense_categories.filter((c) => c.deleted_at === null).map((c) => c.name);
+    expect(active.sort()).toEqual(['مشتريات', 'مصروفات محل'].sort());
+    expect(t.expense_categories.filter((c) => c.deleted_at !== null).length).toBeGreaterThan(0);
+  });
   it('expenses: zero amount skipped, missing category goes to a catch-all, time of day kept', () => {
     expect(t.expenses).toHaveLength(2);
     expect(warning('EXPENSE_SKIPPED')).toBe(1);

@@ -169,7 +169,11 @@ async function main(): Promise<void> {
       const t = target(confirm);
       console.log(`loading into ${t.host}`);
       const rows = loadRows();
-      await loadAll(client(t), rows, console.log);
+      const db = client(t);
+      await loadAll(db, rows, console.log);
+      // the first account of the company (admin / admin, must change its password at the first login); a no-op once any login exists
+      const admin = await db.rpc('bootstrap_admin');
+      console.log(`admin created: ${admin.data?.data?.created ?? 'failed'}`);
       console.log('done. Next: npm run import -- validate');
       break;
     }
