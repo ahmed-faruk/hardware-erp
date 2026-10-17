@@ -1,0 +1,20 @@
+begin;
+select plan(3);
+-- both companies already have a login, so bootstrap_admin only has the box to do
+update workers set username = 'ua' where id = 'a0000000-0000-7000-8000-0000000000d3';
+update workers set username = 'ub' where id = 'b0000000-0000-7000-8000-0000000000d3';
+delete from cash_movements;
+delete from cash_accounts where company_id = 'b0000000-0000-7000-8000-000000000001';
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+select bootstrap_admin();
+reset role;
+select is((select count(*)::int from cash_accounts where company_id = 'b0000000-0000-7000-8000-000000000001' and kind = 'safe' and name = 'الخزنة'), 1, 'a company without a box gets its safe');
+select is((select count(*)::int from cash_accounts where company_id = 'a0000000-0000-7000-8000-000000000001' and kind = 'safe' and deleted_at is null), 1, 'a company that has one keeps exactly one');
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+select bootstrap_admin();
+reset role;
+select is((select count(*)::int from cash_accounts where company_id = 'b0000000-0000-7000-8000-000000000001' and kind = 'safe'), 1, 'a second call adds nothing');
+select * from finish();
+rollback;
