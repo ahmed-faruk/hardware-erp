@@ -8,7 +8,6 @@ import type { Cart } from '@/domain/cart';
 import { toSaleLines } from '@/domain/cart';
 import { formatMoney, toPiasters } from '@/domain/money';
 import type { PaymentInput } from '@/domain/payments';
-import type { Action } from '@/domain/permissions';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
@@ -28,8 +27,6 @@ export interface PayScreenProps {
   total: number;
   digits: (text: string) => string;
   sale: { warehouseId: string; shiftId: string; cashAccountId: string };
-  tokens: string[];
-  ask: (action: Action) => Promise<string | null>;
   onCustomer: (id: string | null) => void;
   onBack: () => void;
   onPaid: (sale: SaleReceipt) => void;
@@ -43,8 +40,6 @@ export function PayScreen({
   total,
   digits,
   sale,
-  tokens,
-  ask,
   onCustomer,
   onBack,
   onPaid,
@@ -100,8 +95,7 @@ export function PayScreen({
     if (!context || busy || remaining !== 0) return;
     setBusy(true);
     setError(null);
-    const approvalTokens = [...tokens];
-    for (let attempt = 0; attempt < 5; attempt++) {
+    {
       const result = await postSale(context, {
         lines: toSaleLines(cart),
         customerId: cart.customerId,
@@ -110,21 +104,18 @@ export function PayScreen({
         ...sale,
         isOffline: !runner.getSnapshot().online,
         creditPolicy: 'allow',
-        approvalTokens,
       });
       if (result.ok) {
         setBusy(false);
         return onPaid(result);
       }
-      if (result.code === 'APPROVAL_REQUIRED') {
-        const token = await ask(result.message as Action);
-        if (token) {
-          approvalTokens.push(token);
-          continue;
-        }
-      }
-      setError(result.code === 'NEGATIVE_STOCK' ? strings.sell.negativeBlocked : strings.sell.saleFailed);
-      break;
+      setError(
+        result.code === 'NEGATIVE_STOCK'
+          ? strings.sell.negativeBlocked
+          : result.code === 'E_FORBIDDEN'
+            ? strings.forbidden
+            : strings.sell.saleFailed,
+      );
     }
     setBusy(false);
   };

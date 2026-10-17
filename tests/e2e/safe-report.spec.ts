@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { formatMoney } from '../../src/domain/money';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, loginAs } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visible`).first();
@@ -12,14 +12,7 @@ async function login(page: Page, f: CashierFixture, who: 'manager' | 'cashier'):
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined;
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page
-    .getByRole('button', { name: new RegExp(who === 'manager' ? f.managerName : f.cashierName) })
-    .click();
-  await page.keyboard.type(who === 'manager' ? f.pin : f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 

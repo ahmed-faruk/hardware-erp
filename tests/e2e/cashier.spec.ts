@@ -3,7 +3,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { ean13Check } from '../../src/domain/scale';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, setSetting, sql, type CashierFixture } from './helpers';
+import {
+  newCashierFixture,
+  productId,
+  setSetting,
+  sql,
+  type CashierFixture,
+  loginAs,
+  typeLogin,
+} from './helpers';
 
 /** Every print() (the receipt frame calls it) is recorded instead of opening a dialog: window.__prints holds the printed HTML. */
 async function recordPrints(page: Page): Promise<void> {
@@ -18,17 +26,6 @@ async function recordPrints(page: Page): Promise<void> {
 
 const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visible`).first();
 const prints = (page: Page) => page.evaluate(() => (window as unknown as { __prints: string[] }).__prints);
-
-async function loginAs(page: Page, f: CashierFixture, who: 'cashier' | 'manager'): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page
-    .getByRole('button', { name: new RegExp(who === 'cashier' ? f.cashierName : f.managerName) })
-    .click();
-  await page.keyboard.type(who === 'cashier' ? f.cashierPin : f.pin);
-  await page.keyboard.press('Enter');
-}
 
 async function openShift(page: Page, float = '100'): Promise<void> {
   await page.getByTestId('open-shift').click();
@@ -47,6 +44,7 @@ async function start(page: Page, who: 'cashier' | 'manager' = 'cashier'): Promis
   const f = newCashierFixture();
   await recordPrints(page);
   await loginAs(page, f, who);
+  if (who === 'manager') await page.getByRole('button', { name: strings.nav.sell }).click();
   await openShift(page);
   return f;
 }
@@ -149,9 +147,7 @@ test.describe('cashier journeys', () => {
     await expect(vis(page, 'total')).toHaveText('15.00');
 
     await page.reload(); // a power cut or a reload: the shop is back at the login, the cart is still there
-    await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-    await page.keyboard.type(f.cashierPin);
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: f.cashierUser, password: f.cashierPassword });
     await expect(vis(page, 'total')).toHaveText('15.00');
 
     await page.keyboard.press('Shift+F8'); // the held carts
@@ -160,32 +156,26 @@ test.describe('cashier journeys', () => {
     await expect(vis(page, 'held')).toHaveText('1'); // the 15.00 cart was held when the other one came back
   });
 
-  test('a cashier discount needs the manager PIN, then applies', async ({ page }) => {
-    const f = await start(page);
+  test('a cashier discount is refused: there are no approvals', async ({ page }) => {
+    await start(page);
     await tap(page, 1); // 12.50
     await page.getByTestId('discount-0').click();
     await page.keyboard.type('10'); // 10 percent
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
-    await expect(vis(page, 'total')).toHaveText('11.25');
+    await expect(page.getByText(strings.forbidden).first()).toBeVisible();
+    await expect(vis(page, 'total')).toHaveText('12.50');
   });
 
-  test('no-sale opens the drawer with a manager PIN, prints a slip and is audited', async ({ page }) => {
-    const f = await start(page);
+  test('no-sale: a cashier is refused, a manager opens the drawer, prints a slip and it is audited', async ({
+    page,
+  }) => {
+    await start(page, 'manager');
     await page.getByTestId('no-sale').click();
     await page.getByTestId('reason-change').click();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
     await expect.poll(async () => (await prints(page)).length, { timeout: 8000 }).toBe(1);
     expect((await prints(page))[0]).toContain(strings.receipt.noSale);
     await expect
-      .poll(
-        () => sql(`select count(*) from audit_log where action = 'no_sale' and approved_by is not null`),
-        { timeout: 60_000 },
-      )
+      .poll(() => sql(`select count(*) from audit_log where action = 'no_sale'`), { timeout: 60_000 })
       .not.toBe('0');
   });
 

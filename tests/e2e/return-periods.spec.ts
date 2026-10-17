@@ -4,17 +4,20 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import {
+  addWorker,
+  newCashierFixture,
+  productId,
+  sql,
+  type CashierFixture,
+  loginAs,
+  type Who,
+} from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 
-async function login(page: Page, f: CashierFixture, who: { name: string; pin: string }): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(who.name) }).click();
-  await page.keyboard.type(who.pin);
-  await page.keyboard.press('Enter');
+async function login(page: Page, f: CashierFixture, who: Who): Promise<void> {
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -57,7 +60,7 @@ test.describe('return periods and finding any invoice', () => {
       );
     }
     try {
-      await login(page, f, { name: f.cashierName, pin: f.cashierPin });
+      await login(page, f, 'cashier');
       await page.getByTestId('open-shift').click();
       await page.keyboard.type('100');
       await page.keyboard.press('Enter');
@@ -136,7 +139,7 @@ test.describe('return periods and finding any invoice', () => {
     sql(
       `insert into payments (id, company_id, document_type, document_id, method, amount) values ('${randomUUID()}', '${COMPANY}', 'sales_invoice', '${id}', 'cash', 3500)`,
     );
-    await login(page, f, { name: f.cashierName, pin: f.cashierPin });
+    await login(page, f, 'cashier');
     await page.getByTestId('open-shift').click();
     await page.keyboard.type('100');
     await page.keyboard.press('Enter');

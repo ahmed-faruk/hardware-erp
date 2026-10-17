@@ -6,7 +6,6 @@ import { newCommon } from '@/db/commands/context';
 import { saveCategory, saveCustomer, saveSupplier, saveWorker } from '@/db/commands/save-master';
 import { saveProduct } from '@/db/commands/save-product';
 import { searchProducts } from '@/db/search';
-import { checkPin } from '@/db/workers';
 
 import { newDevice } from './helpers';
 
@@ -159,34 +158,19 @@ describe('categories, suppliers, customers, workers', () => {
     });
   });
 
-  it('saveWorker hashes the PIN (never stored in clear) and the PIN then works offline', async () => {
+  it('saveWorker saves no secret: no PIN field is accepted any more, a cashier caller is refused, and it can deactivate', async () => {
     const ctx = manager();
-    const r = await saveWorker(ctx, { fields: { name: 'كاشير جديد', role: 'cashier', pin: '482915' } });
-    if (!r.ok) throw new Error('worker');
-    const stored = (await ctx.db.workers.get(r.id))!;
-    expect(stored.pinHash).toBeTruthy();
-    expect(JSON.stringify(stored)).not.toContain('482915');
-    expect(JSON.stringify(await ctx.db.outbox.toArray())).not.toContain('482915');
-    expect(await checkPin(ctx, r.id, '482915')).toMatchObject({ ok: true });
-    expect(await checkPin(ctx, r.id, '000000')).toMatchObject({ ok: false });
-  });
-
-  it('saveWorker refuses a short PIN, a cashier caller, and can deactivate', async () => {
-    const ctx = manager();
-    expect(await saveWorker(ctx, { fields: { name: 'ع', role: 'cashier', pin: '1234' } })).toMatchObject({
-      code: 'E_VALIDATION',
-    });
     expect(
-      await saveWorker(
-        { ...ctx, role: 'cashier' },
-        { fields: { name: 'ع', role: 'cashier', pin: '123456' } },
-      ),
+      await saveWorker(ctx, { fields: { name: 'ع', role: 'cashier', pin: '123456' } as never }),
+    ).toMatchObject({ code: 'E_VALIDATION' });
+    expect(
+      await saveWorker({ ...ctx, role: 'cashier' }, { fields: { name: 'ع', role: 'cashier' } }),
     ).toMatchObject({ code: 'E_FORBIDDEN' });
-    const r = await saveWorker(ctx, { fields: { name: 'ع', role: 'cashier', pin: '123456' } });
+    const r = await saveWorker(ctx, { fields: { name: 'ع', role: 'cashier' } });
     if (!r.ok) throw new Error('worker');
+    expect((await ctx.db.workers.get(r.id))?.pinHash).toBeNull();
     expect(await saveWorker(ctx, { id: r.id, fields: { active: false } })).toMatchObject({ ok: true });
     expect((await ctx.db.workers.get(r.id))?.active).toBe(false);
-    expect(await checkPin(ctx, r.id, '123456')).toMatchObject({ ok: false });
     const changed = (await ctx.db.outbox.toArray()).at(-1);
     expect(changed).toMatchObject({ table: 'workers', changedFields: ['active'] });
   });

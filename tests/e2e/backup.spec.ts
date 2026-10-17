@@ -4,18 +4,13 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newFixture } from './helpers';
+import { newFixture, loginAs } from './helpers';
 
 test('@smoke the manager sets a passphrase, downloads an encrypted backup, and a wrong passphrase cannot restore it', async ({
   page,
 }) => {
   const f = newFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
   await page.getByRole('button', { name: strings.nav.settings }).click();
 

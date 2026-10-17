@@ -4,18 +4,21 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import {
+  addWorker,
+  newCashierFixture,
+  productId,
+  sql,
+  type CashierFixture,
+  loginAs,
+  type Who,
+} from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const t = strings.purchases;
 
-async function login(page: Page, f: CashierFixture, who: { name: string; pin: string }): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(who.name) }).click();
-  await page.keyboard.type(who.pin);
-  await page.keyboard.press('Enter');
+async function login(page: Page, f: CashierFixture, who: Who): Promise<void> {
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -52,7 +55,7 @@ test.describe('purchase returns, easier', () => {
       [5, 10, 5000],
       [6, 4, 4000],
     ]);
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('new-purchase-return').click();
     // nothing to return before a supplier is picked
@@ -90,7 +93,7 @@ test.describe('purchase returns, easier', () => {
       [6, 4, 4000],
     ]);
     const empty = supplierWith([]);
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('new-purchase-return').click();
     await page.getByTestId('purchase-supplier').selectOption({ label: empty.supplier });
@@ -131,7 +134,7 @@ test.describe('purchase returns, easier', () => {
   test('the manager can change the value of a return without invoice', async ({ page }) => {
     const f = newCashierFixture();
     const s = supplierWith([[5, 10, 5000]]);
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('new-purchase-return').click();
     await page.getByTestId('purchase-supplier').selectOption({ label: s.supplier });

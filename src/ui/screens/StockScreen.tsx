@@ -14,7 +14,6 @@ import { FormField } from '../components/FormField';
 import { NumberField } from '../components/NumberField';
 import { ProductPicker } from '../components/ProductPicker';
 import { Skeleton } from '../components/Skeleton';
-import { useApproval } from '../cashier/ApprovalDialog';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
@@ -37,7 +36,6 @@ export function StockScreen() {
   const [reason, setReason] = useState<AdjustmentReason>('count');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const { ask, dialog } = useApproval();
   if (warehouse === undefined) return <Skeleton />;
   if (!warehouse) return <BigAlert tone="warn" word={strings.purchases.noWarehouse} />;
 
@@ -59,16 +57,12 @@ export function StockScreen() {
       reason,
       lines: changed.map((r) => ({ productId: r.product.id, qtyDeltaMilli: diff(r) })),
     };
-    let r = await postStockAdjustment(context, base);
-    if (!r.ok && r.code === 'APPROVAL_REQUIRED') {
-      const token = await ask('stockAdjustmentOverLimit');
-      if (token) r = await postStockAdjustment(context, { ...base, approvalTokens: [token] });
-    }
+    const r = await postStockAdjustment(context, base);
     if (r.ok) {
       setRows([]);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } else setError(r.code === 'APPROVAL_REQUIRED' ? strings.stock.needsManager : strings.stock.failed);
+    } else setError(r.code === 'E_FORBIDDEN' ? strings.forbidden : strings.stock.failed);
   };
 
   return (
@@ -133,7 +127,6 @@ export function StockScreen() {
           />
         </div>
       </div>
-      {dialog}
     </section>
   );
 }

@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, deviceCash, loginAs } from './helpers';
 
 /**
  * One shop day across this release on two devices: sell, return, void the return, return to a supplier without an invoice,
@@ -18,12 +18,7 @@ async function activate(page: Page, f: CashierFixture): Promise<void> {
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined;
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 

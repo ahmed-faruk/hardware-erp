@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql } from './helpers';
+import { newCashierFixture, productId, sql, loginAs } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 
@@ -21,13 +21,7 @@ test('the product screen shows every movement with the balance after it, includi
   sql(
     `insert into legacy_sale_lines (sale_id, line_no, product_id, qty, net, cost) values (800101, 1, 880002, 2000, 1500, 800)`,
   );
-
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   // one sale from this device

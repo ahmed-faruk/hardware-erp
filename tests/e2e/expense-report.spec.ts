@@ -2,16 +2,11 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, sql } from './helpers';
+import { newCashierFixture, sql, loginAs } from './helpers';
 
 test('two expenses show in the expenses report by category, equal to the database', async ({ page }) => {
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   // only two expense types exist: «مشتريات» and «مصروفات محل»; the manager cannot add more

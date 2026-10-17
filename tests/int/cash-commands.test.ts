@@ -2,7 +2,6 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it } from 'vitest';
 
-import { approveWithPin } from '@/db/commands/approval';
 import {
   closeShift,
   postCashTransfer,
@@ -14,11 +13,8 @@ import { newCommon, type DeviceContext } from '@/db/commands/context';
 import { postSale } from '@/db/commands/post-sale';
 import { drawerBalance } from '@/db/cash';
 import type { CashAccount, ExpenseCategory, Worker } from '@/db/types';
-import { hashPin } from '@/db/workers';
 
 import { newDevice, seedCatalog } from './helpers';
-
-const PIN = '482915';
 
 async function setup(role: DeviceContext['role'] = 'cashier') {
   const seedCtx = newDevice('K1', 'manager');
@@ -35,7 +31,7 @@ async function setup(role: DeviceContext['role'] = 'cashier') {
   const category: ExpenseCategory = { ...newCommon(ctx), name: 'نثريات', icon: null };
   await ctx.db.cashAccounts.bulkPut([drawer, safe]);
   await ctx.db.expenseCategories.put(category);
-  const { pinHash, pinSalt } = await hashPin(PIN);
+  const { pinHash, pinSalt } = { pinHash: null, pinSalt: null };
   const manager: Worker = {
     ...newCommon(ctx),
     name: 'م',
@@ -102,7 +98,7 @@ describe('close shift', () => {
     expect(safeRows.map((m) => m.amount)).toEqual([2000]);
   });
 
-  it('a shortage above 20.00 needs a note and the manager PIN; a small one does not', async () => {
+  it('a shortage above 20.00 needs a note (no approval any more); a small one does not', async () => {
     const t = await setup();
     const small = await previewClose(t.ctx, t.s.shiftId, t.count(9000));
     expect(small).toMatchObject({ ok: true, preview: { variance: -1000, needsApproval: false } });
@@ -112,19 +108,9 @@ describe('close shift', () => {
       ok: false,
       code: 'NOTE_REQUIRED',
     });
-    expect(
-      await closeShift(t.ctx, { shiftId: t.s.shiftId, counted: t.count(7000), note: 'نقص' }),
-    ).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'shiftVarianceApprove');
-    if (!a.ok) throw new Error(a.code);
-    const r = await closeShift(t.ctx, {
-      shiftId: t.s.shiftId,
-      counted: t.count(7000),
-      note: 'نقص',
-      approvalToken: a.value.token,
-    });
-    expect(r.ok).toBe(true);
-    expect((await t.ctx.db.shifts.get(t.s.shiftId))?.approvedBy).toBe(t.manager.id);
+    expect((await closeShift(t.ctx, { shiftId: t.s.shiftId, counted: t.count(7000), note: 'نقص' })).ok).toBe(
+      true,
+    );
   });
 
   it('a manager closing his own shift only needs the note', async () => {

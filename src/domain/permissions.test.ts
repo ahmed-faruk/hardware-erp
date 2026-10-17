@@ -16,9 +16,9 @@ describe('permissions', () => {
     expect(can('cashier', 'sell')).toBe('yes');
     expect(can('cashier', 'void')).toBe('no');
   });
-  it('cashier needs a PIN for override actions', () => {
+  it('there are no approvals: the cashier simply has no override actions', () => {
     for (const a of ['discountOverLimit', 'priceOverride', 'creditOverLimit', 'noSaleDrawer'] as Action[]) {
-      expect(can('cashier', a)).toBe('pin');
+      expect(can('cashier', a)).toBe('no');
     }
   });
   it('storekeeper handles stock only', () => {
@@ -43,14 +43,15 @@ describe('permissions', () => {
 });
 
 describe('permission groups', () => {
-  const group: Permissions = { sell: 'yes', recordExpense: 'pin', 'view.expenses': 'yes' };
+  // recordExpense: 'pin' is what an old group may still hold: it now means no
+  const group = { sell: 'yes', recordExpense: 'pin', 'view.expenses': 'yes' } as unknown as Permissions;
 
   it('a worker without a group gets his role defaults', () => {
     expect(resolveAccess('cashier', null, 'sell')).toBe('yes');
     expect(resolveAccess('cashier', null, 'void')).toBe('no');
   });
   it('with a group the group is the whole truth: unlisted means no', () => {
-    expect(resolveAccess('cashier', group, 'recordExpense')).toBe('pin');
+    expect(resolveAccess('cashier', group, 'recordExpense')).toBe('no');
     expect(resolveAccess('cashier', group, 'view.expenses')).toBe('yes');
     expect(resolveAccess('cashier', group, 'holdCart')).toBe('no');
   });

@@ -4,22 +4,26 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import {
+  addWorker,
+  newCashierFixture,
+  productId,
+  sql,
+  type CashierFixture,
+  loginAs,
+  typeLogin,
+  type Who,
+} from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const t = strings.purchases;
 
-async function login(page: Page, f: CashierFixture, who: { name: string; pin: string }): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(who.name) }).click();
-  await page.keyboard.type(who.pin);
-  await page.keyboard.press('Enter');
+async function login(page: Page, f: CashierFixture, who: Who): Promise<void> {
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
-const manager = (f: CashierFixture) => ({ name: f.managerName, pin: f.pin });
+const manager = () => 'manager' as const;
 
 function supplier(): { id: string; name: string } {
   const id = randomUUID();
@@ -54,7 +58,7 @@ test.describe('the new purchase screen', () => {
     const code = sql(
       `select code from barcodes where product_id = '${productId(7)}' order by created_at desc limit 1`,
     );
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await scanLine(page, code);
@@ -123,7 +127,7 @@ test.describe('the new purchase screen', () => {
     const s = supplier();
     const barcode = `9${Date.now()}`.slice(0, 13);
     const name = `صنف بسعر ${randomUUID().slice(0, 5)}`;
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await scanLine(page, barcode);
@@ -150,7 +154,7 @@ test.describe('the new purchase screen', () => {
     const f = newCashierFixture();
     const cash = supplier();
     const credit = supplier();
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     for (const [s, mode] of [
       [cash, 'cash'],
       [credit, 'credit'],
@@ -190,7 +194,7 @@ test.describe('the new purchase screen', () => {
   }) => {
     const f = newCashierFixture();
     const s = supplier();
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await page.getByTestId('purchase-supplier-ref').fill('4471');
@@ -227,7 +231,7 @@ test.describe('the new purchase screen', () => {
     sql(
       `insert into purchase_invoice_lines (id, company_id, invoice_id, line_no, product_id, unit_factor, qty, unit_cost, net_amount) values ('${randomUUID()}', '${COMPANY}', '${inv}', 1, '${productId(8)}', 1000, 10000, 500, 5000)`,
     );
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await scanLine(page, 'Test product 8');
@@ -245,7 +249,7 @@ test.describe('the new purchase screen', () => {
   }) => {
     const f = newCashierFixture();
     const s = supplier();
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await page.getByTestId('purchase-supplier-ref').fill('D-1');
@@ -273,9 +277,7 @@ test.describe('the new purchase screen', () => {
       )
       .toContain('"qty":7000');
     await page.reload();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: f.managerUser, password: f.managerPassword });
     await expect(page.getByTestId('purchase-scan')).toBeVisible();
     await expect(page.getByTestId('purchase-supplier')).toHaveValue(s.name);
     await expect(page.getByTestId('purchase-supplier-ref')).toHaveValue('D-1');
@@ -283,9 +285,7 @@ test.describe('the new purchase screen', () => {
     await page.getByTestId('discard-draft').click();
     await expect(page.getByTestId('purchase-line')).toHaveCount(0);
     await page.reload();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: f.managerUser, password: f.managerPassword });
     await expect(page.getByTestId('purchase-scan')).toBeVisible();
     await expect(page.getByTestId('purchase-line')).toHaveCount(0);
     // a saved invoice leaves no draft behind
@@ -302,7 +302,7 @@ test.describe('the new purchase screen', () => {
 
   test('a supplier is added from the screen and its balance is shown', async ({ page }) => {
     const f = newCashierFixture();
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     const name = `مورد جديد ${randomUUID().slice(0, 5)}`;
     await page.getByTestId('purchase-new-supplier').click();
@@ -329,7 +329,7 @@ test.describe('the new purchase screen', () => {
   }) => {
     const f = newCashierFixture();
     const s = supplier();
-    await login(page, f, manager(f));
+    await login(page, f, manager());
     await openNew(page);
     await page.getByTestId('purchase-supplier').fill(s.name);
     await scanLine(page, 'Test product 5');

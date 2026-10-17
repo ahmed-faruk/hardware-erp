@@ -1,4 +1,3 @@
-import { hashPin } from '../workers';
 import { err, type Err } from '@/domain/result';
 import {
   categoryFieldsSchema,
@@ -140,16 +139,14 @@ export async function saveCategory(ctx: DeviceContext, input: SaveInput): Promis
   );
 }
 
-/** Workers: managers only. A PIN is hashed here (PBKDF2) and only the hash and salt are stored and synced. */
+/** Workers: managers only. Logins (username and password) are made on the server by `set_worker_login`, never here. */
 export async function saveWorker(ctx: DeviceContext, input: SaveInput): Promise<SaveResult> {
   const parsed = workerFieldsSchema.safeParse(input.fields);
   if (!parsed.success) return err('E_VALIDATION', 'بيانات العامل غير صحيحة');
   if (canCtx(ctx, 'manageUsers') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
-  const { pin, ...rest } = parsed.data;
-  const fields: Record<string, unknown> = { ...rest };
-  if (!input.id && (!pin || !rest.name || !rest.role))
-    return err('E_VALIDATION', 'العامل الجديد محتاج اسم ووظيفة ورقم سري');
-  if (pin) Object.assign(fields, await hashPin(pin));
+  const fields: Record<string, unknown> = { ...parsed.data };
+  if (!input.id && (!parsed.data.name || !parsed.data.role))
+    return err('E_VALIDATION', 'العامل الجديد محتاج اسم ووظيفة');
   const { db } = ctx;
   return db.transaction('rw', [db.workers, db.outbox, db.syncState], async () =>
     out(
@@ -159,6 +156,7 @@ export async function saveWorker(ctx: DeviceContext, input: SaveInput): Promise<
         role: 'cashier',
         pinHash: null,
         pinSalt: null,
+        username: null,
         photoPath: null,
         active: true,
         legacyEmployeeId: null,

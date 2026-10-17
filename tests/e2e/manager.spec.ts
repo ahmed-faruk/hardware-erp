@@ -2,19 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newFixture, sql, type Fixture } from './helpers';
+import { newFixture, sql, type Fixture, loginAs, typeLogin } from './helpers';
 
 const run = Math.random().toString(36).slice(2, 7);
 const barcode = String(Date.now()).slice(-9);
 const price = `${strings.products.price} (${strings.common.egp})`;
 
 async function activateAndLogin(page: Page, f: Fixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -67,10 +62,20 @@ test.describe('manager journeys', () => {
     await page.getByRole('button', { name: strings.nav.workers }).click();
     await page.getByTestId('new-worker').click();
     await page.getByTestId('worker-name').fill(`كاشير اختبار ${run}`);
-    await page.getByTestId('worker-pin').fill('654321');
-    await page.getByTestId('worker-pin2').fill('654321');
     await page.getByTestId('save-worker').click();
     await expect(page.getByText(`كاشير اختبار ${run}`)).toBeVisible();
+    // the worker reaches the server, then the manager gives them a login (username once, password any time)
+    await expect
+      .poll(() => sql(`select count(*) from workers where name = 'كاشير اختبار ${run}'`), { timeout: 60_000 })
+      .toBe('1');
+    const cashierUser = `c${run}`.toLowerCase();
+    await page.getByText(`كاشير اختبار ${run}`).click();
+    await page.getByTestId('worker-username').fill(cashierUser);
+    await page.getByTestId('worker-password').fill('654321');
+    await page.getByTestId('worker-password2').fill('654321');
+    await page.getByTestId('worker-save-login').click();
+    await expect(page.getByText(strings.workers.loginSaved)).toBeVisible();
+    await page.getByRole('button', { name: strings.common.cancel }).click();
 
     // everything reaches the server
     await expect(page.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });
@@ -91,16 +96,17 @@ test.describe('manager journeys', () => {
       .toBe('1');
     await expect
       .poll(
-        () => sql(`select count(*) from workers where name = 'كاشير اختبار ${run}' and pin_hash is not null`),
+        () =>
+          sql(
+            `select count(*) from workers w join worker_credentials c on c.worker_id = w.id where w.name = 'كاشير اختبار ${run}' and w.username = '${cashierUser}'`,
+          ),
         { timeout: 60_000 },
       )
       .toBe('1');
 
-    // lock, then the new cashier logs in with the PIN the manager set and sees no manager screens
+    // lock, then the new cashier logs in with the login the manager set and sees no manager screens
     await page.getByTestId('lock').click();
-    await page.getByRole('button', { name: new RegExp(`كاشير اختبار ${run}`) }).click();
-    await page.keyboard.type('654321');
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: cashierUser, password: '654321' });
     // a cashier lands on the sale screen: the shop box exists, so he is asked to open the shift
     await expect(page.getByTestId('open-shift')).toBeVisible();
     await expect(page.getByRole('button', { name: strings.nav.workers })).toHaveCount(0);
@@ -108,35 +114,25 @@ test.describe('manager journeys', () => {
 
   test('the settings screen has no auto-print switch any more', async ({ page }) => {
     const f = newFixture();
-    await page.goto('/');
-    await page.getByTestId('activation-code').fill(f.code);
-    await page.getByTestId('activate').click();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await loginAs(page, f, 'manager');
     await expect(page.getByTestId('sync-status')).toBeVisible();
     await page.getByRole('button', { name: strings.nav.settings }).click();
     await expect(page.getByTestId('backup-pass')).toBeVisible();
     await expect(page.getByTestId('auto-print')).toHaveCount(0);
   });
 
-  test('wrong PIN shakes and 5 wrong tries lock the worker', async ({ page }) => {
+  test('5 wrong passwords lock the username, even the right password is refused for a while', async ({
+    page,
+  }) => {
     const f = newFixture();
+    const creds = { user: f.managerUser, password: f.managerPassword };
     await page.goto('/');
-    await page.getByTestId('activation-code').fill(f.code);
-    await page.getByTestId('activate').click();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.type('000000');
-      await page.keyboard.press('Enter');
-      const dots = page.getByTestId('pin-dots');
-      await expect(dots).toHaveClass(/shake/); // a wrong PIN shakes the dots
-      await expect(dots).not.toHaveClass(/shake/);
-    }
+    await typeLogin(page, creds); // the first login registers the browser
+    await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 300_000 });
+    for (let i = 0; i < 5; i++) await typeLogin(page, { ...creds, password: 'wrong-password' });
+    await typeLogin(page, creds);
     await expect(page.getByText(strings.login.locked)).toBeVisible();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('sync-status')).toHaveCount(0); // still locked out even with the right PIN
+    await expect(page.getByTestId('sync-status')).toHaveCount(0); // still locked out even with the right password
   });
 
   test('works offline: an edit waits in the outbox and syncs when the connection returns', async ({

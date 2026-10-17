@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, sql } from './helpers';
+import { newCashierFixture, sql, loginAs } from './helpers';
 
 const run = Math.random().toString(36).slice(2, 7);
 
@@ -10,12 +10,7 @@ test('a purchase paid 40 from the safe, 30 from the owner pocket and 30 on credi
   page,
 }) => {
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   const supplier = `مورد خارجي ${run}`;

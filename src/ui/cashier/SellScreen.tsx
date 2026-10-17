@@ -41,7 +41,6 @@ import { strings } from '../strings.ar';
 import { customerPriceList, repriceForCustomer } from '@/db/pricing';
 import { runBackup } from '@/app/backup-file';
 import { recordAudit } from '@/db/commands/audit';
-import { useApproval } from './ApprovalDialog';
 import { CartPanel } from './CartPanel';
 import { ChangeDisplay } from './ChangeDisplay';
 import { DiscountDialog } from './DiscountDialog';
@@ -116,7 +115,6 @@ export function SellScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   /** after a return, collection, void, expense, transfer or shift close nothing prints by itself: one print button offers it */
   const [printOffer, setPrintOffer] = useState<(() => void) | null>(null);
-  const [tokens, setTokens] = useState<string[]>([]);
   const [undo, setUndo] = useState<{
     prev: Cart;
     line: { productId: string; name: string; qtyMilli: number; unitPrice: number } | null;
@@ -138,7 +136,6 @@ export function SellScreen() {
   const [shiftMenu, setShiftMenu] = useState(false);
   const [shiftTool, setShiftTool] = useState<Exclude<ShiftTool, 'x'> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const { ask, dialog: approvalDialog } = useApproval();
 
   const digits = useCallback((text: string) => localizeDigits(text, device.digits), [device.digits]);
   const inv = cartInvoice(cart);
@@ -217,7 +214,6 @@ export function SellScreen() {
     if (!context || cart.lines.length === 0) return;
     await holdCart(context, cart, total);
     setCart(EMPTY_CART);
-    setTokens([]);
     play('ok');
   }, [context, cart, total]);
 
@@ -386,7 +382,6 @@ export function SellScreen() {
 
   const onPaid = (sale: SaleReceipt): void => {
     setCart(EMPTY_CART);
-    setTokens([]);
     setStep('done');
     play('done');
     sayAmounts(sale);
@@ -411,15 +406,12 @@ export function SellScreen() {
     setStep('items');
   };
 
-  const guardApproval = async (
-    needs: boolean,
-    action: 'discountOverLimit' | 'priceOverride',
-  ): Promise<boolean> => {
+  /** no approvals: whoever may not go past their level is told so and nothing changes */
+  const guardApproval = async (needs: boolean): Promise<boolean> => {
     if (!needs) return true;
-    const token = await ask(action);
-    if (!token) return false;
-    setTokens((t) => [...t, token]);
-    return true;
+    play('error');
+    flash(strings.forbidden);
+    return false;
   };
 
   const applyDiscount = async (target: Exclude<DiscountTarget, null>, discount: Discount): Promise<void> => {
@@ -432,7 +424,6 @@ export function SellScreen() {
     if (
       !(await guardApproval(
         discountNeedsApproval(settings, approverRole('discountOverLimit'), discount, gross),
-        'discountOverLimit',
       ))
     )
       return;
@@ -453,7 +444,6 @@ export function SellScreen() {
     if (
       !(await guardApproval(
         priceNeedsApproval(settings, approverRole('priceOverride'), price.value, line.listPrice),
-        'priceOverride',
       ))
     )
       return;
@@ -463,13 +453,7 @@ export function SellScreen() {
   const doNoSale = async (reason: NoSaleReason): Promise<void> => {
     setNoSaleOpen(false);
     if (!context) return;
-    let token: string | undefined;
-    if (can('noSaleDrawer') !== 'yes') {
-      const t = await ask('noSaleDrawer');
-      if (!t) return;
-      token = t;
-    }
-    const r = await noSale(context, reason, token);
+    const r = await noSale(context, reason);
     if (!r.ok) return flash(strings.forbidden);
     const shop = (await db.companies.toCollection().first())?.name ?? '';
     const { cairoFontFaces } = await import('../print/printHtml');
@@ -531,7 +515,6 @@ export function SellScreen() {
             testId="new-sale"
           />
         </div>
-        {approvalDialog}
       </section>
     );
   }
@@ -544,8 +527,6 @@ export function SellScreen() {
           total={total}
           digits={digits}
           sale={sale}
-          tokens={tokens}
-          ask={ask}
           pickerOpen={pickerOpen}
           setPickerOpen={setPickerOpen}
           onCustomer={(id) => {
@@ -555,7 +536,6 @@ export function SellScreen() {
           onBack={() => setStep('items')}
           onPaid={onPaid}
         />
-        {approvalDialog}
       </>
     );
   }
@@ -778,7 +758,6 @@ export function SellScreen() {
         open={shiftTool === 'close'}
         shiftId={shift.id}
         digits={digits}
-        ask={ask}
         onClose={() => setShiftTool(null)}
         onClosed={(id) => {
           setShiftTool(null);
@@ -796,7 +775,6 @@ export function SellScreen() {
         onDone={onCollectDone}
       />
       <NoSaleDialog open={noSaleOpen} onPick={(r) => void doNoSale(r)} onClose={() => setNoSaleOpen(false)} />
-      {approvalDialog}
     </section>
   );
 }

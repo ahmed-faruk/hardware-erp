@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, UserCog } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { saveWorker } from '@/db/commands/save-master';
+import { callRpc } from '@/sync/errors';
 import { formatMoney, toPiasters } from '@/domain/money';
 import type { Worker } from '@/db/types';
 
@@ -100,6 +101,113 @@ export function WorkersScreen() {
   );
 }
 
+/** The worker's login: a username (once) and a password the manager can reset. The server keeps the password; this needs the internet. */
+function LoginBlock({ worker }: { worker: Worker | null }) {
+  const { client, runner } = useServices();
+  const { context } = useSession();
+  const online = useSyncExternalStore(runner.subscribe, runner.getSnapshot).online;
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  const [message, setMessage] = useState<{ tone: 'ok' | 'danger'; word: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!worker) return <p>{strings.workers.loginSaveFirst}</p>;
+  const save = async (): Promise<void> => {
+    if (!context) return;
+    if (password.length < 6) return setMessage({ tone: 'danger', word: strings.workers.passwordShort });
+    if (password !== password2) return setMessage({ tone: 'danger', word: strings.workers.passwordMismatch });
+    setBusy(true);
+    setMessage(null);
+    const r = await callRpc<{ username: string }>(client, 'set_worker_login', {
+      p_actor: context.workerId,
+      p_worker: worker.id,
+      p_username: worker.username ? null : username,
+      p_password: password,
+    });
+    setBusy(false);
+    if (r.ok) {
+      setPassword('');
+      setPassword2('');
+      setMessage({ tone: 'ok', word: strings.workers.loginSaved });
+      void runner.runOnce();
+    } else
+      setMessage({
+        tone: 'danger',
+        word: r.network
+          ? strings.workers.needsNet
+          : r.message.includes(strings.workers.serverNoWorker)
+            ? strings.workers.waitAndRetry
+            : r.message.includes(strings.workers.serverUsername)
+              ? strings.workers.usernameBad
+              : strings.errors.saveFailed,
+      });
+  };
+  return (
+    <fieldset className={styles.form} style={{ gridTemplateColumns: '1fr', border: 0, padding: 0 }}>
+      <legend>{strings.workers.loginTitle}</legend>
+      {!online && <BigAlert tone="warn" word={strings.workers.needsNet} sound={false} />}
+      {worker.username ? (
+        <p dir="ltr" data-testid="worker-username-shown">
+          {worker.username}
+        </p>
+      ) : (
+        <FormField label={strings.workers.username} hint={strings.workers.usernameHint}>
+          {(id, d) => (
+            <input
+              id={id}
+              className="control"
+              dir="ltr"
+              autoCapitalize="none"
+              autoComplete="off"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              aria-describedby={d}
+              data-testid="worker-username"
+            />
+          )}
+        </FormField>
+      )}
+      <FormField label={strings.workers.password}>
+        {(id) => (
+          <input
+            id={id}
+            className="control"
+            dir="ltr"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            data-testid="worker-password"
+          />
+        )}
+      </FormField>
+      <FormField label={strings.workers.passwordRepeat}>
+        {(id) => (
+          <input
+            id={id}
+            className="control"
+            dir="ltr"
+            type="password"
+            autoComplete="new-password"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            data-testid="worker-password2"
+          />
+        )}
+      </FormField>
+      {message && <BigAlert tone={message.tone} word={message.word} sound={false} />}
+      <ActionButton
+        label={strings.workers.saveLogin}
+        variant="soft"
+        loading={busy}
+        disabled={!online || (!worker.username && !username) || !password}
+        onClick={() => void save()}
+        testId="worker-save-login"
+      />
+    </fieldset>
+  );
+}
+
 function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => void }) {
   const { db } = useServices();
   const { context } = useSession();
@@ -109,9 +217,6 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
   const [groupId, setGroupId] = useState(worker?.groupId ?? '');
   const [salary, setSalary] = useState<number | null>(worker?.monthlySalary ?? null);
   const groups = useLiveQuery(() => db.permissionGroups.filter((g) => !g.deletedAt).toArray(), [db]);
-  const [changePin, setChangePin] = useState(!worker);
-  const [pin, setPin] = useState('');
-  const [pin2, setPin2] = useState('');
   const [error, setError] = useState<string | null>(null);
   const saver = useSaver(onDone);
   return (
@@ -121,8 +226,6 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return setError(strings.common.required);
-        if (changePin && !/^\d{6,12}$/.test(pin)) return setError(strings.workers.pinShort);
-        if (changePin && pin !== pin2) return setError(strings.workers.pinMismatch);
         setError(null);
         if (!context) return;
         void saver.run(() =>
@@ -135,7 +238,6 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
               active,
               groupId: groupId || null,
               monthlySalary: salary,
-              ...(changePin ? { pin } : {}),
             },
           }),
         );
@@ -194,47 +296,7 @@ function WorkerForm({ worker, onDone }: { worker: Worker | null; onDone: () => v
           </select>
         )}
       </FormField>
-      {worker && (
-        <label className={styles.check}>
-          <input type="checkbox" checked={changePin} onChange={(e) => setChangePin(e.target.checked)} />
-          {strings.workers.pinChange}
-        </label>
-      )}
-      {changePin && (
-        <>
-          <FormField label={strings.workers.pin} hint={strings.workers.pinHint}>
-            {(id, d) => (
-              <input
-                id={id}
-                className="control"
-                dir="ltr"
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                aria-describedby={d}
-                data-testid="worker-pin"
-              />
-            )}
-          </FormField>
-          <FormField label={strings.workers.pinRepeat}>
-            {(id) => (
-              <input
-                id={id}
-                className="control"
-                dir="ltr"
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                value={pin2}
-                onChange={(e) => setPin2(e.target.value)}
-                data-testid="worker-pin2"
-              />
-            )}
-          </FormField>
-        </>
-      )}
+      <LoginBlock worker={worker} />
       {worker && (
         <label className={styles.check}>
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />

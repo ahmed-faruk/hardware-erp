@@ -4,18 +4,13 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, sql, type CashierFixture, loginAs } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const t = strings.purchases;
 
 async function login(page: Page, f: CashierFixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 

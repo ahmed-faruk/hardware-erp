@@ -1,11 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 
-// @ts-expect-error plain JS module shared with the Mac admin tools
-import { hashPin } from '../../tools/device-admin/pin.mjs';
+import { expect, type Page } from '@playwright/test';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /** Test-only superuser query against the local database container (never used against staging or production). */
 export function sql(query: string): string {
@@ -19,34 +17,41 @@ export function sql(query: string): string {
 
 const q = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 
-export interface Fixture {
-  deviceId: string;
-  code: string;
-  pin: string;
-  managerName: string;
-  prefix: string;
+export interface Creds {
+  user: string;
+  password: string;
 }
 
-/** A fresh device activation code and a manager with a known PIN, as `npm run device:add` and `worker:add` would create. */
+export interface Fixture {
+  /** the device registers itself on the first login: these are filled in by `loginAs` */
+  deviceId: string;
+  prefix: string;
+  managerName: string;
+  managerUser: string;
+  managerPassword: string;
+}
+
+const PASSWORD = 'pass1234';
+
+/** A worker with a login (username + bcrypt password hash made by the database), as the Workers screen would create it. */
+function makeWorker(name: string, role: string): Creds {
+  const user = `u${randomBytes(5).toString('hex')}`;
+  const id = randomUUID();
+  sql(
+    `insert into workers (id, company_id, name, role, active, username) values (${q(id)}, ${q(COMPANY)}, ${q(name)}, ${q(role)}, true, ${q(user)})`,
+  );
+  sql(
+    `insert into worker_credentials (worker_id, company_id, password_hash, must_change) values (${q(id)}, ${q(COMPANY)}, extensions.crypt(${q(PASSWORD)}, extensions.gen_salt('bf')), false)`,
+  );
+  return { user, password: PASSWORD };
+}
+
+/** A manager with a known login. The shop has one shift, so every test starts with none open. */
 export function newFixture(): Fixture {
-  // the shop has one shift: every test starts with none open
   sql("update shifts set status = 'closed', closed_at = now() where status = 'open'");
-  const code = Array.from(randomBytes(10), (b) => ALPHABET[b % ALPHABET.length]).join('');
-  const prefix = Array.from(randomBytes(3), (b) => ALPHABET[b % ALPHABET.length]).join('');
-  const pin = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 899999));
   const managerName = `مدير ${randomUUID().slice(0, 8)}`;
-  const { pinHash, pinSalt } = hashPin(pin) as { pinHash: string; pinSalt: string };
-  const deviceId = randomUUID();
-  sql(
-    `insert into devices (id, company_id, name, prefix, kind, max_role) values (${q(deviceId)}, ${q(COMPANY)}, 'e2e', ${q(prefix)}, 'pc', 'manager')`,
-  );
-  sql(
-    `insert into device_activations (device_id, code_hash, expires_at) values (${q(deviceId)}, encode(extensions.digest(${q(code)}, 'sha256'), 'hex'), now() + interval '1 day')`,
-  );
-  sql(
-    `insert into workers (id, company_id, name, role, pin_hash, pin_salt, active) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(managerName)}, 'manager', ${q(pinHash)}, ${q(pinSalt)}, true)`,
-  );
-  return { deviceId, code, pin, managerName, prefix };
+  const c = makeWorker(managerName, 'manager');
+  return { deviceId: '', prefix: '', managerName, managerUser: c.user, managerPassword: c.password };
 }
 
 export const productId = (n: number): string =>
@@ -55,7 +60,8 @@ const CATEGORY = 'a0000000-0000-7000-8000-0000000ca001';
 
 export interface CashierFixture extends Fixture {
   cashierName: string;
-  cashierPin: string;
+  cashierUser: string;
+  cashierPassword: string;
 }
 
 /**
@@ -65,11 +71,7 @@ export interface CashierFixture extends Fixture {
 export function newCashierFixture(): CashierFixture {
   const f = newFixture();
   const cashierName = `كاشير ${randomUUID().slice(0, 8)}`;
-  const cashierPin = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 899999));
-  const { pinHash, pinSalt } = hashPin(cashierPin) as { pinHash: string; pinSalt: string };
-  sql(
-    `insert into workers (id, company_id, name, role, pin_hash, pin_salt, active) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(cashierName)}, 'cashier', ${q(pinHash)}, ${q(pinSalt)}, true)`,
-  );
+  const cashier = makeWorker(cashierName, 'cashier');
   sql(
     `insert into categories (id, company_id, name, color_token, icon, sort) values (${q(CATEGORY)}, ${q(COMPANY)}, 'قسم الكاشير', 'cat-1', 'paint-roller', -1) on conflict (id) do nothing`,
   );
@@ -82,7 +84,7 @@ export function newCashierFixture(): CashierFixture {
     );
   }
   sql(`delete from settings where company_id = ${q(COMPANY)} and key like 'sale.%'`);
-  return { ...f, cashierName, cashierPin };
+  return { ...f, cashierName, cashierUser: cashier.user, cashierPassword: cashier.password };
 }
 
 /** Same as the default settings plus whatever the test changes (values are JSON). */
@@ -92,15 +94,52 @@ export function setSetting(key: string, value: string): void {
   );
 }
 
-/** A worker of the given role with a known PIN, on the company (any device with a high enough max role can list him). */
-export function addWorker(role: 'cashier' | 'storekeeper' | 'manager'): { name: string; pin: string } {
-  const pin = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 899999));
+/** A worker of the given role with a known login, on the company. */
+export function addWorker(role: 'cashier' | 'storekeeper' | 'manager'): Creds & { name: string } {
   const name = `${role === 'storekeeper' ? 'أمين' : role === 'cashier' ? 'كاشير' : 'مدير'} ${randomUUID().slice(0, 8)}`;
-  const { pinHash, pinSalt } = hashPin(pin) as { pinHash: string; pinSalt: string };
-  sql(
-    `insert into workers (id, company_id, name, role, pin_hash, pin_salt, active) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(name)}, ${q(role)}, ${q(pinHash)}, ${q(pinSalt)}, true)`,
-  );
-  return { name, pin };
+  return { name, ...makeWorker(name, role) };
+}
+
+export type Who = 'manager' | 'cashier' | Creds;
+
+const credsOf = (f: Fixture | CashierFixture, who: Who): Creds =>
+  who === 'manager'
+    ? { user: f.managerUser, password: f.managerPassword }
+    : who === 'cashier'
+      ? { user: (f as CashierFixture).cashierUser, password: (f as CashierFixture).cashierPassword }
+      : who;
+
+/** Types a login on the login form that is on screen and submits it. */
+export async function typeLogin(page: Page, who: Creds): Promise<void> {
+  await page.getByTestId('login-username').fill(who.user);
+  await page.getByTestId('login-password').fill(who.password);
+  await page.getByTestId('login-submit').click();
+}
+
+/**
+ * First run on a fresh browser: the first login registers the browser as a device, the second one is the worker's own login
+ * (the same form). Afterwards `f.deviceId` and `f.prefix` hold the device that was just registered.
+ */
+export async function loginAs(page: Page, f: Fixture | CashierFixture, who: Who = 'manager'): Promise<void> {
+  const c = credsOf(f, who);
+  await page.goto('/');
+  await expect(page.getByTestId('setup-form')).toBeVisible();
+  await typeLogin(page, c);
+  await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 300_000 });
+  await typeLogin(page, c);
+  await expect(page.getByTestId('login-form')).toHaveCount(0, { timeout: 60_000 });
+  const id = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((ok) => {
+      const r = indexedDB.open('HanafyPOS');
+      r.onsuccess = () => ok(r.result);
+    });
+    return await new Promise<{ deviceId: string; prefix: string }>((ok) => {
+      const q = db.transaction('deviceSettings').objectStore('deviceSettings').get('device');
+      q.onsuccess = () => ok(q.result.value);
+    });
+  });
+  f.deviceId = id.deviceId;
+  f.prefix = id.prefix;
 }
 
 /** Cash moved by the documents of one device (their numbers start with its prefix). */

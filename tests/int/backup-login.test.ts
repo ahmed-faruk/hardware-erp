@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 
 import { postSale } from '@/db/commands/post-sale';
-import { checkPin, hashPin } from '@/db/workers';
+import { checkVerifier, hasVerifier, saveVerifier } from '@/db/login';
 import { HanafyDB } from '@/db/schema';
 import { exportBackup, restoreBackup } from '@/sync/backup';
 
@@ -42,33 +42,16 @@ describe('backup', () => {
   });
 });
 
-describe('worker PIN', () => {
-  it('accepts the right PIN, locks after 5 wrong tries, audits the lock', async () => {
+describe('offline login verifier', () => {
+  it('accepts the password it was saved with, refuses another, and knows a worker it never saw', async () => {
     const ctx = newDevice();
-    const { pinHash, pinSalt } = await hashPin('123456');
-    await ctx.db.workers.put({
-      id: ctx.workerId,
-      companyId: ctx.companyId,
-      deviceId: null,
-      createdBy: null,
-      createdAt: '',
-      updatedAt: '',
-      version: 1,
-      deletedAt: null,
-      name: 'w',
-      role: 'cashier',
-      pinHash,
-      pinSalt,
-      photoPath: null,
-      active: true,
-      legacyEmployeeId: null,
-    });
-    expect(await checkPin(ctx, ctx.workerId, '123456')).toMatchObject({ ok: true });
-    for (let i = 0; i < 4; i++)
-      expect(await checkPin(ctx, ctx.workerId, '000000')).toMatchObject({ code: 'PIN_WRONG' });
-    expect(await checkPin(ctx, ctx.workerId, '000000', 1_000)).toMatchObject({ code: 'PIN_LOCKED' });
-    expect(await checkPin(ctx, ctx.workerId, '123456', 2_000)).toMatchObject({ code: 'PIN_LOCKED' });
-    expect((await ctx.db.auditLog.toArray()).filter((a) => a.action === 'pin_locked')).toHaveLength(1);
-    expect(await checkPin(ctx, ctx.workerId, '123456', Date.now() + 6 * 60_000)).toMatchObject({ ok: true });
+    expect(await hasVerifier(ctx.db, 'boss')).toBe(false);
+    await saveVerifier(ctx.db, 'Boss', ctx.workerId, 'secret1');
+    expect(await hasVerifier(ctx.db, ' boss ')).toBe(true);
+    expect(await checkVerifier(ctx.db, 'boss', 'secret1')).toBe(ctx.workerId);
+    expect(await checkVerifier(ctx.db, 'boss', 'secret2')).toBeNull();
+    expect(await checkVerifier(ctx.db, 'nobody', 'secret1')).toBeNull();
+    // the stored value never holds the password itself
+    expect(JSON.stringify(await ctx.db.deviceSettings.toArray())).not.toContain('secret1');
   });
 });

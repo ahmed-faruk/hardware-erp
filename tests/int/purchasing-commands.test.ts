@@ -2,7 +2,6 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it } from 'vitest';
 
-import { approveWithPin } from '@/db/commands/approval';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
 import {
   postPurchase,
@@ -12,11 +11,8 @@ import {
 } from '@/db/commands/purchasing';
 import { uuidv7 } from '@/db/ids';
 import type { Supplier, Worker } from '@/db/types';
-import { hashPin } from '@/db/workers';
 
 import { newDevice, seedCatalog } from './helpers';
-
-const PIN = '482915';
 
 async function setup(role: DeviceContext['role'] = 'manager') {
   const seedCtx = newDevice('K1', 'manager');
@@ -44,7 +40,7 @@ async function setup(role: DeviceContext['role'] = 'manager') {
   };
   await ctx.db.suppliers.put(supplier);
   const safe = uuidv7();
-  const { pinHash, pinSalt } = await hashPin(PIN);
+  const { pinHash, pinSalt } = { pinHash: null, pinSalt: null };
   const manager: Worker = {
     ...newCommon(ctx),
     name: 'م',
@@ -399,23 +395,18 @@ describe('supplier payment', () => {
 });
 
 describe('stock adjustment', () => {
-  it('a storekeeper adjusts a small value alone, a big one needs the manager PIN', async () => {
+  it('a storekeeper adjusts a small value; a big one is refused (there are no approvals), a manager may', async () => {
     const t = await setup('storekeeper');
     // seeded cost is 600 per piece: 1 piece = 6.00, 200 pieces = 1200.00 (limit 500.00)
-    const adj = (qty: number, tokens: string[] = []) =>
-      postStockAdjustment(t.ctx, {
+    const adj = (ctx: typeof t.ctx, qty: number) =>
+      postStockAdjustment(ctx, {
         warehouseId: t.warehouse.id,
         reason: 'count',
         lines: [{ productId: t.p1, qtyDeltaMilli: qty }],
-        approvalTokens: tokens,
       });
-    expect((await adj(1000)).ok).toBe(true);
-    expect(await adj(200000)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const a = await approveWithPin(t.ctx, t.manager.id, PIN, 'stockAdjustmentOverLimit');
-    if (!a.ok) throw new Error(a.code);
-    expect((await adj(200000, [a.value.token])).ok).toBe(true);
-    const row = (await t.ctx.db.stockAdjustments.toArray()).find((x) => x.approvedBy);
-    expect(row?.approvedBy).toBe(t.manager.id);
+    expect((await adj(t.ctx, 1000)).ok).toBe(true);
+    expect(await adj(t.ctx, 200000)).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect((await adj({ ...t.ctx, role: 'manager' }, 200000)).ok).toBe(true);
   });
 
   it('lost cannot add stock', async () => {

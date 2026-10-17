@@ -25,7 +25,7 @@ insert into permission_groups (id, company_id, name, permissions)
 values ('a0000000-0000-7000-8000-0000000000b1', 'a0000000-0000-7000-8000-000000000001', 'مجموعة اختبار', '{"cashAdjustment": "yes", "recordExpense": "pin"}');
 update workers set group_id = 'a0000000-0000-7000-8000-0000000000b1' where id = 'a0000000-0000-7000-8000-0000000000d1';
 select is(worker_can('a0000000-0000-7000-8000-0000000000d1', 'cashAdjustment'), 'yes', 'the group grants more than the role');
-select is(worker_can('a0000000-0000-7000-8000-0000000000d1', 'recordExpense'), 'pin', 'the group can turn a yes into pin');
+select is(worker_can('a0000000-0000-7000-8000-0000000000d1', 'recordExpense'), 'no', 'a stored pin means no (there are no approvals any more)');
 select is(worker_can('a0000000-0000-7000-8000-0000000000d1', 'sell'), 'no', 'with a group an unlisted action is no');
 
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');

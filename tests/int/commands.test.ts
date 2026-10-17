@@ -52,7 +52,7 @@ describe('postSale', () => {
     expect(await ctx.db.cashMovements.count()).toBe(0);
   });
 
-  it('refuses credit above the limit without manager approval', async () => {
+  it('refuses credit above the limit to a worker without the permission', async () => {
     const ctx = newDevice();
     const s = await seedCatalog(ctx);
     await ctx.db.customers.update(s.customer.id, { creditLimit: 500 });
@@ -64,7 +64,7 @@ describe('postSale', () => {
       shiftId: s.shiftId,
       cashAccountId: s.cashAccountId,
     };
-    expect(await postSale(ctx, base)).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
+    expect(await postSale(ctx, base)).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
     expect(await ctx.db.salesInvoices.count()).toBe(0);
   });
 
