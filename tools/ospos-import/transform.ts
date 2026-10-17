@@ -497,13 +497,17 @@ export function transform(data: OsposExport): TransformResult {
     note('REQUISITIONS_SKIPPED', 'receivings with zero total (requisitions): not imported as purchases');
 
   // ---- expenses --------------------------------------------------------------------------------------------------
+  // the only two active types after the import (owner decision 2026-10-12, kept on every reload)
+  for (const name of ['مشتريات', 'مصروفات محل'])
+    push('expense_categories', { ...common(legacyId('expense-category-v2', name)), name, icon: null });
   const expenseCategoryId = new Map<string, string>();
   for (const name of [...new Set(data.expenses.map((e) => cleanText(e.category_name)).filter(Boolean))].sort(
     (a, b) => a.localeCompare(b, 'ar'),
   )) {
     const id = legacyId('expense-category', name);
     expenseCategoryId.set(name, id);
-    push('expense_categories', { ...common(id), name, icon: null });
+    // old types stay on old expenses (their names show in the reports) but are retired: only the two real types are offered
+    push('expense_categories', { ...common(id), name, icon: null, deleted_at: exportedAt });
   }
   const uncategorized = legacyId('expense-category', '__none__');
   for (const e of data.expenses) {
@@ -518,7 +522,12 @@ export function transform(data: OsposExport): TransformResult {
       categoryOf = uncategorized;
       if (!expenseCategoryId.has('__none__')) {
         expenseCategoryId.set('__none__', uncategorized);
-        push('expense_categories', { ...common(uncategorized), name: 'بدون تصنيف', icon: null });
+        push('expense_categories', {
+          ...common(uncategorized),
+          name: 'بدون تصنيف',
+          icon: null,
+          deleted_at: exportedAt,
+        });
       }
     }
     push('expenses', {
