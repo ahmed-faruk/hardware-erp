@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newFixture, type Fixture } from './helpers';
+import { newFixture, type Fixture, loginAs } from './helpers';
 
 const VIEWPORTS = [
   [320, 568],
@@ -31,12 +31,7 @@ const SCREENS = [
 ];
 
 async function activateAndLogin(page: Page, f: Fixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 

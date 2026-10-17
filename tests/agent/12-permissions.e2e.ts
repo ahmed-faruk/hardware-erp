@@ -30,9 +30,9 @@ describe('permission groups', () => {
     await expect(screen.getByTestId('save-worker')).toHaveCount(0);
 
     await screen.getByTestId('lock').tap();
-    await screen.getByText(f.cashierName, { exact: false }).tap();
-    await typeKeys(browser, f.cashierPin);
-    await browser.keyboard.press('Enter');
+    await screen.getByTestId('login-username').fill(f.cashierUser);
+    await screen.getByTestId('login-password').fill(f.cashierPassword);
+    await screen.getByTestId('login-submit').tap();
     await openShift(screen, browser);
     await addProduct(screen, 1); // 12.50
     await screen.getByTestId('discount-0').tap();

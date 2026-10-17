@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 
-import { activateDevice, loadIdentity, signInDevice } from '@/app/device-setup';
+import { firstLogin, loadIdentity, signInDevice } from '@/app/device-setup';
 import { SessionProvider, useServices, useSession, type Services } from '@/app/session';
 import { APP_VERSION } from '@/app/version';
 import { HanafyDB } from '@/db/schema';
@@ -123,14 +123,16 @@ export function App() {
     const { db, client } = boot;
     return (
       <SetupScreen
-        onActivate={async (code) => {
-          const r = await activateDevice(db, client, code);
+        onLogin={async (username, password) => {
+          const r = await firstLogin(db, client, username, password);
           if (!r.ok)
             return r.code === 'NO_NET'
               ? strings.setup.noNet
-              : r.code === 'BAD_CODE'
-                ? strings.setup.badCode
-                : strings.setup.failed;
+              : r.code === 'LOCKED'
+                ? strings.login.locked
+                : r.code === 'BAD_LOGIN'
+                  ? strings.login.wrong
+                  : strings.setup.failed;
           void requestPersistence().catch(() => false);
           const services = await startServices(db, client);
           if (services) setBoot({ state: 'ready', services });

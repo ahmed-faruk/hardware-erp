@@ -1,5 +1,5 @@
 import type { Browser } from '@e2e-dev/web';
-import type { Screen } from 'e2e';
+import { expect, type Screen } from 'e2e';
 
 import { newCashierFixture, productId, sql } from '../e2e/helpers';
 import type { CashierFixture } from '../e2e/helpers';
@@ -23,11 +23,23 @@ export async function login(
   f: CashierFixture,
   who: 'cashier' | 'manager',
 ): Promise<void> {
-  await screen.getByTestId('activation-code').fill(f.code);
-  await screen.getByTestId('activate').tap();
-  await screen.getByText(who === 'cashier' ? f.cashierName : f.managerName, { exact: false }).tap();
-  await typeKeys(browser, who === 'cashier' ? f.cashierPin : f.pin);
-  await browser.keyboard.press('Enter');
+  const user = who === 'cashier' ? f.cashierUser : f.managerUser;
+  const password = who === 'cashier' ? f.cashierPassword : f.managerPassword;
+  const type = async (): Promise<void> => {
+    await screen.getByTestId('login-username').fill(user);
+    await screen.getByTestId('login-password').fill(password);
+    await screen.getByTestId('login-submit').tap();
+  };
+  // the first login registers this browser as a device; the second is the worker's own login (the same form)
+  await expect(screen.getByTestId('setup-form')).toBeVisible();
+  await type();
+  await expect(screen.getByTestId('login-form')).toBeVisible();
+  await type();
+  // the device that was just registered
+  const row = sql(`select id || ',' || prefix from devices order by created_at desc limit 1`).split(',');
+  f.deviceId = row[0] ?? '';
+  f.prefix = row[1] ?? '';
+  void browser;
 }
 
 export async function openShift(screen: Screen, browser: Browser, float = '100'): Promise<void> {

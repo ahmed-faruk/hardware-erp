@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, loginAs } from './helpers';
 
 async function recordPrints(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -19,12 +19,7 @@ const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visi
 async function start(page: Page): Promise<CashierFixture> {
   const f = newCashierFixture();
   await recordPrints(page);
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');
@@ -102,7 +97,7 @@ test.describe('shift close', () => {
       .toBe('500');
   });
 
-  test('a shortage above 20.00 needs the manager PIN and a note', async ({ page }) => {
+  test('a shortage above 20.00 needs a note, and no approval', async ({ page }) => {
     const f = await start(page);
     await page.getByTestId('shift-menu').click();
     await page.getByTestId('shift-close').click();
@@ -111,9 +106,6 @@ test.describe('shift close', () => {
     await expect(page.getByTestId('close-variance')).toHaveText('-50.00');
     await page.getByTestId('close-note').fill('نقص في الدرج');
     await page.getByTestId('close-confirm').click();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
     await expect(page.getByTestId('open-shift')).toBeVisible();
     await expect
       .poll(
@@ -123,7 +115,7 @@ test.describe('shift close', () => {
           ),
         { timeout: 60_000 },
       )
-      .toBe('-5000:true');
+      .toBe('-5000:false');
   });
 });
 
@@ -131,12 +123,7 @@ test('the manager corrects a cash account with a voucher; it reaches the server 
   page,
 }) => {
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
   await page.getByRole('button', { name: strings.nav.expenses }).click();
   await page.getByTestId('new-adjustment').click();

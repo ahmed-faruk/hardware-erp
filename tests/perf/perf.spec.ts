@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from '../e2e/helpers';
+import { loginAs, newCashierFixture, productId, sql, type CashierFixture } from '../e2e/helpers';
 
 // docs: skill testing-playbook §6. Chromium with the CPU slowed 4x (a shop PC / old phone), numbers measured in the browser.
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
@@ -13,13 +13,7 @@ async function throttle(page: Page): Promise<void> {
 }
 
 async function login(page: Page, f: CashierFixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  // the first pull of a 20,000-product catalog happens before the worker list shows
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click({ timeout: 300_000 });
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');

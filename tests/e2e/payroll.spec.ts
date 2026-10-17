@@ -2,18 +2,13 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, sql } from './helpers';
+import { newCashierFixture, sql, loginAs } from './helpers';
 
 test('salary 3000, advance 500, deduction 100: the slip pays 2400 and the server agrees', async ({
   page,
 }) => {
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   // the cashier gets a monthly salary

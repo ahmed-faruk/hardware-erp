@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { newCashierFixture, productId } from './helpers';
+import { newCashierFixture, productId, loginAs } from './helpers';
 
 const VIEWPORTS = [
   [320, 568],
@@ -40,12 +40,7 @@ test('the sale and pay screens at every width: no horizontal scroll, tap targets
 }, info) => {
   const f = newCashierFixture();
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');
@@ -85,12 +80,7 @@ test('return and collection dialogs fit every width with 56 px targets', async (
     if (window !== window.top) window.print = () => undefined;
   });
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');
@@ -133,12 +123,7 @@ test('return and collection dialogs fit every width with 56 px targets', async (
 test('shift menu and the counting screen fit every width with 56 px targets', async ({ page }, info) => {
   const f = newCashierFixture();
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');

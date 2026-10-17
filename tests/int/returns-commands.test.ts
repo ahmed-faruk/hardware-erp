@@ -9,11 +9,8 @@ import { drawerBalance } from '@/db/cash';
 import { postSale } from '@/db/commands/post-sale';
 import { uuidv7 } from '@/db/ids';
 import type { Worker } from '@/db/types';
-import { hashPin } from '@/db/workers';
 
 import { newDevice, seedCatalog } from './helpers';
-
-const PIN = '482915';
 
 async function setup(role: DeviceContext['role'] = 'cashier') {
   const ctx = newDevice('K1', role);
@@ -27,7 +24,7 @@ async function setup(role: DeviceContext['role'] = 'cashier') {
   };
   const scrap = { ...main, id: uuidv7(), name: 'scrap', kind: 'scrap' as const };
   await ctx.db.warehouses.bulkPut([main, scrap]);
-  const { pinHash, pinSalt } = await hashPin(PIN);
+  const { pinHash, pinSalt } = { pinHash: null, pinSalt: null };
   const manager: Worker = {
     ...newCommon(ctx),
     name: 'م',

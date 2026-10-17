@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, loginAs } from './helpers';
 
 /** R1 in miniature (PRD flow 7): two devices lose the network, sell, return and take credit all "day", then reconnect. */
 /** The first device opens the shop's one shift; the second one finds it already open (it syncs in). */
@@ -8,12 +8,7 @@ async function openDevice(page: Page, f: CashierFixture, opensShift: boolean): P
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined; // never open a real print dialog
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   if (opensShift) {
     await page.getByTestId('open-shift').click();
     await page.keyboard.type('100');

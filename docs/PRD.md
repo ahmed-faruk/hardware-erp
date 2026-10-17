@@ -41,7 +41,7 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 
 | Persona         | Reads?       | Device                      | Needs                                                              |
 | --------------- | ------------ | --------------------------- | ------------------------------------------------------------------ |
-| Owner / manager | Yes          | PC + phone                  | Prices, approvals by PIN, balances, profit, reports, settings      |
+| Owner / manager | Yes          | PC + phone                  | Prices, balances, profit, reports, settings                        |
 | Cashier         | Often **no** | Windows 7 PC at the counter | Sell fast by photo/barcode, take money, print, give correct change |
 | Storekeeper     | Partly       | PC or phone                 | Receive goods, count stock, adjust with reason                     |
 
@@ -49,7 +49,7 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 
 | Area            | Features                                                                                                                                                       | IDs                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Foundation      | Installable PWA, works offline, local DB, sync to cloud, device registration, worker login by photo + PIN, local encrypted backup, audit log                   | ARC-01..06, SYN-01..05, BAK-01..05, SEC-01..05, AUD-01..03 |
+| Foundation      | Installable PWA, works offline, local DB, sync to cloud, device registration, worker login by username + password, local encrypted backup, audit log           | ARC-01..06, SYN-01..05, BAK-01..05, SEC-01..05, AUD-01..03 |
 | Catalog         | Products with photo, category, barcode, cost, price, reorder level; base unit + one pack unit; fractional quantities                                           | INV-01..03                                                 |
 | Selling         | Barcode/photo/search, quick grid, hold multiple carts, cash/credit/card/InstaPay/split, print 58/80 mm, reprint marked "copy", no-sale drawer open with reason | POS-01..13, PAY-01..03                                     |
 | Returns & voids | Return by invoice (never above sold qty), manager-only return without invoice, manager void by reversing document                                              | RET-01..08, VOID-01..02                                    |
@@ -72,7 +72,7 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 5. **Shift:** open with counted float → sell all day → close: count notes by denomination before seeing expected → Z report.
 6. **Stock adjustment:** storekeeper counts → enters difference with reason → manager approves above threshold.
 7. **Offline day:** router unplugged all day on two devices → everything works → reconnect → sync with zero loss, identical balances.
-8. **Manager approval:** cashier hits a limit (discount, price, credit) → manager enters PIN on the same device → logged.
+8. **No approvals** (owner decision 2026-10-17): a cashier who reaches a limit (discount, price, credit) is simply refused; whoever has the permission does it.
 9. **Migration day:** final OSPOS export → import → validation report signed → sell in the new system next morning.
 
 ## 8. Requirements
@@ -87,7 +87,7 @@ the router unplugged, a cashier screen usable without reading, customer and supp
 ### UX
 
 - Cashier screens follow `docs/DESIGN_SYSTEM.md` §1–§9 (photo-first, icon + color + fixed position, sounds, spoken totals,
-  change shown as notes, PIN instead of text confirmations, undo instead of "are you sure").
+  change shown as notes, no text confirmations, undo instead of "are you sure").
 - Every cashier action reachable by keyboard, by touch, and by barcode scanner.
 - Arabic RTL everywhere; digits style (123 or ١٢٣) is a setting.
 

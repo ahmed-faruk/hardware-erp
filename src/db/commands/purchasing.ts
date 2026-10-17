@@ -8,7 +8,6 @@ import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
 import { lastPurchaseLine } from '../purchase-return';
 import { loadSettings } from '../settings';
-import { peekApproval, spendApproval } from './approval';
 import { upsertRow } from './save-master';
 import { VOID_REASONS } from './returns';
 import type {
@@ -690,7 +689,6 @@ const adjustmentInput = z.object({
       }),
     )
     .min(1),
-  approvalTokens: z.array(z.string()).default([]),
 });
 
 /** INV-06 / INV-10: correct stock with a reason; above the manager's value limit a manager's PIN is needed. */
@@ -712,17 +710,12 @@ export async function postStockAdjustment(
   const value = adjustmentValue(
     input.lines.map((l, i) => ({ qtyDelta: l.qtyDeltaMilli, unitCost: products[i]!.unitCost })),
   );
-  let approver: string | null = null;
-  let token: string | null = null;
+  const approver: string | null = null;
   // a device below manager level has no costs, so its value reads 0: the server decides there with the real cost and refuses
   if (
     adjustmentNeedsApproval(settings.stockApprovalAbove, approvalRole(ctx, 'stockAdjustmentOverLimit'), value)
-  ) {
-    token = input.approvalTokens.find((t) => peekApproval(t, 'stockAdjustmentOverLimit')) ?? null;
-    const approval = token ? peekApproval(token, 'stockAdjustmentOverLimit') : null;
-    if (!token || !approval) return err('APPROVAL_REQUIRED', 'stockAdjustmentOverLimit');
-    approver = approval.approvedBy;
-  }
+  )
+    return err('E_FORBIDDEN', 'stockAdjustmentOverLimit');
   const adjId = uuidv7();
   const at = nowIso();
   const lines: LooseRow[] = input.lines.map((l, i) => ({
@@ -743,7 +736,6 @@ export async function postStockAdjustment(
     lineId: null,
     occurredAt: at,
   }));
-  if (token) spendApproval(token);
   return db.transaction(
     'rw',
     [

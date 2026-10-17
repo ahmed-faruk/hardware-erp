@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import { formatMoney } from '../../src/domain/money';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql } from './helpers';
+import { newCashierFixture, productId, sql, loginAs } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const today = `(issued_at at time zone 'Africa/Cairo')::date = (now() at time zone 'Africa/Cairo')::date`;
@@ -18,9 +18,10 @@ test('F7: the returns tab shows sales and purchase returns of today, equal to th
   const supplier = randomUUID();
   const supplierName = `مورد مرتجع ${randomUUID().slice(0, 5)}`;
   const purReturn = randomUUID();
+  const purNumber = `ZP${randomUUID().slice(0, 4).toUpperCase()}-PRT-900001`;
   sql(`insert into suppliers (id, company_id, name) values ('${supplier}', '${COMPANY}', '${supplierName}')`);
   sql(
-    `insert into purchase_returns (id, company_id, number, issued_at, supplier_id, total) values ('${purReturn}', '${COMPANY}', '${f.prefix}-PRT-900001', now(), '${supplier}', 4200)`,
+    `insert into purchase_returns (id, company_id, number, issued_at, supplier_id, total) values ('${purReturn}', '${COMPANY}', '${purNumber}', now(), '${supplier}', 4200)`,
   );
   sql(
     `insert into purchase_return_lines (id, company_id, return_id, line_no, product_id, qty, unit_cost, net_amount) values ('${randomUUID()}', '${COMPANY}', '${purReturn}', 1, '${productId(5)}', 2000, 2100, 4200)`,
@@ -30,12 +31,7 @@ test('F7: the returns tab shows sales and purchase returns of today, equal to th
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined;
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   // a sale and a return of one unit by invoice
@@ -91,6 +87,6 @@ test('F7: the returns tab shows sales and purchase returns of today, equal to th
   await page.getByTestId('returns-kind-purchases').click();
   await expect(page.getByTestId('report-table-0')).toContainText(formatMoney(purTotal));
   await expect(page.getByTestId('report-table-1')).toContainText(supplierName);
-  await expect(page.getByTestId('report-table-4')).toContainText(`${f.prefix}-PRT-900001`);
-  expect(sql(`select count(*) from purchase_returns where number = '${f.prefix}-PRT-900001'`)).toBe('1');
+  await expect(page.getByTestId('report-table-4')).toContainText(purNumber);
+  expect(sql(`select count(*) from purchase_returns where number = '${purNumber}'`)).toBe('1');
 });

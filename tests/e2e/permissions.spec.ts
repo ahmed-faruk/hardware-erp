@@ -2,18 +2,13 @@ import { expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId } from './helpers';
+import { newCashierFixture, productId, loginAs, typeLogin } from './helpers';
 
 test('a manager builds a permission group and gives it to a cashier: the screen follows it at once', async ({
   page,
 }) => {
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 
   // the group: cashier defaults, no expenses, may give any discount without a manager's PIN
@@ -36,9 +31,7 @@ test('a manager builds a permission group and gives it to a cashier: the screen 
 
   // the cashier: a 10 percent discount goes through without anybody's PIN, and the expense tool is gone
   await page.getByTestId('lock').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
-  await page.keyboard.type(f.cashierPin);
-  await page.keyboard.press('Enter');
+  await typeLogin(page, { user: f.cashierUser, password: f.cashierPassword });
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');

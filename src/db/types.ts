@@ -58,8 +58,11 @@ export interface Device extends Common {
 export interface Worker extends Common {
   name: string;
   role: Role;
+  /** old PIN columns, no longer used (login is by username and password) */
   pinHash: string | null;
   pinSalt: string | null;
+  /** the login name; the password lives on the server only */
+  username?: string | null;
   photoPath: string | null;
   active: boolean;
   legacyEmployeeId: number | null;

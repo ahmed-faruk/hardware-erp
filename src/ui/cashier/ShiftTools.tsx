@@ -7,7 +7,6 @@ import { closeShift, postExpense, previewClose, type ClosePreview } from '@/db/c
 import { formatMoney, toPiasters } from '@/domain/money';
 import { DEFAULT_DENOMINATIONS } from '@/domain/payments';
 import { countByDenomination } from '@/domain/shift';
-import type { Action } from '@/domain/permissions';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
@@ -20,7 +19,6 @@ import { NumEntry } from './NumEntry';
 import styles from './dialogs.module.css';
 
 type Digits = (t: string) => string;
-type Ask = (action: Action) => Promise<string | null>;
 
 export type ShiftTool = 'x' | 'expense' | 'close';
 
@@ -163,20 +161,18 @@ export function CloseShiftDialog({
   open,
   shiftId,
   digits,
-  ask,
   onClose,
   onClosed,
 }: {
   open: boolean;
   shiftId: string;
   digits: Digits;
-  ask: Ask;
   onClose: () => void;
   onClosed: (shiftId: string) => void;
 }) {
   return (
     <Dialog title={strings.shift.close} open={open} onClose={onClose}>
-      <Body shiftId={shiftId} digits={digits} ask={ask} onClosed={onClosed} />
+      <Body shiftId={shiftId} digits={digits} onClosed={onClosed} />
     </Dialog>
   );
 }
@@ -184,12 +180,10 @@ export function CloseShiftDialog({
 function Body({
   shiftId,
   digits,
-  ask,
   onClosed,
 }: {
   shiftId: string;
   digits: Digits;
-  ask: Ask;
   onClosed: (id: string) => void;
 }) {
   const session = useSession();
@@ -211,13 +205,7 @@ function Body({
   };
   const finish = async (): Promise<void> => {
     if (!context || !preview) return;
-    let token: string | undefined;
-    if (preview.needsApproval && session.can('shiftVarianceApprove') !== 'yes') {
-      const t = await ask('shiftVarianceApprove');
-      if (!t) return;
-      token = t;
-    }
-    const r = await closeShift(context, { shiftId, counted: parts, note, approvalToken: token });
+    const r = await closeShift(context, { shiftId, counted: parts, note });
     if (r.ok) {
       play('done');
       onClosed(shiftId);

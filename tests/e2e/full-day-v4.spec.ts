@@ -5,7 +5,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { formatMoney } from '../../src/domain/money';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
+import {
+  newCashierFixture,
+  productId,
+  sql,
+  type CashierFixture,
+  deviceCash,
+  loginAs,
+  typeLogin,
+} from './helpers';
 
 /**
  * One shop day with every feature of this release, then the database checked against the ledgers:
@@ -30,14 +38,7 @@ async function activate(page: Page, f: CashierFixture, who: 'cashier' | 'manager
       window.print = () =>
         (window.top as unknown as { __prints: string[] }).__prints.push(document.documentElement.outerHTML);
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page
-    .getByRole('button', { name: new RegExp(who === 'cashier' ? f.cashierName : f.managerName) })
-    .click();
-  await page.keyboard.type(who === 'cashier' ? f.cashierPin : f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -356,8 +357,6 @@ test('offline half day: a sale and a free return while offline sync once, with n
   ).toBe('1');
   // reload: the same numbers and no pending or rejected rows come back
   await page.reload();
-  await page.getByRole('button', { name: new RegExp(a.managerName) }).click();
-  await page.keyboard.type(a.pin);
-  await page.keyboard.press('Enter');
+  await typeLogin(page, { user: a.managerUser, password: a.managerPassword });
   await expect(page.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });
 });

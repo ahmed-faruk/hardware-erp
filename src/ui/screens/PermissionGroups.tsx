@@ -29,13 +29,13 @@ import styles from './screens.module.css';
 import { useSaver } from './useSaver';
 
 const t = strings.permissions;
-const ACCESS: Access[] = ['yes', 'pin', 'no'];
+const ACCESS: Access[] = ['yes', 'no'];
 
 /** Every action explicit: what a group stores, so that "missing" never has to be guessed. */
 const complete = (p: Permissions): Permissions =>
   Object.fromEntries(ACTIONS.map((a) => [a, p[a] ?? 'no'])) as Permissions;
 
-/** Manager: the list of permission groups, each one a full yes / pin / no map for every screen and button. */
+/** Manager: the list of permission groups, each one a full yes / no map for every screen and button. */
 export function PermissionGroups() {
   const { db } = useServices();
   const [editing, setEditing] = useState<PermissionGroup | 'new' | null>(null);

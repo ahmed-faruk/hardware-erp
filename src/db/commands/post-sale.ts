@@ -7,7 +7,6 @@ import { auditRow } from './audit';
 import { negativeAfterSale } from '@/domain/stock';
 import { nextNumber } from '../numbering';
 import { loadSettings } from '../settings';
-import { type Approval, peekApproval, spendApproval } from './approval';
 import { enqueue } from '../outbox';
 import type {
   AuditRow,
@@ -92,8 +91,6 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
   }
   const customerList = await customerPriceList(db, input.customerId);
   const needs = new Set<Action>();
-  // AUD-02: what the manager's PIN allowed on this sale, written next to it
-  const overrides: { action: string; approves: Action; after: unknown }[] = [];
   const units = await db.productUnits.bulkGet(input.lines.map((l) => l.productUnitId ?? ''));
   input.lines.forEach((l, i) => {
     if (
@@ -105,11 +102,6 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       )
     ) {
       needs.add('discountOverLimit');
-      overrides.push({
-        action: 'discount_over_limit',
-        approves: 'discountOverLimit',
-        after: { target: 'line', productId: l.productId, discount: l.discount },
-      });
     }
     const u = units[i];
     const listPrice = priceFor(
@@ -123,11 +115,6 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     );
     if (priceNeedsApproval(settings, approvalRole(ctx, 'priceOverride'), l.unitPrice, listPrice)) {
       needs.add('priceOverride');
-      overrides.push({
-        action: 'price_override',
-        approves: 'priceOverride',
-        after: { productId: l.productId, listPrice, price: l.unitPrice },
-      });
     }
   });
   const netSum = invoice.lines.reduce((a, l) => a + l.netAmount, 0);
@@ -140,11 +127,6 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     )
   ) {
     needs.add('discountOverLimit');
-    overrides.push({
-      action: 'discount_over_limit',
-      approves: 'discountOverLimit',
-      after: { target: 'invoice', discount: input.invoiceDiscount },
-    });
   }
 
   const creditTotal = input.payments.filter((p) => p.method === 'credit').reduce((a, p) => a + p.amount, 0);
@@ -161,15 +143,10 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
     if (!check.ok && canCtx(ctx, 'creditOverLimit') !== 'yes') needs.add('creditOverLimit');
   }
 
-  const approvals: { token: string; approval: Approval }[] = [];
-  for (const action of needs) {
-    const token = input.approvalTokens.find((t) => peekApproval(t, action));
-    const approval = token ? peekApproval(token, action) : null;
-    if (!token || !approval) return err('APPROVAL_REQUIRED', action);
-    approvals.push({ token, approval });
-  }
+  // no approvals: whoever may not do something that needs more than their level is refused
+  const refused = [...needs][0];
+  if (refused) return err('E_FORBIDDEN', refused);
 
-  for (const a of approvals) spendApproval(a.token);
   const issuedAt = nowIso();
   const invoiceId = uuidv7();
   const cashShare = input.payments.filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0);
@@ -305,7 +282,7 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
         before: null,
         after: { number, total: invoice.total },
         workerId: ctx.workerId,
-        approvedBy: approvals[0]?.approval.approvedBy ?? null,
+        approvedBy: null,
         occurredAt: issuedAt,
       };
       await db.salesInvoices.add(doc);
@@ -317,18 +294,6 @@ export async function postSale(ctx: DeviceContext, raw: SaleInput): Promise<Sale
       await db.auditLog.add(audit);
       if (negatives.length > 0) {
         const extra = auditRow(ctx, 'negative_stock_sale', 'sales_invoices', invoiceId, { lines: negatives });
-        await db.auditLog.add(extra);
-        await enqueue(db, 'auditLog', extra, ctx.workerId);
-      }
-      for (const o of overrides) {
-        const extra = auditRow(
-          ctx,
-          o.action,
-          'sales_invoices',
-          invoiceId,
-          o.after,
-          approvals.find((a) => a.approval.action === o.approves)?.approval.approvedBy ?? null,
-        );
         await db.auditLog.add(extra);
         await enqueue(db, 'auditLog', extra, ctx.workerId);
       }

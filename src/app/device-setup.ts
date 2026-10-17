@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { HanafyDB } from '@/db/schema';
 import { err, ok, type Result } from '@/domain/result';
+import { saveVerifier } from '@/db/login';
+import { strings } from '@/ui/strings.ar';
 import { callRpc } from '@/sync/errors';
 import { pullAll } from '@/sync/pull';
 
@@ -24,17 +26,24 @@ export async function loadIdentity(db: HanafyDB): Promise<DeviceIdentity | null>
 const randomHex = (bytes: number): string =>
   Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
 
+export interface FirstLogin {
+  identity: DeviceIdentity;
+  workerId: string;
+  mustChange: boolean;
+}
+
 /**
- * First run: the manager registered this device on the Mac and read out a one-time code. The device creates its own
- * login, claims the code, stores its identity, and pulls everything (docs/API.md §2, claim_device_activation).
+ * First run on a browser: the worker types a username and password. The device creates its own login, asks the server to check
+ * the password (and register this browser as a manager device), stores its identity, pulls everything and keeps a local verifier
+ * so the same worker can log in again offline (docs/API.md §2, login_device).
  */
-export async function activateDevice(
+export async function firstLogin(
   db: HanafyDB,
   client: SupabaseClient,
-  code: string,
-): Promise<Result<DeviceIdentity>> {
-  const clean = code.trim().toUpperCase();
-  if (!/^[A-Z2-9]{10}$/.test(clean)) return err('BAD_CODE', 'activation code has the wrong shape');
+  username: string,
+  password: string,
+): Promise<Result<FirstLogin>> {
+  if (!username.trim() || !password) return err('BAD_LOGIN', 'username and password are required');
   const authEmail = `device-${randomHex(8)}@hanafy-pos.pages.dev`;
   const authPassword = randomHex(24);
   const signUp = await client.auth.signUp({ email: authEmail, password: authPassword });
@@ -44,15 +53,24 @@ export async function activateDevice(
       'CONFIRMATION_REQUIRED',
       'the server requires email confirmation: disable it in the Supabase auth settings',
     );
+  const kind =
+    typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'mobile' : 'pc';
   const claim = await callRpc<{
     device_id: string;
     company_id: string;
     prefix: string;
     max_role: DeviceIdentity['maxRole'];
-  }>(client, 'claim_device_activation', { p_code: clean });
+    worker_id: string;
+    must_change: boolean;
+  }>(client, 'login_device', {
+    p_username: username.trim(),
+    p_password: password,
+    p_device_name: kind === 'mobile' ? strings.setup.deviceMobile : strings.setup.deviceComputer,
+    p_kind: kind,
+  });
   if (!claim.ok) {
     await client.auth.signOut({ scope: 'local' });
-    return err(claim.network ? 'NO_NET' : 'BAD_CODE', claim.message);
+    return err(claim.network ? 'NO_NET' : claim.code === 'E_LOCKED' ? 'LOCKED' : 'BAD_LOGIN', claim.message);
   }
   const identity: DeviceIdentity = {
     deviceId: claim.data.device_id,
@@ -65,7 +83,8 @@ export async function activateDevice(
   await db.deviceSettings.put({ key: KEY, value: identity });
   const pulled = await pullAll(db, client);
   if (!pulled.ok) return err('PULL_FAILED', pulled.message);
-  return ok(identity);
+  if (!claim.data.must_change) await saveVerifier(db, username, claim.data.worker_id, password);
+  return ok({ identity, workerId: claim.data.worker_id, mustChange: claim.data.must_change });
 }
 
 /**

@@ -1,18 +1,13 @@
 import { test } from '@playwright/test';
 
-import { newCashierFixture } from '../e2e/helpers';
+import { loginAs, newCashierFixture } from '../e2e/helpers';
 
 // CPU profile of one screen: PROFILE_HASH=reports npm run perf:profile -> top functions by self time.
 test('cpu profile of a screen', async ({ page }) => {
   test.setTimeout(300_000);
   const hash = process.env.PROFILE_HASH ?? 'reports';
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click({ timeout: 300_000 });
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await page.getByTestId('sync-status').waitFor();
   await page.waitForTimeout(2000);
   const cdp = await page.context().newCDPSession(page);

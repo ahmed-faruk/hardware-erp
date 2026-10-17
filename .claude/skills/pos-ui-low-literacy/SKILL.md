@@ -37,11 +37,10 @@ Digits: setting `latn` (123) or `arab` (١٢٣) applied through `Intl.NumberForm
 | `PayMethodButton` | fixed color/icon per method, same order everywhere |
 | `ChangeDisplay` | change amount big + drawings of the notes/coins to hand back (from `breakChange`). Stylized drawings in note colors, not photos of real currency |
 | `CustomerPicker` | grid of customer photos/initial avatars; filter by typing phone digits |
-| `PinPad` | manager approval for risky actions instead of a text confirmation |
 | `BigAlert` | full-width icon + color + sound; text optional |
 | `UndoToast` | 5 s undo instead of "are you sure?" |
 | `SyncStatus` | always visible: dot (green/grey), pending count, last sync time |
-| `WorkerSwitch` | photo grid of workers + PIN; no username typing |
+| Login form | username + password (owner decision 2026-10-17; the old photo grid + PIN is gone) |
 
 ## 4. Input
 - Barcode scanner works anywhere on the cashier screen: global key listener detects a burst (< 30 ms between keys, ends with Enter) and adds the item even if no field is focused.

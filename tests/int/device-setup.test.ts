@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { activateDevice, signInDevice, type DeviceIdentity } from '@/app/device-setup';
+import { firstLogin, signInDevice, type DeviceIdentity } from '@/app/device-setup';
 
 import { newDevice } from './helpers';
 
@@ -57,24 +57,35 @@ describe('signInDevice', () => {
   });
 });
 
-describe('activateDevice', () => {
-  it('drops the throw-away login when the code is refused, and stores nothing', async () => {
+describe('firstLogin', () => {
+  it('drops the throw-away login when the password is refused, and stores nothing', async () => {
     const { db } = newDevice();
     const c = client(null, {
-      data: { ok: false, error: { code: 'E_VALIDATION', message: 'x' } },
+      data: { ok: false, error: { code: 'E_LOGIN', message: 'x' } },
       error: null,
     });
-    const r = await activateDevice(db, c as unknown as SupabaseClient, 'ABCDEFGHJK');
-    expect(r).toMatchObject({ ok: false, code: 'BAD_CODE' });
+    const r = await firstLogin(db, c as unknown as SupabaseClient, 'boss', 'wrong-pass');
+    expect(r).toMatchObject({ ok: false, code: 'BAD_LOGIN' });
     expect(c.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
     expect(await db.deviceSettings.get('device')).toBeUndefined();
   });
-  it('refuses a code of the wrong shape before touching the network', async () => {
+  it('says LOCKED when the server locks the username', async () => {
+    const { db } = newDevice();
+    const c = client(null, {
+      data: { ok: false, error: { code: 'E_LOCKED', message: 'x' } },
+      error: null,
+    });
+    expect(await firstLogin(db, c as unknown as SupabaseClient, 'boss', 'pw12345')).toMatchObject({
+      ok: false,
+      code: 'LOCKED',
+    });
+  });
+  it('refuses an empty username or password before touching the network', async () => {
     const { db } = newDevice();
     const c = client(null);
-    expect(await activateDevice(db, c as unknown as SupabaseClient, 'short')).toMatchObject({
+    expect(await firstLogin(db, c as unknown as SupabaseClient, '', 'x')).toMatchObject({
       ok: false,
-      code: 'BAD_CODE',
+      code: 'BAD_LOGIN',
     });
     expect(c.auth.signUp).not.toHaveBeenCalled();
   });

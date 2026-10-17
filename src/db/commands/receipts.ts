@@ -7,7 +7,6 @@ import { enqueue } from '../outbox';
 import type { HanafyDB } from '../schema';
 import { loadDeviceSettings, loadSettings } from '../settings';
 import type { AuditRow } from '../types';
-import { peekApproval, spendApproval } from './approval';
 
 /** Everything a receipt prints, read back from the saved invoice (so a reprint is identical to the original). */
 export async function loadReceipt(
@@ -232,18 +231,11 @@ export interface NoSaleSlipData {
   at: string;
 }
 
-/** POS-13: open the drawer without a sale. A cashier needs a manager's PIN; the reason and both people are audited. */
-export async function noSale(
-  ctx: DeviceContext,
-  reason: NoSaleReason,
-  approvalToken?: string,
-): Promise<Result<NoSaleSlipData>> {
+/** POS-13: open the drawer without a sale. Whoever has the permission may; the reason is audited. */
+export async function noSale(ctx: DeviceContext, reason: NoSaleReason): Promise<Result<NoSaleSlipData>> {
   if (!NO_SALE_REASONS.includes(reason)) return err('E_VALIDATION', 'سبب غير صحيح');
   if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
-  const free = canCtx(ctx, 'noSaleDrawer') === 'yes';
-  const approval = free ? null : approvalToken ? peekApproval(approvalToken, 'noSaleDrawer') : null;
-  if (!free && !approval) return err('APPROVAL_REQUIRED', 'noSaleDrawer');
-  if (approvalToken && approval) spendApproval(approvalToken);
+  if (canCtx(ctx, 'noSaleDrawer') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
   const at = nowIso();
   await db.transaction('rw', [db.auditLog, db.outbox, db.syncState], () =>
@@ -254,7 +246,7 @@ export async function noSale(
       before: null,
       after: { reason },
       workerId: ctx.workerId,
-      approvedBy: approval?.approvedBy ?? null,
+      approvedBy: null,
       occurredAt: at,
     }),
   );

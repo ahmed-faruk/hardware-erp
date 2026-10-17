@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newFixture, productId, sql, type Fixture } from './helpers';
+import { newFixture, productId, sql, type Fixture, loginAs } from './helpers';
 
 const run = Math.random().toString(36).slice(2, 7);
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
@@ -10,12 +10,7 @@ const price = `${strings.products.price} (${strings.common.egp})`;
 const reasons = strings.products.deleteReasons;
 
 async function activateAndLogin(page: Page, f: Fixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 

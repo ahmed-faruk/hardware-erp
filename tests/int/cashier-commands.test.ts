@@ -2,7 +2,6 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it } from 'vitest';
 
-import { approveWithPin, APPROVAL_TTL_MS } from '@/db/commands/approval';
 import {
   holdCart,
   listHeldCarts,
@@ -21,23 +20,19 @@ import { saveSetting } from '@/db/commands/save-setting';
 import { findByBarcode } from '@/db/lookup';
 import { loadSettings } from '@/db/settings';
 import type { Worker } from '@/db/types';
-import { hashPin } from '@/db/workers';
 import { addItem, EMPTY_CART, productToItem } from '@/domain/cart';
 
 import { newDevice, seedCatalog } from './helpers';
 
-const MANAGER_PIN = '482915';
-
 async function setup(role: DeviceContext['role'] = 'cashier') {
   const ctx = newDevice('K1', role);
   const s = await seedCatalog(ctx);
-  const { pinHash, pinSalt } = await hashPin(MANAGER_PIN);
   const manager: Worker = {
     ...newCommon(ctx),
     name: 'المدير',
     role: 'manager',
-    pinHash,
-    pinSalt,
+    pinHash: null,
+    pinSalt: null,
     photoPath: null,
     active: true,
     legacyEmployeeId: null,
@@ -51,14 +46,7 @@ async function setup(role: DeviceContext['role'] = 'cashier') {
       ...base,
       ...extra,
     } as never);
-  const approve = async (
-    action: 'discountOverLimit' | 'priceOverride' | 'creditOverLimit' | 'noSaleDrawer',
-  ) => {
-    const r = await approveWithPin(ctx, manager.id, MANAGER_PIN, action);
-    if (!r.ok) throw new Error(r.code);
-    return r.value;
-  };
-  return { ctx, s, manager, base, sell, approve };
+  return { ctx, s, manager, base, sell };
 }
 
 describe('openShift rules', () => {
@@ -81,78 +69,28 @@ describe('openShift rules', () => {
   });
 });
 
-describe('approveWithPin', () => {
-  it('gives a single-use token for one action after the right manager PIN', async () => {
-    const { ctx, manager } = await setup();
-    const ok = await approveWithPin(ctx, manager.id, MANAGER_PIN, 'discountOverLimit');
-    expect(ok).toMatchObject({ ok: true });
-    const wrong = await approveWithPin(ctx, manager.id, '000000', 'discountOverLimit');
-    expect(wrong).toMatchObject({ ok: false, code: 'PIN_WRONG' });
-  });
-  it('only an active manager can approve', async () => {
-    const { ctx } = await setup();
-    expect(await approveWithPin(ctx, ctx.workerId, MANAGER_PIN, 'noSaleDrawer')).toMatchObject({
-      ok: false,
-      code: 'E_FORBIDDEN',
-    });
-  });
-});
-
-describe('postSale approvals', () => {
+describe('postSale: no approvals, a worker is allowed or refused', () => {
   const discount = { kind: 'percentBp', valueBp: 100 };
-  it('a cashier discount needs the manager PIN by default; with a token it sells and the approver is audited', async () => {
-    const { ctx, s, sell, approve, manager } = await setup();
+  it('a cashier discount is refused by default; a manager gives it', async () => {
+    const { ctx, s, sell } = await setup();
     const line = [{ productId: s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000, discount }];
     expect(await sell({ lines: line, payments: [{ method: 'cash', amount: 990 }] })).toMatchObject({
       ok: false,
-      code: 'APPROVAL_REQUIRED',
+      code: 'E_FORBIDDEN',
       message: 'discountOverLimit',
     });
-    const token = (await approve('discountOverLimit')).token;
-    const r = await sell({
-      lines: line,
-      payments: [{ method: 'cash', amount: 990 }],
-      approvalTokens: [token],
-    });
-    expect(r).toMatchObject({ ok: true, total: 990 });
-    const audit = (await ctx.db.auditLog.toArray()).find((a) => a.action === 'sale_posted');
-    expect(audit?.approvedBy).toBe(manager.id);
-  });
-  it('a token is single use and bound to its action', async () => {
-    const { s, sell, approve } = await setup();
-    const line = [{ productId: s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000, discount }];
-    const token = (await approve('discountOverLimit')).token;
+    const mgr = { ...ctx, role: 'manager' as const };
     expect(
-      await sell({ lines: line, payments: [{ method: 'cash', amount: 990 }], approvalTokens: [token] }),
-    ).toMatchObject({ ok: true });
-    expect(
-      await sell({ lines: line, payments: [{ method: 'cash', amount: 990 }], approvalTokens: [token] }),
-    ).toMatchObject({ code: 'APPROVAL_REQUIRED' });
-    const wrongAction = (await approve('priceOverride')).token;
-    expect(
-      await sell({ lines: line, payments: [{ method: 'cash', amount: 990 }], approvalTokens: [wrongAction] }),
-    ).toMatchObject({ code: 'APPROVAL_REQUIRED' });
-  });
-  it('an expired token is refused', async () => {
-    const { ctx, manager, s, sell } = await setup();
-    const old = await approveWithPin(
-      ctx,
-      manager.id,
-      MANAGER_PIN,
-      'discountOverLimit',
-      Date.now() - APPROVAL_TTL_MS - 1000,
-    );
-    if (!old.ok) throw new Error('approve');
-    const line = [{ productId: s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000, discount }];
-    expect(
-      await sell({
+      await postSale(mgr, {
         lines: line,
         payments: [{ method: 'cash', amount: 990 }],
-        approvalTokens: [old.value.token],
-      }),
-    ).toMatchObject({ code: 'APPROVAL_REQUIRED' });
+        warehouseId: s.warehouseId,
+        shiftId: s.shiftId,
+        cashAccountId: s.cashAccountId,
+      } as never),
+    ).toMatchObject({ ok: true, total: 990 });
   });
-  it('when the manager allows discounts, up to the limit is free and above it needs approval', async () => {
+  it('when the manager allows discounts, up to the limit is free and above it is refused', async () => {
     const m = { ...(await setup()) };
     const mgr: DeviceContext = { ...m.ctx, role: 'manager' };
     await saveSetting(mgr, 'sale.cashierMayDiscount', true);
@@ -169,14 +107,14 @@ describe('postSale approvals', () => {
       ok: true,
     });
     expect(await m.sell({ lines: line(501), payments: [{ method: 'cash', amount: 950 }] })).toMatchObject({
-      code: 'APPROVAL_REQUIRED',
+      code: 'E_FORBIDDEN',
     });
   });
-  it('a changed price needs approval unless the manager allows it', async () => {
+  it('a changed price is refused unless the manager allows it', async () => {
     const m = await setup();
     const cheaper = [{ productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 900 }];
     expect(await m.sell({ lines: cheaper, payments: [{ method: 'cash', amount: 900 }] })).toMatchObject({
-      code: 'APPROVAL_REQUIRED',
+      code: 'E_FORBIDDEN',
       message: 'priceOverride',
     });
     await saveSetting({ ...m.ctx, role: 'manager' }, 'sale.cashierMayChangePrice', true);
@@ -184,7 +122,7 @@ describe('postSale approvals', () => {
       ok: true,
     });
   });
-  it('a manager never needs approval', async () => {
+  it('a manager is never refused', async () => {
     const m = await setup('manager');
     const line = [
       {
@@ -198,13 +136,19 @@ describe('postSale approvals', () => {
       ok: true,
     });
   });
-  it('credit over the customer limit needs approval', async () => {
+  it('credit over the customer limit is refused to a cashier and allowed to a manager', async () => {
     const m = await setup();
     await m.ctx.db.customers.update(m.s.customer.id, { creditLimit: 500 });
     const credit = { customerId: m.s.customer.id, payments: [{ method: 'credit', amount: 1000 }] };
-    expect(await m.sell(credit)).toMatchObject({ code: 'APPROVAL_REQUIRED', message: 'creditOverLimit' });
-    const token = (await m.approve('creditOverLimit')).token;
-    expect(await m.sell({ ...credit, approvalTokens: [token] })).toMatchObject({ ok: true });
+    expect(await m.sell(credit)).toMatchObject({ code: 'E_FORBIDDEN', message: 'creditOverLimit' });
+    const mgr = { ...m.ctx, role: 'manager' as const };
+    expect(
+      await postSale(mgr, {
+        ...m.base,
+        lines: [{ productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 1000 }],
+        ...credit,
+      } as never),
+    ).toMatchObject({ ok: true });
   });
 });
 
@@ -233,14 +177,13 @@ describe('held carts', () => {
 });
 
 describe('noSale and reprint', () => {
-  it('a cashier needs a manager PIN to open the drawer; the reason and approver are audited and queued', async () => {
-    const { ctx, approve, manager } = await setup();
-    expect(await noSale(ctx, 'change')).toMatchObject({ ok: false, code: 'APPROVAL_REQUIRED' });
-    const token = (await approve('noSaleDrawer')).token;
-    const r = await noSale(ctx, 'change', token);
-    expect(r).toMatchObject({ ok: true });
+  it('a cashier may not open the drawer without a sale; a manager may, and the reason is audited and queued', async () => {
+    const { ctx } = await setup();
+    expect(await noSale(ctx, 'change')).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    const mgr = { ...ctx, role: 'manager' as const };
+    expect(await noSale(mgr, 'change')).toMatchObject({ ok: true });
     const audit = (await ctx.db.auditLog.toArray()).find((a) => a.action === 'no_sale');
-    expect(audit).toMatchObject({ approvedBy: manager.id, after: { reason: 'change' } });
+    expect(audit).toMatchObject({ after: { reason: 'change' } });
     expect((await ctx.db.outbox.toArray()).some((o) => o.table === 'auditLog' && o.id === audit?.id)).toBe(
       true,
     );
@@ -343,21 +286,6 @@ describe('findByBarcode', () => {
 });
 
 describe('audit events (AUD-02)', () => {
-  const actions = async (ctx: DeviceContext) => (await ctx.db.auditLog.toArray()).map((a) => a.action);
-
-  it('a price override is audited with the manager who approved it', async () => {
-    const m = await setup();
-    const token = (await m.approve('priceOverride')).token;
-    const r = await m.sell({
-      lines: [{ productId: m.s.products[0]!.id, qtyMilli: 1000, unitPrice: 900 }],
-      payments: [{ method: 'cash', amount: 900 }],
-      approvalTokens: [token],
-    });
-    expect(r.ok).toBe(true);
-    const row = (await m.ctx.db.auditLog.toArray()).find((a) => a.action === 'price_override');
-    expect(row).toMatchObject({ approvedBy: m.manager.id, after: { listPrice: 1000, price: 900 } });
-  });
-
   it('a changed setting is audited with before and after, an unchanged one is not', async () => {
     const m = await setup('manager');
     await saveSetting(m.ctx, 'sale.cashierMayChangePrice', true);
@@ -365,14 +293,6 @@ describe('audit events (AUD-02)', () => {
     const rows = (await m.ctx.db.auditLog.toArray()).filter((a) => a.action === 'setting_changed');
     expect(rows).toHaveLength(1);
     expect(rows[0]?.after).toMatchObject({ key: 'sale.cashierMayChangePrice', after: true });
-  });
-
-  it('every wrong PIN is audited; the fifth is the lockout', async () => {
-    const m = await setup();
-    for (let i = 0; i < 5; i++) await approveWithPin(m.ctx, m.manager.id, '000000', 'noSaleDrawer');
-    const list = await actions(m.ctx);
-    expect(list.filter((a) => a === 'pin_failed')).toHaveLength(4);
-    expect(list.filter((a) => a === 'pin_locked')).toHaveLength(1);
   });
 
   it('recordAudit queues the row for sync', async () => {
@@ -474,7 +394,7 @@ describe('collections against invoices (FIN-06)', () => {
 });
 
 describe('price lists (POS-10)', () => {
-  it('a wholesale customer buys at the wholesale price with no approval; others need approval for it', async () => {
+  it('a wholesale customer buys at the wholesale price; a cashier may not set it for others', async () => {
     const m = await setup();
     const p = m.s.products[0]!;
     await m.ctx.db.products.update(p.id, { priceWholesale: 800 });
@@ -485,7 +405,7 @@ describe('price lists (POS-10)', () => {
     ).toMatchObject({ ok: true });
     expect(await m.sell({ lines: line, payments: [{ method: 'cash', amount: 800 }] })).toMatchObject({
       ok: false,
-      code: 'APPROVAL_REQUIRED',
+      code: 'E_FORBIDDEN',
       message: 'priceOverride',
     });
   });

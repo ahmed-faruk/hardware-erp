@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newFixture, sql, type Fixture } from './helpers';
+import { addWorker, newFixture, sql, type Fixture, loginAs, type Who } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 
@@ -29,13 +29,8 @@ function productWithHistory(stock: number): { id: string; name: string; barcode:
   return { id, name, barcode };
 }
 
-async function login(page: Page, f: Fixture, who: { name: string; pin: string }): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(who.name) }).click();
-  await page.keyboard.type(who.pin);
-  await page.keyboard.press('Enter');
+async function login(page: Page, f: Fixture, who: Who): Promise<void> {
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -47,7 +42,7 @@ test.describe('archive and restore a product with history', () => {
   }) => {
     const f = newFixture();
     const p = productWithHistory(0);
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await open(page, p.id);
     await page.getByTestId('delete-product').click();
     await expect(page.getByTestId('undo-toast')).toContainText(strings.products.archiving);
@@ -81,7 +76,7 @@ test.describe('archive and restore a product with history', () => {
   test('with stock on hand it says to adjust stock first and changes nothing', async ({ page }) => {
     const f = newFixture();
     const p = productWithHistory(3);
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await open(page, p.id);
     await page.getByTestId('delete-product').click();
     await expect(page.getByText(strings.products.archiveNeedsZeroStock)).toBeVisible();

@@ -10,15 +10,18 @@ Rules every developer and AI agent follows in this project. If a requested chang
 
 ## 2. Authentication and authorization
 
-- **Devices:** each shop device has one Supabase Auth account created by the manager; it signs in once online.
+- **Devices (owner decision 2026-10-17):** there is no activation code. A new browser opens the app and logs in with a worker's
+  username and password; the server (`login_device`) checks the password and registers the browser as a manager device.
   A lost device is revoked (`revoke_device`) and wipes its local data on next start.
-- **Workers:** pick photo + PIN (≥ 6 digits). PIN stored as PBKDF2-SHA256 (≥ 210,000 iterations, per-worker salt),
-  verified locally. 5 wrong tries → 5-minute lock + audit entry. Screen locks after idle time (setting).
-- **Permission groups:** every screen, report tab and button is an action in `src/domain/permissions.ts`. A manager builds groups (yes / pin / no per action) and gives one to a worker. The server enforces them with `worker_can(worker, action)` (migration `20261012100000_permission_groups.sql`) in `ingest_row` and in every bundle that used a hard-coded manager check; approvals (`approved_by`) need an approver whose own access to that action is `yes`. A manager always keeps `view.workers`, `manageUsers`, `manageGroups`, `view.settings`, `settings`. Limit: report RPCs are still "manager device only" on the server, so report tabs are gated per worker in the UI only.
+- **Workers:** username + password (≥ 6 characters). The server keeps a bcrypt hash in `worker_credentials`, which no device can read
+  and which is never pulled. 5 wrong tries lock the username for 15 minutes. The first account is `admin` / `admin` and must set
+  a new password at its first login. A worker who logged in on a device before can log in offline: the device keeps a salted PBKDF2 verifier of the password in its own settings (never synced).
+  Screen locks after idle time (setting).
+- **Permission groups:** every screen, report tab and button is an action in `src/domain/permissions.ts`. A manager builds groups (yes / no per action) and gives one to a worker. The server enforces them with `worker_can(worker, action)` (migration `20261012100000_permission_groups.sql`) in `ingest_row` and in every bundle that used a hard-coded manager check; approvals (`approved_by`) need an approver whose own access to that action is `yes`. A manager always keeps `view.workers`, `manageUsers`, `manageGroups`, `view.settings`, `settings`. Limit: report RPCs are still "manager device only" on the server, so report tabs are gated per worker in the UI only.
 - **Authorization:** one permission matrix in `src/domain/permissions.ts` (roles: cashier, storekeeper, manager) used by
   the UI AND re-checked by `ingest_batch` on the server. Never trust a role or worker id sent by the client without
   checking it against the `workers` table and the device's `max_role`.
-- **Manager approvals:** `approveWithPin` returns a single-use token (2 minutes) attached to the document and audit log.
+- **No approvals (owner decision 2026-10-17):** an action is allowed or refused by permission; there are no manager PIN steps.
 - **RLS:** enabled on every table in the migration that creates it. Clients get SELECT scoped to their company; no direct
   INSERT/UPDATE/DELETE. Writes only through `security definer` RPCs with `set search_path = public`.
 - Cost and profit columns are exposed to non-manager devices only through views without them.

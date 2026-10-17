@@ -14,7 +14,8 @@ import {
 import type { DeviceContext } from '@/db/commands/context';
 import { groupPermissions } from '@/db/permissions';
 import type { HanafyDB } from '@/db/schema';
-import { checkPin } from '@/db/workers';
+import { checkVerifier, hasVerifier, saveVerifier } from '@/db/login';
+import { callRpc } from '@/sync/errors';
 import { resolveAccess, type Access, type Action } from '@/domain/permissions';
 import type { SyncRunner } from '@/sync/runner';
 
@@ -27,6 +28,8 @@ export interface Services {
   runner: SyncRunner;
 }
 
+export type LoginResult = 'ok' | 'wrong' | 'locked' | 'needsNet' | { mustChange: string };
+
 export interface CurrentWorker {
   id: string;
   name: string;
@@ -38,8 +41,13 @@ interface SessionValue {
   worker: CurrentWorker | null;
   /** what the logged-in worker may do (his permission group, else his role); 'no' while nobody is logged in */
   can: (action: Action) => Access;
-  /** checks the PIN locally (works offline): 'locked' after 5 wrong tries for 5 minutes */
-  login: (worker: CurrentWorker, pin: string) => Promise<'ok' | 'wrong' | 'locked'>;
+  /**
+   * Username and password. Online the server checks them (5 wrong tries lock the username for 15 minutes); offline a worker who
+   * logged in on this device before is checked against the verifier kept here. `mustChange`: the password has to be replaced first.
+   */
+  login: (username: string, password: string) => Promise<LoginResult>;
+  /** the new password for a worker who must change it (online); logs them in */
+  changePassword: (workerId: string, username: string, newPassword: string) => Promise<boolean>;
   lock: () => void;
   /** what commands need; null while nobody is logged in */
   context: DeviceContext | null;
@@ -90,24 +98,58 @@ export function SessionProvider({ services, children }: { services: Services; ch
     [worker, live, permissions, services],
   );
 
-  const login = useCallback(
-    async (w: CurrentWorker, pin: string): Promise<'ok' | 'wrong' | 'locked'> => {
-      const probe: DeviceContext = {
-        db: services.db,
-        companyId: services.identity.companyId,
-        deviceId: services.identity.deviceId,
-        devicePrefix: services.identity.prefix,
-        workerId: w.id,
-        role: w.role,
-      };
-      const result = await checkPin(probe, w.id, pin);
-      if (result.ok) {
-        setWorker(w);
-        return 'ok';
-      }
-      return result.code === 'PIN_LOCKED' ? 'locked' : 'wrong';
+  const enter = useCallback(
+    async (workerId: string): Promise<boolean> => {
+      const w = await services.db.workers.get(workerId);
+      if (!w || !w.active || w.deletedAt) return false;
+      setWorker({ id: w.id, name: w.name, role: w.role, groupId: w.groupId ?? null });
+      return true;
     },
     [services],
+  );
+
+  const login = useCallback(
+    async (username: string, password: string): Promise<LoginResult> => {
+      // a dead connection must not hang the login: no connection or no answer within 5 seconds counts as offline
+      const offline = { ok: false, code: 'E_INTERNAL', message: '', network: true } as const;
+      const r =
+        typeof navigator !== 'undefined' && navigator.onLine === false
+          ? offline
+          : await Promise.race([
+              callRpc<{ worker_id: string; must_change: boolean }>(services.client, 'verify_worker_login', {
+                p_username: username.trim(),
+                p_password: password,
+              }),
+              new Promise<typeof offline>((resolve) => setTimeout(() => resolve(offline), 5000)),
+            ]);
+      if (r.ok) {
+        if (r.data.must_change) return { mustChange: r.data.worker_id };
+        await saveVerifier(services.db, username, r.data.worker_id, password);
+        return (await enter(r.data.worker_id)) ? 'ok' : 'wrong';
+      }
+      if (r.code === 'E_LOCKED') return 'locked';
+      if (!r.network) return 'wrong';
+      // no internet: a worker who logged in on this device before is checked against the saved verifier
+      const workerId = await checkVerifier(services.db, username, password);
+      if (workerId) return (await enter(workerId)) ? 'ok' : 'wrong';
+      return (await hasVerifier(services.db, username)) ? 'wrong' : 'needsNet';
+    },
+    [services, enter],
+  );
+
+  const changePassword = useCallback(
+    async (workerId: string, username: string, newPassword: string): Promise<boolean> => {
+      const r = await callRpc<{ username: string }>(services.client, 'set_worker_login', {
+        p_actor: workerId,
+        p_worker: workerId,
+        p_username: null,
+        p_password: newPassword,
+      });
+      if (!r.ok) return false;
+      await saveVerifier(services.db, username, workerId, newPassword);
+      return enter(workerId);
+    },
+    [services, enter],
   );
 
   useEffect(() => {
@@ -137,8 +179,8 @@ export function SessionProvider({ services, children }: { services: Services; ch
     [worker, permissions],
   );
   const value = useMemo<SessionValue>(
-    () => ({ worker, can, login, lock: () => setWorker(null), context }),
-    [worker, can, login, context],
+    () => ({ worker, can, login, changePassword, lock: () => setWorker(null), context }),
+    [worker, can, login, changePassword, context],
   );
   return (
     <ServicesContext.Provider value={services}>

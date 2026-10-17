@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql } from './helpers';
+import { newCashierFixture, productId, sql, loginAs } from './helpers';
 
 async function recordPrints(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -23,12 +23,7 @@ test.describe('manager reports', () => {
   }) => {
     const f = newCashierFixture();
     await recordPrints(page);
-    await page.goto('/');
-    await page.getByTestId('activation-code').fill(f.code);
-    await page.getByTestId('activate').click();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await loginAs(page, f, 'manager');
     await expect(page.getByTestId('sync-status')).toBeVisible();
 
     // one sale so that today has something

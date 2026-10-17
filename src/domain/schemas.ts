@@ -36,7 +36,6 @@ export const saleInputSchema = z.object({
   creditPolicy: z
     .union([z.literal('allow'), z.literal('block'), z.object({ reduceByBp: int.min(0).max(10000) })])
     .default('allow'),
-  approvalTokens: z.array(z.string().max(64)).max(5).default([]),
 });
 export type SaleInput = z.input<typeof saleInputSchema>;
 
@@ -134,13 +133,11 @@ export const categoryFieldsSchema = z
   .partial()
   .strict();
 
-/** `pin` is hashed by the command and never stored (docs/SECURITY.md §2). */
 export const workerFieldsSchema = z
   .object({
     name: text,
     role: z.enum(['cashier', 'storekeeper', 'manager']),
     active: z.boolean(),
-    pin: z.string().regex(/^\d{6,12}$/),
     groupId: id.nullable(),
     monthlySalary: z.number().int().min(0).max(100_000_000).nullable(),
   })
@@ -150,7 +147,7 @@ export const workerFieldsSchema = z
 export const permissionGroupFieldsSchema = z
   .object({
     name: text,
-    permissions: z.record(z.string().max(64), z.enum(['yes', 'pin', 'no'])),
+    permissions: z.record(z.string().max(64), z.enum(['yes', 'no'])),
     deletedAt: z.string().nullable(),
   })
   .partial()

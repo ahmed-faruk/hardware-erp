@@ -2,15 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, type CashierFixture } from './helpers';
+import { newCashierFixture, type CashierFixture, loginAs } from './helpers';
 
 async function openNew(page: Page, f: CashierFixture): Promise<void> {
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'manager');
   await expect(page.getByTestId('sync-status')).toBeVisible();
   await page.getByRole('button', { name: strings.nav.purchases }).click();
   await page.getByTestId('new-purchase').click();

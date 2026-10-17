@@ -6,7 +6,6 @@ import { nowIso, uuidv7 } from '../ids';
 import { nextNumber } from '../numbering';
 import { enqueue } from '../outbox';
 import { loadSettings } from '../settings';
-import { peekApproval, spendApproval } from './approval';
 import type { AuditRow, CashMovement } from '../types';
 import { err, type Err } from '@/domain/result';
 import { countByDenomination, requiresVarianceApproval, shiftVariance } from '@/domain/shift';
@@ -69,27 +68,18 @@ export async function previewClose(
   };
 }
 
-/** FIN-02..03: close the shift with the counted notes. Above the limit a manager must approve and a note is required. */
+/** FIN-02..03: close the shift with the counted notes. Above the limit a note is required. */
 export async function closeShift(
   ctx: DeviceContext,
-  input: { shiftId: string; counted: z.input<typeof countedSchema>; note?: string; approvalToken?: string },
+  input: { shiftId: string; counted: z.input<typeof countedSchema>; note?: string },
 ): Promise<{ ok: true; shiftId: string; preview: ClosePreview } | Err> {
   if (canCtx(ctx, 'sell') === 'no') return err('E_FORBIDDEN', 'غير مسموح');
   const p = await previewClose(ctx, input.shiftId, input.counted);
   if (!p.ok) return p;
   const { db } = ctx;
   const note = (input.note ?? '').trim();
-  let approver: string | null = null;
-  if (p.preview.needsApproval) {
-    if (!note) return err('NOTE_REQUIRED', 'اكتب تعليق');
-    if (canCtx(ctx, 'shiftVarianceApprove') === 'yes') approver = ctx.workerId;
-    else {
-      const approval = input.approvalToken ? peekApproval(input.approvalToken, 'shiftVarianceApprove') : null;
-      if (!input.approvalToken || !approval) return err('APPROVAL_REQUIRED', 'shiftVarianceApprove');
-      approver = approval.approvedBy;
-      spendApproval(input.approvalToken);
-    }
-  }
+  const approver: string | null = canCtx(ctx, 'shiftVarianceApprove') === 'yes' ? ctx.workerId : null;
+  if (p.preview.needsApproval && !note) return err('NOTE_REQUIRED', 'اكتب تعليق');
   const at = nowIso();
   return db.transaction('rw', [db.shifts, db.auditLog, db.outbox, db.syncState], async () => {
     const shift = await db.shifts.get(input.shiftId);

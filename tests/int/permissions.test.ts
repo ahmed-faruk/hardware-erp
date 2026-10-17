@@ -2,17 +2,13 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it } from 'vitest';
 
-import { approveWithPin } from '@/db/commands/approval';
 import { postExpense } from '@/db/commands/cash';
 import { newCommon, type DeviceContext } from '@/db/commands/context';
 import { savePermissionGroup, saveWorker } from '@/db/commands/save-master';
 import { groupPermissions, workerAccess } from '@/db/permissions';
 import type { CashAccount, ExpenseCategory, Worker } from '@/db/types';
-import { hashPin } from '@/db/workers';
 
 import { newDevice } from './helpers';
-
-const PIN = '482915';
 
 async function setup(
   permissions: DeviceContext['permissions'] = null,
@@ -75,7 +71,7 @@ describe('permission groups on the device', () => {
     const g = await savePermissionGroup(m.ctx, { fields: { name: 'مخازن', permissions: { void: 'yes' } } });
     if (!g.ok) throw new Error('group not saved');
     const w = await saveWorker(m.ctx, {
-      fields: { name: 'كاشير', role: 'cashier', pin: PIN, groupId: g.id },
+      fields: { name: 'كاشير', role: 'cashier', groupId: g.id },
     });
     if (!w.ok) throw new Error('worker not saved');
     const worker = (await m.ctx.db.workers.get(w.id)) as Worker;
@@ -87,25 +83,23 @@ describe('permission groups on the device', () => {
     expect(await workerAccess(m.ctx.db, worker, 'sell')).toBe('yes');
   });
 
-  it('an approval PIN works for anyone whose own permissions give him the action, not only managers', async () => {
+  it('with no approvals, a group that gives a cashier discountOverLimit lets him do it, and only that', async () => {
     const { ctx } = await setup(null, 'cashier');
-    const { pinHash, pinSalt } = await hashPin(PIN);
     const group = { ...newCommon(ctx), name: 'مشرف', permissions: { discountOverLimit: 'yes' as const } };
     await ctx.db.permissionGroups.put(group);
     const supervisor: Worker = {
       ...newCommon(ctx),
       name: 'مشرف',
       role: 'cashier',
-      pinHash,
-      pinSalt,
+      pinHash: null,
+      pinSalt: null,
       photoPath: null,
       active: true,
       legacyEmployeeId: null,
       groupId: group.id,
     };
     await ctx.db.workers.put(supervisor);
-    expect((await approveWithPin(ctx, supervisor.id, PIN, 'discountOverLimit')).ok).toBe(true);
-    const refused = await approveWithPin(ctx, supervisor.id, PIN, 'priceOverride');
-    expect(refused.ok).toBe(false);
+    expect(await workerAccess(ctx.db, supervisor, 'discountOverLimit')).toBe('yes');
+    expect(await workerAccess(ctx.db, supervisor, 'priceOverride')).toBe('no');
   });
 });

@@ -4,22 +4,26 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
+import {
+  addWorker,
+  newCashierFixture,
+  productId,
+  sql,
+  type CashierFixture,
+  deviceCash,
+  loginAs,
+  type Who,
+} from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const WAREHOUSE = 'a0000000-0000-7000-8000-0000000000c1';
 const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visible`).first();
 
-async function login(page: Page, f: CashierFixture, who: { name: string; pin: string }): Promise<void> {
+async function login(page: Page, f: CashierFixture, who: Who): Promise<void> {
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined;
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(who.name) }).click();
-  await page.keyboard.type(who.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, who);
   await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
@@ -56,7 +60,7 @@ test.describe('delete invoices', () => {
     page,
   }) => {
     const f = newCashierFixture();
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.sell }).click();
     await page.getByTestId('open-shift').click();
     await page.keyboard.type('100');
@@ -100,7 +104,7 @@ test.describe('delete invoices', () => {
   }) => {
     const f = newCashierFixture();
     const p = purchaseOnServer();
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('f-number').fill(p.number);
     await page.getByTestId(`delete-purchase-${p.number}`).click();
@@ -148,7 +152,7 @@ test.describe('delete invoices', () => {
   }) => {
     const f = newCashierFixture();
     const p = purchaseOnServer();
-    await login(page, f, { name: f.managerName, pin: f.pin });
+    await login(page, f, 'manager');
     await page.getByRole('button', { name: strings.nav.purchases }).click();
     await page.getByTestId('f-number').fill(p.number);
     await expect(page.getByTestId(`delete-purchase-${p.number}`)).toBeVisible();

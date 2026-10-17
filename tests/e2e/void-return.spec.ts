@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, deviceCash, loginAs } from './helpers';
 
 const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visible`).first();
 
@@ -11,14 +11,7 @@ async function start(page: Page, who: 'cashier' | 'manager'): Promise<CashierFix
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined;
   });
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page
-    .getByRole('button', { name: new RegExp(who === 'cashier' ? f.cashierName : f.managerName) })
-    .click();
-  await page.keyboard.type(who === 'cashier' ? f.cashierPin : f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, who);
   if (who === 'manager') await page.getByRole('button', { name: strings.nav.sell }).click();
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');

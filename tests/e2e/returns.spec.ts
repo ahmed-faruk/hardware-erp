@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, loginAs, typeLogin } from './helpers';
 
 async function recordPrints(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -21,14 +21,7 @@ const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visi
 async function start(page: Page, who: 'cashier' | 'manager'): Promise<CashierFixture> {
   const f = newCashierFixture();
   await recordPrints(page);
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page
-    .getByRole('button', { name: new RegExp(who === 'cashier' ? f.cashierName : f.managerName) })
-    .click();
-  await page.keyboard.type(who === 'cashier' ? f.cashierPin : f.pin);
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, who);
   if (who === 'manager') await page.getByRole('button', { name: strings.nav.sell }).click();
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
@@ -123,9 +116,7 @@ test.describe('return without invoice, many items', () => {
       `insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals, category_id) values ('${randomUUID()}', '${COMPANY}', 'U${run}', '${unsold}', 'pcs', 1000, 500, 0, null)`,
     );
     await page.reload();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: f.managerUser, password: f.managerPassword });
     await page.getByRole('button', { name: strings.nav.sell }).click();
     await page.getByTestId('return').click();
     await page.getByTestId('return-free').click();
@@ -142,9 +133,7 @@ test.describe('return without invoice, many items', () => {
       `insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost, qty_decimals) values ('${randomUUID()}', '${COMPANY}', 'S${run}', '${name}', 'pcs', 1000, 500, 0)`,
     );
     await page.reload();
-    await page.getByRole('button', { name: new RegExp(f.managerName) }).click();
-    await page.keyboard.type(f.pin);
-    await page.keyboard.press('Enter');
+    await typeLogin(page, { user: f.managerUser, password: f.managerPassword });
     await page.getByRole('button', { name: strings.nav.sell }).click();
     await page.getByTestId('sell-search').fill(name);
     await page.getByTestId('sell-search').press('Enter');

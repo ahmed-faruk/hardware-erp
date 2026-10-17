@@ -84,7 +84,7 @@ export const ACTIONS = [
 export type Action = (typeof ACTIONS)[number];
 
 /** `pin` = allowed after a worker who has this action as `yes` enters his PIN on the same device. */
-export type Access = 'yes' | 'pin' | 'no';
+export type Access = 'yes' | 'no';
 
 /** What a permission group stores: one explicit access per action. */
 export type Permissions = Partial<Record<Action, Access>>;
@@ -177,10 +177,6 @@ const cashier: Permissions = {
   holdCart: 'yes',
   returnWithInvoice: 'yes',
   discountWithinLimit: 'yes',
-  discountOverLimit: 'pin',
-  priceOverride: 'pin',
-  creditOverLimit: 'pin',
-  noSaleDrawer: 'pin',
   customerReceipt: 'yes',
   addCustomer: 'yes',
   recordExpense: 'yes',
@@ -219,7 +215,8 @@ export const MANAGER_ALWAYS: Action[] = [
  */
 export function resolveAccess(role: Role, groupPermissions: Permissions | null, action: Action): Access {
   if (role === 'manager' && MANAGER_ALWAYS.includes(action)) return 'yes';
-  if (groupPermissions) return groupPermissions[action] ?? 'no';
+  // a stored `pin` (from before the approvals were removed) means no
+  if (groupPermissions) return groupPermissions[action] === 'yes' ? 'yes' : 'no';
   return defaultsFor(role)[action] ?? 'no';
 }
 

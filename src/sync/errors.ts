@@ -8,6 +8,8 @@ export type ErrorCode =
   | 'E_VERSION_TOO_OLD'
   | 'E_CONFLICT'
   | 'E_RATE_LIMIT'
+  | 'E_LOGIN'
+  | 'E_LOCKED'
   | 'E_INTERNAL';
 
 export type RpcResult<T> =

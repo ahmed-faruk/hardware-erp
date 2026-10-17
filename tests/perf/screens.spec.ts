@@ -2,7 +2,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { newCashierFixture, productId } from '../e2e/helpers';
+import { newCashierFixture, productId, loginAs } from '../e2e/helpers';
 
 // Time every screen of the system on the seeded volume (npm run perf:seed first): `npm run perf:screens` -> perf-results/screens.json.
 // Numbers are measured in the browser: from the route change (or tab click) until no skeleton is left on screen for 300 ms.
@@ -86,10 +86,7 @@ test('every manager screen and report tab', async ({ page }) => {
   });
   const f = newCashierFixture();
   const t0 = Date.now();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.managerName) }).click({ timeout: 300_000 });
+  await loginAs(page, f, 'manager');
   console.log(`activation + first pull: ${Date.now() - t0} ms`);
   rows.push({
     screen: 'activation + first pull',
@@ -98,8 +95,6 @@ test('every manager screen and report tab', async ({ page }) => {
     longTasks: 0,
     longestTaskMs: 0,
   });
-  await page.keyboard.type(f.pin);
-  await page.keyboard.press('Enter');
   await expect(page.getByTestId('sync-status')).toBeVisible();
   await settle(page);
 
@@ -162,13 +157,8 @@ test('every manager screen and report tab', async ({ page }) => {
 test('cashier: login to a paid sale', async ({ page }) => {
   test.setTimeout(300_000);
   const f = newCashierFixture();
-  await page.goto('/');
-  await page.getByTestId('activation-code').fill(f.code);
-  await page.getByTestId('activate').click();
-  await page.getByRole('button', { name: new RegExp(f.cashierName) }).click({ timeout: 300_000 });
-  await page.keyboard.type(f.cashierPin);
   const t0 = Date.now();
-  await page.keyboard.press('Enter');
+  await loginAs(page, f, 'cashier');
   await page.getByTestId('open-shift').click();
   await page.keyboard.type('100');
   await page.keyboard.press('Enter');
