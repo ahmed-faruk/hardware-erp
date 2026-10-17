@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
 
 /**
  * One shop day across this release on two devices: sell, return, void the return, return to a supplier without an invoice,
@@ -101,11 +101,7 @@ test('a whole day on two devices: sell, return, void the return, supplier return
   await expect
     .poll(() => count(`select status from sales_returns where number = '${ret}'`), { timeout: 60_000 })
     .toBe('voided');
-  expect(
-    count(
-      `select coalesce(sum(m.amount), 0) from cash_movements m join cash_accounts c on c.id = m.cash_account_id where c.owner_device_id = '${a.deviceId}'`,
-    ),
-  ).toBe('1500');
+  expect(String(deviceCash(a.prefix))).toBe('1500');
 
   // device A: return to the supplier without an invoice at the last price
   await page.getByRole('button', { name: strings.nav.purchases }).click();

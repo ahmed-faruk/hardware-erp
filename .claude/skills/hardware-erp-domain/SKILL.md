@@ -82,6 +82,7 @@ Offline policy (setting): `allow` | `reduce:<percent>` | `block`. Over limit →
 ## 10. Shift (FIN-02..05)
 Open with counted float. Close: cashier enters counted cash by denomination BEFORE seeing expected.
 `variance = counted − expected`; stored automatically; manager comment required above a threshold.
+One shop box, one shift (owner decision 2026-10-17): there is one open shift for the whole shop; any device sells into it and any device closes it. Expected at close = opening float + every cash movement on the box (any document, any device) between `opened_at` and the close.
 
 ## 11. Roles (MVP) and permission groups
 The table below is the default of each role. A manager can build permission groups (every screen and button is an action; yes / pin / no) and give one to a worker: a worker with a group gets exactly the group, without a group he gets his role. Use `canCtx(ctx, action)` in commands and `useSession().can(action)` in screens, never `role ===`. Server: `worker_can()`.

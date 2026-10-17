@@ -51,6 +51,6 @@ test('a manager builds a permission group and gives it to a cashier: the screen 
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="total"]:visible').first()).toHaveText('11.25');
   await page.getByTestId('shift-menu').click();
-  await expect(page.getByTestId('shift-transfer')).toBeVisible();
+  await expect(page.getByTestId('shift-x')).toBeVisible();
   await expect(page.getByTestId('shift-expense')).toHaveCount(0);
 });

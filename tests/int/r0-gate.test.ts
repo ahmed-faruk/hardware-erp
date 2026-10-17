@@ -43,15 +43,14 @@ describe('R0 gate: 1,000 invoices on two offline devices', () => {
     await pullMasterData(k2);
     expect(await k1.ctx.db.products.count()).toBe(20);
 
-    const shifts = await Promise.all([
-      openShift(k1.ctx, { cashAccountId: IDS.drawers.K1, openingFloat: 10000 }),
-      openShift(k2.ctx, { cashAccountId: IDS.drawers.K2, openingFloat: 10000 }),
-    ]);
-    if (!shifts[0].ok || !shifts[1].ok) throw new Error('shift');
+    // one box, one shift: device K1 opened it, device K2 sells into it too
+    const shift = await openShift(k1.ctx, { cashAccountId: IDS.drawers.K1, openingFloat: 10000 });
+    if (!shift.ok) throw new Error('shift');
+    const shifts = [shift, shift] as const;
 
     // both devices are "offline": nothing is pushed or pulled while they sell
     await sellOffline(k1, shifts[0].id, IDS.drawers.K1);
-    await sellOffline(k2, shifts[1].id, IDS.drawers.K2);
+    await sellOffline(k2, shifts[1].id, IDS.drawers.K1);
 
     const p1 = await pushAll(k1.ctx.db, k1.client, k1.ctx.deviceId, 'test');
     const p2 = await pushAll(k2.ctx.db, k2.client, k2.ctx.deviceId, 'test');

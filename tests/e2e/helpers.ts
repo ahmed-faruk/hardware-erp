@@ -29,6 +29,8 @@ export interface Fixture {
 
 /** A fresh device activation code and a manager with a known PIN, as `npm run device:add` and `worker:add` would create. */
 export function newFixture(): Fixture {
+  // the shop has one shift: every test starts with none open
+  sql("update shifts set status = 'closed', closed_at = now() where status = 'open'");
   const code = Array.from(randomBytes(10), (b) => ALPHABET[b % ALPHABET.length]).join('');
   const prefix = Array.from(randomBytes(3), (b) => ALPHABET[b % ALPHABET.length]).join('');
   const pin = String(100000 + (randomBytes(3).readUIntBE(0, 3) % 899999));
@@ -69,9 +71,6 @@ export function newCashierFixture(): CashierFixture {
     `insert into workers (id, company_id, name, role, pin_hash, pin_salt, active) values (${q(randomUUID())}, ${q(COMPANY)}, ${q(cashierName)}, 'cashier', ${q(pinHash)}, ${q(pinSalt)}, true)`,
   );
   sql(
-    `insert into cash_accounts (id, company_id, name, kind, owner_device_id) values (${q(randomUUID())}, ${q(COMPANY)}, 'درج اختبار', 'drawer', ${q(f.deviceId)})`,
-  );
-  sql(
     `insert into categories (id, company_id, name, color_token, icon, sort) values (${q(CATEGORY)}, ${q(COMPANY)}, 'قسم الكاشير', 'cat-1', 'paint-roller', -1) on conflict (id) do nothing`,
   );
   sql(
@@ -103,3 +102,11 @@ export function addWorker(role: 'cashier' | 'storekeeper' | 'manager'): { name: 
   );
   return { name, pin };
 }
+
+/** Cash moved by the documents of one device (their numbers start with its prefix). */
+export const deviceCash = (prefix: string): number =>
+  Number(
+    sql(
+      `select coalesce(sum(m.amount), 0) from cash_movements m where m.doc_id in (select id from sales_invoices where number like '${prefix}-%' union all select id from sales_returns where number like '${prefix}-%' union all select id from voids where number like '${prefix}-%' union all select id from expenses where number like '${prefix}-%' union all select id from customer_receipts where number like '${prefix}-%' union all select id from cash_adjustments where number like '${prefix}-%')`,
+    ),
+  );

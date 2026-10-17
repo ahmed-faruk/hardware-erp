@@ -4,7 +4,7 @@ import { rebuildPartyBalances, rebuildStockBalances } from '../balances';
 import { newCommon, type DeviceContext, canCtx } from './context';
 import { nowIso, uuidv7 } from '../ids';
 import { validateAllocations } from '../allocations';
-import { drawerBalance, openShiftOfDevice } from '../cash';
+import { drawerBalance, openShopShift } from '../cash';
 import { nextNumber } from '../numbering';
 import { loadSoldReturned, postedReturnLines } from '../returnable';
 import { enqueue } from '../outbox';
@@ -309,7 +309,7 @@ export async function voidInvoice(
     db.cashMovements.where('docId').equals(invoice.id).toArray(),
   ]);
   // the cash share goes back out of the drawer of the shift open on this device now, whatever the age or device of the invoice
-  const shift = cash.length > 0 ? await openShiftOfDevice(db, ctx.deviceId) : null;
+  const shift = cash.length > 0 ? await openShopShift(db) : null;
   if (cash.length > 0 && !shift) return err('NO_SHIFT', 'افتح وردية الأول');
   const stockMovements: StockMovement[] = stock.map((m) => ({
     ...newCommon(ctx),

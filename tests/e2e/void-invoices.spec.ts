@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { addWorker, newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { addWorker, newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
 
 const COMPANY = 'a0000000-0000-7000-8000-000000000001';
 const WAREHOUSE = 'a0000000-0000-7000-8000-0000000000c1';
@@ -87,11 +87,7 @@ test.describe('delete invoices', () => {
       .poll(() => sql(`select status from sales_invoices where number = '${number}'`), { timeout: 60_000 })
       .toBe('voided');
     // the cash left the open drawer again: the invoice and its delete cancel out
-    expect(
-      sql(
-        `select coalesce(sum(m.amount), 0) from cash_movements m join cash_accounts c on c.id = m.cash_account_id where c.owner_device_id = '${f.deviceId}'`,
-      ),
-    ).toBe('0');
+    expect(String(deviceCash(f.prefix))).toBe('0');
     // the exceptions report lists the delete with what it targeted
     await page.getByRole('button', { name: strings.nav.reports }).click();
     await page.getByTestId('report-tab-exceptions').click();

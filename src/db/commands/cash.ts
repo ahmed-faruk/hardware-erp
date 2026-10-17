@@ -147,7 +147,8 @@ export async function postExpense(
   ]);
   if (!category || category.deletedAt || !account || account.deletedAt)
     return err('NOT_FOUND', 'بيانات ناقصة');
-  const ownDrawer = account.kind === 'drawer' && account.ownerDeviceId === ctx.deviceId;
+  const ownDrawer =
+    (account.kind === 'drawer' && account.ownerDeviceId === ctx.deviceId) || account.kind === 'safe';
   if (ctx.role !== 'manager' && !ownDrawer) return err('E_FORBIDDEN', 'من درج الجهاز بس');
   if (ownDrawer && input.shiftId && input.amount > (await drawerBalance(db, input.shiftId)))
     return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
@@ -226,7 +227,7 @@ export async function postCashTransfer(
     db.cashAccounts.get(input.toAccountId),
   ]);
   if (!from || !to || from.deletedAt || to.deletedAt) return err('NOT_FOUND', 'حساب غير موجود');
-  const ownDrawer = from.kind === 'drawer' && from.ownerDeviceId === ctx.deviceId;
+  const ownDrawer = (from.kind === 'drawer' && from.ownerDeviceId === ctx.deviceId) || from.kind === 'safe';
   if (ctx.role !== 'manager' && !(ownDrawer && to.kind === 'safe'))
     return err('E_FORBIDDEN', 'من الدرج للخزنة بس');
   if (ownDrawer && input.shiftId && input.amount > (await drawerBalance(db, input.shiftId)))

@@ -1,15 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowRightLeft, ClipboardList, Lock, Minus, Plus, Wallet } from 'lucide-react';
+import { ClipboardList, Lock, Minus, Plus, Wallet } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
-import {
-  closeShift,
-  postCashTransfer,
-  postExpense,
-  previewClose,
-  type ClosePreview,
-} from '@/db/commands/cash';
+import { closeShift, postExpense, previewClose, type ClosePreview } from '@/db/commands/cash';
 import { formatMoney, toPiasters } from '@/domain/money';
 import { DEFAULT_DENOMINATIONS } from '@/domain/payments';
 import { countByDenomination } from '@/domain/shift';
@@ -28,7 +22,7 @@ import styles from './dialogs.module.css';
 type Digits = (t: string) => string;
 type Ask = (action: Action) => Promise<string | null>;
 
-export type ShiftTool = 'x' | 'expense' | 'transfer' | 'close';
+export type ShiftTool = 'x' | 'expense' | 'close';
 
 /** One menu instead of four toolbar buttons: the shift's own tools. */
 export function ShiftMenuDialog({
@@ -44,12 +38,6 @@ export function ShiftMenuDialog({
   const items = [
     { key: 'x', icon: ClipboardList, label: strings.shift.showX, shown: true },
     { key: 'expense', icon: Wallet, label: strings.cash.expense, shown: can('recordExpense') !== 'no' },
-    {
-      key: 'transfer',
-      icon: ArrowRightLeft,
-      label: strings.cash.transfer,
-      shown: can('cashTransfer') !== 'no',
-    },
     { key: 'close', icon: Lock, label: strings.shift.close, shown: true },
   ] as const;
   return (
@@ -166,64 +154,6 @@ export function ExpenseDialog({
         onCancel={close}
         onSubmit={(t) => void save(t)}
       />
-    </>
-  );
-}
-
-export function TransferDialog({
-  open,
-  shiftId,
-  cashAccountId,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  shiftId: string;
-  cashAccountId: string;
-  onClose: () => void;
-  onDone: (transferId: string) => void;
-}) {
-  const { db } = useServices();
-  const { context } = useSession();
-  const safe = useLiveQuery(
-    async () => (await db.cashAccounts.filter((a) => a.kind === 'safe' && !a.deletedAt).first()) ?? null,
-    [db],
-  );
-  const [error, setError] = useState<string | null>(null);
-  const save = async (text: string): Promise<void> => {
-    const amount = toPiasters(text);
-    if (!context || !safe || !amount.ok || amount.value <= 0) return;
-    const r = await postCashTransfer(context, {
-      fromAccountId: cashAccountId,
-      toAccountId: safe.id,
-      amount: amount.value,
-      shiftId,
-    });
-    if (r.ok) {
-      play('done');
-      setError(null);
-      onDone(r.id);
-    } else {
-      play('error');
-      setError(r.code === 'DRAWER_SHORT' ? strings.cash.drawerShort : strings.cash.failed);
-    }
-  };
-  return (
-    <>
-      <NumEntry
-        title={strings.cash.transferTitle}
-        open={open && safe !== null && safe !== undefined}
-        decimals={2}
-        hint={error ? <BigAlert tone="danger" word={error} sound={false} /> : undefined}
-        onCancel={() => {
-          setError(null);
-          onClose();
-        }}
-        onSubmit={(t) => void save(t)}
-      />
-      <Dialog title={strings.cash.transferTitle} open={open && safe === null} onClose={onClose}>
-        <BigAlert tone="warn" word={strings.cash.noSafe} sound={false} />
-      </Dialog>
     </>
   );
 }

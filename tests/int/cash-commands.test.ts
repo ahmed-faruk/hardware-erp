@@ -147,11 +147,11 @@ describe('expense and transfer', () => {
     expect(await t.expense(7501)).toMatchObject({ ok: false, code: 'DRAWER_SHORT' });
   });
 
-  it('a cashier cannot spend from the safe or move cash anywhere but to the safe', async () => {
+  it('the safe is the shop box: a cashier may spend from it, but not move cash out of it to a drawer', async () => {
     const t = await setup();
     expect(
-      await postExpense(t.ctx, { categoryId: t.category.id, amount: 100, cashAccountId: t.safe.id }),
-    ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+      (await postExpense(t.ctx, { categoryId: t.category.id, amount: 100, cashAccountId: t.safe.id })).ok,
+    ).toBe(true);
     expect(
       await postCashTransfer(t.ctx, { fromAccountId: t.safe.id, toAccountId: t.drawer.id, amount: 100 }),
     ).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });

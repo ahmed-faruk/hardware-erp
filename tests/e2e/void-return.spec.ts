@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
 
 const vis = (page: Page, id: string) => page.locator(`[data-testid="${id}"]:visible`).first();
 
@@ -64,11 +64,7 @@ test.describe('void a sales return', () => {
       .poll(() => sql(`select status from sales_returns where number = '${number}'`), { timeout: 60_000 })
       .toBe('voided');
     // the drawer is back to float + sale: the cash that went out came back
-    expect(
-      sql(
-        `select coalesce(sum(m.amount), 0) from cash_movements m join cash_accounts c on c.id = m.cash_account_id where c.owner_device_id = '${f.deviceId}'`,
-      ),
-    ).toBe('1500');
+    expect(String(deviceCash(f.prefix))).toBe('1500');
     // the void shows in the item history next to the return
     await page.evaluate((id) => (window.location.hash = `#/products/${id}`), productId(2));
     await page.getByTestId('product-view-history').click();

@@ -51,13 +51,7 @@ import { VoidReasonDialog } from '../components/VoidReasonDialog';
 import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
 import { CollectionDialog } from './CollectionDialog';
 import { ReturnDialog } from './ReturnDialog';
-import {
-  CloseShiftDialog,
-  ExpenseDialog,
-  ShiftMenuDialog,
-  TransferDialog,
-  type ShiftTool,
-} from './ShiftTools';
+import { CloseShiftDialog, ExpenseDialog, ShiftMenuDialog, type ShiftTool } from './ShiftTools';
 import { ProductGrid } from './ProductGrid';
 import { ShiftOpen } from './ShiftOpen';
 import { TotalBar } from './TotalBar';
@@ -87,7 +81,7 @@ interface Done {
 }
 
 export function SellScreen() {
-  const { db, identity } = useServices();
+  const { db } = useServices();
   const { context, worker, can } = useSession();
   const role = worker?.role ?? 'cashier';
   const approverRole = (action: 'discountOverLimit' | 'priceOverride') =>
@@ -95,11 +89,8 @@ export function SellScreen() {
   const settings = useLiveQuery(() => loadSettings(db), [db]) ?? DEFAULT_SETTINGS;
   const device = useLiveQuery(() => loadDeviceSettings(db), [db]) ?? DEVICE_DEFAULTS;
   const drawer = useLiveQuery(
-    async () =>
-      (await db.cashAccounts
-        .filter((a) => a.kind === 'drawer' && a.ownerDeviceId === identity.deviceId && !a.deletedAt)
-        .first()) ?? null,
-    [db, identity.deviceId],
+    async () => (await db.cashAccounts.filter((a) => a.kind === 'safe' && !a.deletedAt).first()) ?? null,
+    [db],
   );
   const warehouse = useLiveQuery(
     async () => (await db.warehouses.filter((w) => w.kind === 'main' && !w.deletedAt).first()) ?? null,
@@ -361,7 +352,7 @@ export function SellScreen() {
     })();
   };
 
-  const printMoneySlip = (kind: 'expense' | 'transfer', id: string): void => {
+  const printMoneySlip = (kind: 'expense', id: string): void => {
     void (async () => {
       const shop = (await db.companies.toCollection().first())?.name ?? '';
       const doc = kind === 'expense' ? await db.expenses.get(id) : await db.cashTransfers.get(id);
@@ -781,17 +772,6 @@ export function SellScreen() {
           setShiftTool(null);
           flash(strings.cash.saved);
           setPrintOffer(() => () => printMoneySlip('expense', id));
-        }}
-      />
-      <TransferDialog
-        open={shiftTool === 'transfer'}
-        shiftId={shift.id}
-        cashAccountId={sale.cashAccountId}
-        onClose={() => setShiftTool(null)}
-        onDone={(id) => {
-          setShiftTool(null);
-          flash(strings.cash.saved);
-          setPrintOffer(() => () => printMoneySlip('transfer', id));
         }}
       />
       <CloseShiftDialog
