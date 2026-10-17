@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { formatMoney } from '../../src/domain/money';
 import { strings } from '../../src/ui/strings.ar';
 
-import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
+import { newCashierFixture, productId, sql, type CashierFixture, deviceCash } from './helpers';
 
 /**
  * One shop day with every feature of this release, then the database checked against the ledgers:
@@ -205,7 +205,7 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
   await page.getByTestId('delete-product').click();
   await expect(page.getByTestId('delete-blocked')).toContainText(strings.products.deleteReasons.sales);
 
-  // 8. close the shift blind: 100 + 15 + 10 − 32.50 + 10 − 8 = 94.50; the Z report is printed by the button
+  // 8. close the shift blind: 100 + 15 + 10 − 32.50 + 10 − 8 − 40.00 (the purchase paid in cash from the box) = 54.50; the Z report is printed by the button
   await page.getByRole('button', { name: strings.nav.sell }).click();
   await page.getByTestId('shift-menu').click();
   await page.getByTestId('shift-close').click();
@@ -213,11 +213,10 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
     for (let i = 0; i < times; i++) await page.getByTestId(`denom-${id}-plus`).click();
   };
   await count('5000', 1);
-  await count('2000', 2);
   await count('100', 4);
   await count('50', 1);
   await page.getByTestId('count-done').click();
-  await expect(page.getByTestId('close-expected')).toHaveText('94.50');
+  await expect(page.getByTestId('close-expected')).toHaveText('54.50');
   await expect(page.getByTestId('close-variance')).toHaveText('0.00');
   await page.getByTestId('close-confirm').click();
   await expect(page.getByTestId('open-shift')).toBeVisible();
@@ -272,12 +271,8 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
       `select coalesce(sum(amount), 0) from party_ledger where party_type = 'supplier' and party_id = (select id from suppliers where name = '${supplier}')`,
     ),
   ).toBe('-1000');
-  // the drawer of device A: its movements add up to 15 + 10 − 32.50 + 10 − 8 = −5.50, which with the 100.00 float is the counted 94.50
-  expect(
-    sql(
-      `select coalesce(sum(m.amount), 0) from cash_movements m join cash_accounts c on c.id = m.cash_account_id where c.owner_device_id = '${a.deviceId}'`,
-    ),
-  ).toBe('-550');
+  // the drawer of device A: its movements add up to 15 + 10 − 32.50 + 10 − 8 = −5.50, (the 40.00 cash purchase is on the box too, so the counted amount is 54.50)
+  expect(String(deviceCash(a.prefix))).toBe('-550');
   expect(sql(`select status || ':' || variance from shifts where number = '${a.prefix}-SHF-000001'`)).toBe(
     'closed:0',
   );

@@ -125,26 +125,6 @@ test.describe('shift close', () => {
       )
       .toBe('-5000:true');
   });
-
-  test('cash to the safe leaves the drawer count lower', async ({ page }) => {
-    const f = await start(page);
-    await page.getByTestId('shift-menu').click();
-    await page.getByTestId('shift-transfer').click();
-    await page.keyboard.type('30');
-    await page.keyboard.press('Enter');
-    await expect
-      .poll(() => sql(`select amount from cash_transfers where number = '${f.prefix}-XFR-000001'`), {
-        timeout: 60_000,
-      })
-      .toBe('3000');
-    await page.getByTestId('shift-menu').click();
-    await page.getByTestId('shift-close').click();
-    await click(page, 'denom-5000-plus');
-    await click(page, 'denom-2000-plus', 1); // 70.00 = 100 - 30
-    await page.getByTestId('count-done').click();
-    await expect(page.getByTestId('close-expected')).toHaveText('70.00');
-    await expect(page.getByTestId('close-variance')).toHaveText('0.00');
-  });
 });
 
 test('the manager corrects a cash account with a voucher; it reaches the server with its reason', async ({

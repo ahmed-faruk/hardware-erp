@@ -40,7 +40,7 @@ describe('permission groups', () => {
     await browser.keyboard.press('Enter');
     await expect(screen.getByTestId('total', { visible: true }).first()).toHaveText('11.25');
     await screen.getByTestId('shift-menu').tap();
-    await expect(screen.getByTestId('shift-transfer')).toBeVisible();
+    await expect(screen.getByTestId('shift-x')).toBeVisible();
     await expect(screen.getByTestId('shift-expense')).toHaveCount(0);
   });
 });

@@ -45,7 +45,7 @@ select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
 -- shift 1: float 100.00, an expense of 5.00 and a transfer of 20.00 -> drawer should hold 75.00
 select is(pg_temp.push(pg_temp.shift_row('0190f000-0000-7000-8000-000000000a01', 'K1-SHF-000001', 10000)), null, 'a shift opens');
 select is(pg_temp.push(pg_temp.expense('K1-EXP-000001', '0190f000-0000-7000-8000-000000000a01', 500)), null, 'a cashier records an expense from his drawer');
-select is(pg_temp.push(pg_temp.expense('K1-EXP-000002', '0190f000-0000-7000-8000-000000000a01', 500, 'a0000000-0000-7000-8000-000000000a13')), 'E_FORBIDDEN', 'but not from the safe');
+select is(pg_temp.push(pg_temp.expense('K1-EXP-000002', '0190f000-0000-7000-8000-000000000a01', 500, 'a0000000-0000-7000-8000-000000000a13')), null, 'the safe is the shop box: a cashier may pay an expense from it');
 select is(pg_temp.push(pg_temp.expense('K1-EXP-000003', '0190f000-0000-7000-8000-000000000a01', 500, 'a0000000-0000-7000-8000-000000000a11', 'a0000000-0000-7000-8000-000000000999')), 'E_VALIDATION', 'an unknown category is refused');
 select is(pg_temp.push(pg_temp.transfer('K1-XFR-000001', '0190f000-0000-7000-8000-000000000a01', 2000)), null, 'a cashier moves drawer cash to the safe');
 select is(pg_temp.push(pg_temp.transfer('K1-XFR-000002', '0190f000-0000-7000-8000-000000000a01', 2000, 'a0000000-0000-7000-8000-000000000a12')), 'E_FORBIDDEN', 'but only to the safe');
@@ -60,6 +60,8 @@ select is(pg_temp.push(pg_temp.shift_row('0190f000-0000-7000-8000-000000000a01',
   '[{"value":5000,"count":2}]', 7500, 2500)), 'E_VALIDATION', 'a different close of a closed shift is refused');
 reset role;
 select is((select status || ':' || variance from shifts where id = '0190f000-0000-7000-8000-000000000a01'), 'closed:0', 'the shift is closed with variance 0');
+-- everything of shift 1 happened earlier (in this test it all shares one transaction time)
+update cash_movements set occurred_at = now() - interval '2 hours' where doc_type in ('expense', 'cash_transfer');
 
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
 -- shift 2: float 50.00, nothing happens; counted 20.00 -> shortage of 30.00 > 20.00 limit

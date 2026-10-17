@@ -101,8 +101,8 @@ test.describe('manager journeys', () => {
     await page.getByRole('button', { name: new RegExp(`كاشير اختبار ${run}`) }).click();
     await page.keyboard.type('654321');
     await page.keyboard.press('Enter');
-    // a cashier lands on the sale screen; this test device has no cash drawer, so it says so
-    await expect(page.getByText(strings.sell.noDrawer)).toBeVisible();
+    // a cashier lands on the sale screen: the shop box exists, so he is asked to open the shift
+    await expect(page.getByTestId('open-shift')).toBeVisible();
     await expect(page.getByRole('button', { name: strings.nav.workers })).toHaveCount(0);
   });
 

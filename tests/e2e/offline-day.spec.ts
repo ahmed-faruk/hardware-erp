@@ -3,8 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { newCashierFixture, productId, sql, type CashierFixture } from './helpers';
 
 /** R1 in miniature (PRD flow 7): two devices lose the network, sell, return and take credit all "day", then reconnect. */
-async function openDevice(page: Page): Promise<CashierFixture> {
-  const f = newCashierFixture();
+/** The first device opens the shop's one shift; the second one finds it already open (it syncs in). */
+async function openDevice(page: Page, f: CashierFixture, opensShift: boolean): Promise<CashierFixture> {
   await page.addInitScript(() => {
     if (window !== window.top) window.print = () => undefined; // never open a real print dialog
   });
@@ -14,10 +14,12 @@ async function openDevice(page: Page): Promise<CashierFixture> {
   await page.getByRole('button', { name: new RegExp(f.cashierName) }).click();
   await page.keyboard.type(f.cashierPin);
   await page.keyboard.press('Enter');
-  await page.getByTestId('open-shift').click();
-  await page.keyboard.type('100');
-  await page.keyboard.press('Enter');
-  await expect(page.getByTestId('sell-search')).toBeVisible();
+  if (opensShift) {
+    await page.getByTestId('open-shift').click();
+    await page.keyboard.type('100');
+    await page.keyboard.press('Enter');
+  }
+  await expect(page.getByTestId('sell-search')).toBeVisible({ timeout: 60_000 });
   return f;
 }
 
@@ -71,8 +73,12 @@ test('@smoke two devices offline all day: sales, a return and a credit sale, the
   const ctxB = await browser.newContext();
   const a = await ctxA.newPage();
   const b = await ctxB.newPage();
-  const fa = await openDevice(a);
-  const fb = await openDevice(b);
+  // both fixtures first: creating a fixture closes any shift left open
+  const fa = newCashierFixture();
+  const fb = newCashierFixture();
+  await openDevice(a, fa, true);
+  await expect(a.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });
+  await openDevice(b, fb, false);
   // both devices have finished their first sync before the router is "unplugged"
   await expect(a.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });
   await expect(b.getByTestId('sync-pending')).toHaveText('0', { timeout: 60_000 });

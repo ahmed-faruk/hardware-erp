@@ -66,26 +66,6 @@ if (!companyId) {
 
 // every cashier device has a cash drawer, and the shop has one main safe (docs/DATABASE.md §4.1); both are created once
 async function ensureCashAccounts(deviceId, deviceName) {
-  const { data: drawers, error: dErr } = await db
-    .from('cash_accounts')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('owner_device_id', deviceId)
-    .eq('kind', 'drawer');
-  if (dErr) fail('drawer lookup', dErr);
-  if (drawers.length === 0) {
-    const { error } = await db
-      .from('cash_accounts')
-      .insert({
-        id: randomUUID(),
-        company_id: companyId,
-        name: `درج ${deviceName}`,
-        kind: 'drawer',
-        owner_device_id: deviceId,
-      });
-    if (error) fail('drawer', error);
-    console.log('Cash drawer created.');
-  }
   const { data: safes, error: sErr } = await db
     .from('cash_accounts')
     .select('id')
@@ -98,7 +78,7 @@ async function ensureCashAccounts(deviceId, deviceName) {
       .insert({
         id: randomUUID(),
         company_id: companyId,
-        name: 'الخزينة الرئيسية',
+        name: 'الخزنة',
         kind: 'safe',
         owner_device_id: null,
       });
