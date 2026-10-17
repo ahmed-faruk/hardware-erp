@@ -35,9 +35,21 @@ jobs:
           version: latest
       - name: Link staging
         run: supabase link --project-ref "$STAGING_REF"
-      - name: Reset (wipes all staging data, no test seed)
+      - name: Reset (wipes ALL staging data, then applies the migrations; no test seed)
         if: ${{ inputs.action == 'reset' }}
-        run: supabase db reset --linked --no-seed --yes
+        run: |
+          supabase db query --linked "
+            drop schema if exists public cascade;
+            create schema public;
+            grant usage on schema public to postgres, anon, authenticated, service_role;
+            grant all on schema public to postgres, service_role;
+            alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
+            alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
+            alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
+            delete from supabase_migrations.schema_migrations;
+            delete from auth.users;
+          "
+          supabase db push --linked --yes
       - name: Sizes
         run: |
           supabase inspect db db-stats --linked
