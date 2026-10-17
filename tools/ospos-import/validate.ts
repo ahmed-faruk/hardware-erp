@@ -112,7 +112,15 @@ export async function validate(input: ValidateInput): Promise<{ markdown: string
         : null;
     let inDb = 0;
     if (compactTable) inDb = await count(db, compactTable, cid);
-    else for (const name of tables) inDb += await count(db, name, cid);
+    else if (label === 'workers') {
+      // the first account (admin) is not an imported employee
+      const { count: n } = await db
+        .from('workers')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', cid)
+        .not('legacy_employee_id', 'is', null);
+      inDb = n ?? 0;
+    } else for (const name of tables) inDb += await count(db, name, cid);
     add(
       `Count: ${label}`,
       transformed === want && inDb === want,
