@@ -1,10 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Tags } from 'lucide-react';
+import { Package, Pencil, Plus, Tags } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { saveCategory } from '@/db/commands/save-master';
 import type { Category } from '@/db/types';
+import { formatMoney, formatQty } from '@/domain/money';
 
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
@@ -15,7 +16,9 @@ import { FormField } from '../components/FormField';
 import { IconPicker } from '../components/IconPicker';
 import { Skeleton } from '../components/Skeleton';
 import { iconFor } from '../icons/catalog';
+import { IconView } from '../icons/IconView';
 import { cx } from '../cx';
+import { navigate } from '../router';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
@@ -27,6 +30,17 @@ export function CategoriesScreen() {
   const { db } = useServices();
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).toArray(), [db]);
   const [editing, setEditing] = useState<Category | 'new' | null>(null);
+  const [showing, setShowing] = useState<Category | null>(null);
+  const products = useLiveQuery(async () => {
+    if (!showing) return [];
+    const stock = new Map<string, number>();
+    for (const b of await db.stockBalances.toArray())
+      stock.set(b.productId, (stock.get(b.productId) ?? 0) + b.qty);
+    return (await db.products.where('categoryId').equals(showing.id).toArray())
+      .filter((p) => !p.deletedAt)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+      .map((p) => ({ ...p, qty: stock.get(p.id) ?? 0 }));
+  }, [db, showing]);
   const byId = new Map((categories ?? []).map((c) => [c.id, c]));
 
   const columns: Column<Category>[] = [
@@ -53,6 +67,28 @@ export function CategoriesScreen() {
       header: strings.categories.parent,
       cell: (c) => (c.parentId ? (byId.get(c.parentId)?.name ?? '') : strings.categories.noParent),
     },
+    {
+      key: 'actions',
+      header: '',
+      cell: (c) => (
+        <>
+          <ActionButton
+            label={strings.categories.edit}
+            icon={Pencil}
+            variant="ghost"
+            onClick={() => setEditing(c)}
+            testId={`edit-category-${c.id}`}
+          />
+          <ActionButton
+            label={strings.categories.products}
+            icon={Package}
+            variant="soft"
+            onClick={() => setShowing(c)}
+            testId={`category-products-${c.id}`}
+          />
+        </>
+      ),
+    },
   ];
 
   return (
@@ -78,7 +114,6 @@ export function CategoriesScreen() {
           rows={[...categories].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, 'ar'))}
           columns={columns}
           rowKey={(c) => c.id}
-          onRowClick={setEditing}
         />
       )}
       <Dialog
@@ -93,6 +128,55 @@ export function CategoriesScreen() {
             onDone={() => setEditing(null)}
           />
         )}
+      </Dialog>
+      <Dialog
+        title={showing ? `${strings.categories.productsOf} ${showing.name}` : ''}
+        open={showing !== null}
+        onClose={() => setShowing(null)}
+      >
+        {showing &&
+          (!products ? (
+            <Skeleton />
+          ) : products.length === 0 ? (
+            <EmptyState icon={Package} word={strings.categories.noProducts} />
+          ) : (
+            <DataTable
+              label={strings.categories.products}
+              rows={products}
+              rowKey={(p) => p.id}
+              onRowClick={(p) => navigate('products', p.id)}
+              columns={[
+                {
+                  key: 'name',
+                  header: strings.products.name,
+                  cell: (p) => (
+                    <span className={styles.row} data-testid={`category-product-${p.id}`}>
+                      <span className={styles.tile}>
+                        <IconView
+                          iconKey={(p.extraFields as { icon?: string } | null)?.icon ?? showing.icon}
+                          size={22}
+                          aria-hidden="true"
+                        />
+                      </span>
+                      <span>{p.name}</span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'stock',
+                  header: strings.products.stock,
+                  numeric: true,
+                  cell: (p) => formatQty(p.qty),
+                },
+                {
+                  key: 'price',
+                  header: strings.products.price,
+                  numeric: true,
+                  cell: (p) => formatMoney(p.price),
+                },
+              ]}
+            />
+          ))}
       </Dialog>
     </section>
   );

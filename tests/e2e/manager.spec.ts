@@ -28,7 +28,7 @@ test.describe('manager journeys', () => {
     await expect(page.getByText(`دهانات اختبار ${run}`)).toBeVisible();
 
     // product with barcode, price and an icon
-    await page.getByRole('button', { name: strings.nav.products }).click();
+    await page.getByRole('navigation').getByRole('button', { name: strings.nav.products }).click();
     await page.getByTestId('new-product').click();
     await page.getByTestId('product-name').fill(`رولة دهان اختبار ${run}`);
     await page.getByLabel(price).fill('45.50');

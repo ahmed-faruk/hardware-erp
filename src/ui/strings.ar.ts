@@ -151,6 +151,10 @@ export const strings = {
     color: 'اللون',
     icon: 'الأيقونة',
     noCategories: 'مفيش تصنيفات',
+    edit: 'تعديل',
+    products: 'الأصناف',
+    productsOf: 'أصناف',
+    noProducts: 'مفيش أصناف في التصنيف ده',
   },
   customers: {
     title: 'العملاء',
