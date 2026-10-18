@@ -48,6 +48,7 @@ export const ACTIONS = [
   // cash
   'view.expenses',
   'recordExpense',
+  'voidExpense',
   'expenseOverLimit',
   'expenseAnyAccount',
   'cashTransfer',
@@ -155,6 +156,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     actions: [
       'view.expenses',
       'recordExpense',
+      'voidExpense',
       'expenseOverLimit',
       'expenseAnyAccount',
       'cashTransfer',

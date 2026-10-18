@@ -88,6 +88,9 @@ describe('sections', () => {
     expect(can('manager', 'voidPurchase')).toBe('yes');
     expect(can('storekeeper', 'voidPurchase')).toBe('no');
     expect(can('cashier', 'voidPurchase')).toBe('no');
+    expect(can('manager', 'voidExpense')).toBe('yes');
+    expect(can('storekeeper', 'voidExpense')).toBe('no');
+    expect(can('cashier', 'voidExpense')).toBe('no');
   });
 
   it('P4: the storekeeper returns purchases without an invoice by default; only a manager edits the value', () => {

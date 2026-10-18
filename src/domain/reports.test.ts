@@ -440,6 +440,8 @@ describe('exceptions report: deleted documents', () => {
       voidSalesInvoice: 'S',
       voidSalesReturn: 'R',
       voidPurchaseInvoice: 'P',
+      voidExpense: 'E',
+      voidPayrollEntry: 'W',
     } as Record<string, string>;
     const base = {
       reprints: 0,
@@ -466,7 +468,13 @@ describe('exceptions report: deleted documents', () => {
     const tables = exceptionsTables(
       {
         ...base,
-        voids: [row('sales_invoice', 'A'), row('sales_return', 'B'), row('purchase_invoice', 'C')],
+        voids: [
+          row('sales_invoice', 'A'),
+          row('sales_return', 'B'),
+          row('purchase_invoice', 'C'),
+          row('expense', 'D'),
+          row('payroll_entry', 'F'),
+        ],
       },
       labels,
       (x) => x,
@@ -477,6 +485,8 @@ describe('exceptions report: deleted documents', () => {
       ['S', 'A'],
       ['R', 'B'],
       ['P', 'C'],
+      ['E', 'D'],
+      ['W', 'F'],
     ]);
   });
 });
