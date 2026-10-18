@@ -214,3 +214,5 @@ service-role only and idempotent. Tool and steps: `tools/ospos-import/README.md`
 - Never run `supabase db reset` or destructive SQL against staging/production.
 - Multi-row business writes happen in one transaction (Dexie transaction on device, one RPC call on server).
 - Access rules: `docs/SECURITY.md`. RPC contracts: `docs/API.md`.
+
+Deleting a customer, supplier or worker sets `deleted_at`; triggers refuse it while the party's `party_ledger` sum is not 0, or while the worker owes an advance not taken by a salary (migration 20261019100000).

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Truck, Users } from 'lucide-react';
+import { Plus, Trash2, Truck, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -22,6 +22,7 @@ import { strings } from '../strings.ar';
 import { StatementDialog } from './StatementDialog';
 import { SupplierPaymentDialog } from './SupplierPaymentDialog';
 import styles from './screens.module.css';
+import { useMasterDelete } from './useMasterDelete';
 import { useSaver } from './useSaver';
 
 /** `5.5` (percent) -> 550 basis points: the same two-decimal parser as money. */
@@ -37,6 +38,7 @@ export function CustomersScreen() {
   const [text, setText] = useState('');
   const [editing, setEditing] = useState<Customer | 'new' | null>(null);
   const [statementOf, setStatementOf] = useState<Customer | null>(null);
+  const del = useMasterDelete('customer', () => setEditing(null));
   const rows = useLiveQuery(async () => {
     const balances = new Map(
       (await db.partyBalances.where('partyType').equals('customer').toArray()).map((b) => [
@@ -65,6 +67,7 @@ export function CustomersScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.customers.title}</h1>
+      {del.view}
       <div className={styles.toolbar}>
         <FormField label={strings.common.search}>
           {(id) => (
@@ -117,6 +120,15 @@ export function CustomersScreen() {
                   setEditing(null);
                 }}
                 testId="open-statement"
+              />
+            )}
+            {editing !== 'new' && (
+              <ActionButton
+                label={strings.masterDelete.button}
+                icon={Trash2}
+                variant="danger"
+                onClick={() => void del.start(editing.id)}
+                testId="delete-customer"
               />
             )}
           </>
@@ -258,6 +270,7 @@ export function SuppliersScreen() {
   const [editing, setEditing] = useState<Supplier | 'new' | null>(null);
   const [payFor, setPayFor] = useState<Supplier | null>(null);
   const [statementFor, setStatementFor] = useState<Supplier | null>(null);
+  const del = useMasterDelete('supplier', () => setEditing(null));
   const rows = useLiveQuery(async () => {
     const balances = new Map(
       (await db.partyBalances.where('partyType').equals('supplier').toArray()).map((b) => [
@@ -281,6 +294,7 @@ export function SuppliersScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.suppliers.title}</h1>
+      {del.view}
       <div className={styles.toolbar}>
         <FormField label={strings.common.search}>
           {(id) => (
@@ -343,6 +357,13 @@ export function SuppliersScreen() {
                     setEditing(null);
                   }}
                   testId="open-supplier-statement"
+                />
+                <ActionButton
+                  label={strings.masterDelete.button}
+                  icon={Trash2}
+                  variant="danger"
+                  onClick={() => void del.start(editing.id)}
+                  testId="delete-supplier"
                 />
               </div>
             )}
