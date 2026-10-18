@@ -1093,6 +1093,15 @@ export const strings = {
     legacy: 'دي فاتورة قديمة من النظام القديم',
     failed: 'الفاتورة ماتحذفتش',
   },
+  masterDelete: {
+    button: 'حذف',
+    deleting: 'هيتحذف',
+    done: 'اتحذف',
+    hasBalance: 'عليه رصيد، لازم يبقى صفر الأول',
+    hasAdvance: 'عليه سلف لسه ما اتخصمتش',
+    self: 'مينفعش تحذف نفسك',
+    failed: 'ماتحذفش',
+  },
   collection: {
     button: 'تحصيل',
     title: 'تحصيل من عميل',

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, UserCog } from 'lucide-react';
+import { Plus, Trash2, UserCog } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
 
 import { useServices, useSession } from '@/app/session';
@@ -21,6 +21,7 @@ import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
+import { useMasterDelete } from './useMasterDelete';
 import { useSaver } from './useSaver';
 
 export function WorkersScreen() {
@@ -28,6 +29,7 @@ export function WorkersScreen() {
   const { can } = useSession();
   const [tab, setTab] = useState<'workers' | 'groups'>('workers');
   const [editing, setEditing] = useState<Worker | 'new' | null>(null);
+  const del = useMasterDelete('worker', () => setEditing(null));
   const workers = useLiveQuery(() => db.workers.filter((w) => !w.deletedAt).toArray(), [db]);
   const columns: Column<Worker>[] = [
     { key: 'name', header: strings.workers.name, cell: (w) => w.name },
@@ -41,6 +43,7 @@ export function WorkersScreen() {
   return (
     <section>
       <h1 className={styles.title}>{strings.workers.title}</h1>
+      {del.view}
       {can('manageGroups') === 'yes' && (
         <div className={styles.toolbar}>
           <div className={styles.fixed}>
@@ -94,7 +97,18 @@ export function WorkersScreen() {
         onClose={() => setEditing(null)}
       >
         {editing && (
-          <WorkerForm worker={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+          <>
+            <WorkerForm worker={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+            {editing !== 'new' && can('manageUsers') === 'yes' && (
+              <ActionButton
+                label={strings.masterDelete.button}
+                icon={Trash2}
+                variant="danger"
+                onClick={() => void del.start(editing.id)}
+                testId="delete-worker"
+              />
+            )}
+          </>
         )}
       </Dialog>
     </section>
