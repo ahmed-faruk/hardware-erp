@@ -54,3 +54,6 @@ insert into devices (id, company_id, branch_id, auth_user_id, name, prefix, kind
   ('b0000000-0000-7000-8000-0000000000f1', 'b0000000-0000-7000-8000-000000000001', 'b0000000-0000-7000-8000-0000000000b1', 'b0000000-0000-7000-8000-0000000000e1', 'Counter B', 'B1', 'pc', 'manager');
 insert into products (id, company_id, sku, name, base_unit_name, price, unit_cost) values
   ('b0000000-0000-7000-8000-000000000001', 'b0000000-0000-7000-8000-000000000001', 'B001', 'Other shop product', 'pcs', 5000, 3000);
+
+-- expense types as the owner set them (only «مصروفات محل» is active)
+select apply_expense_types();

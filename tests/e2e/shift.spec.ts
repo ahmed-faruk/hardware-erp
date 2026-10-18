@@ -54,8 +54,8 @@ test.describe('shift close', () => {
     await sellCash(page);
     await page.getByTestId('shift-menu').click();
     await page.getByTestId('shift-expense').click();
-    // only the two expense types are offered
-    await expect(page.locator('[data-testid^="expense-cat-"]')).toHaveText(['مشتريات', 'مصروفات محل']);
+    // only the shop expense type is offered
+    await expect(page.locator('[data-testid^="expense-cat-"]')).toHaveText(['مصروفات محل']);
     await page.getByTestId('expense-cat-مصروفات محل').click();
     await page.keyboard.type('5');
     await page.keyboard.press('Enter');

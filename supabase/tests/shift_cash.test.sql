@@ -20,7 +20,7 @@ create function pg_temp.shift_row(p_id uuid, p_number text, p_float bigint, p_st
     'counted_breakdown', p_counted, 'counted_total', (select sum((x ->> 'value')::bigint * (x ->> 'count')::bigint) from jsonb_array_elements(p_counted) x),
     'expected_total', p_expected, 'variance', p_variance, 'closed_at', case when p_status = 'closed' then now() end, 'approved_by', p_approved, 'close_note', p_note));
 $$;
-create function pg_temp.expense(p_number text, p_shift uuid, amount bigint, acct uuid default 'a0000000-0000-7000-8000-000000000a11', cat uuid default 'a0000000-0000-7000-8000-000000000e01') returns jsonb language sql as $$
+create function pg_temp.expense(p_number text, p_shift uuid, amount bigint, acct uuid default 'a0000000-0000-7000-8000-000000000a11', cat uuid default 'a0000000-0000-7000-8000-000000000e02') returns jsonb language sql as $$
   with v as (select gen_random_uuid() eid)
   select pg_temp.row_of('expenses', 'a0000000-0000-7000-8000-0000000000d1', jsonb_build_object('id', eid, 'number', p_number, 'issued_at', now(),
     'worker_id', 'a0000000-0000-7000-8000-0000000000d1', 'created_by', 'a0000000-0000-7000-8000-0000000000d1', 'shift_id', p_shift,
