@@ -493,53 +493,78 @@ describe('exceptions report: deleted documents', () => {
 
 describe('safeTables', () => {
   const labels = {
-    safeIn: 'in',
-    safeOut: 'out',
     safeSummary: 'summary',
-    safeAdjust: 'adjust',
     safeNet: 'net',
-    safeOwnerNote: 'owner',
     legacy: 'old',
     item: 'item',
+    count: 'count',
     amount: 'amount',
     total: 'total',
   } as Record<string, string>;
   const base = {
-    in: [
-      { key: 'cash_sales', amount: 10000 },
-      { key: 'card_sales', amount: 2500 },
+    sections: [
+      {
+        key: 'sales',
+        total: 9000,
+        lines: [
+          { key: 'cash_sales', sign: 1, amount: 10000, count: 2 },
+          { key: 'cash_sales_returns', sign: -1, amount: 1000, count: 1 },
+        ],
+      },
+      { key: 'purchases', total: 3000, lines: [{ key: 'cash_purchases', sign: 1, amount: 3000, count: 1 }] },
+      { key: 'expenses', total: 500, lines: [{ key: 'shop_expenses', sign: 1, amount: 500, count: 1 }] },
+      { key: 'payroll', total: 1000, lines: [{ key: 'advances', sign: 1, amount: 1000, count: 1 }] },
+      { key: 'excluded', total: 0, lines: [{ key: 'transfers_sales', sign: 0, amount: 2500, count: 1 }] },
     ],
-    out: [{ key: 'expenses', amount: 4000 }],
-    adjust: [{ key: 'voids', amount: -1000 }],
-    total_in: 12500,
-    total_out: 4000,
-    adjust_total: -1000,
-    net: 7500,
-    owner_paid: 0,
+    net: 4500,
     legacy_count: 0,
+    cash_now: { total: 0 },
+    returns_today: { returns_count: 0, returns_total: 0, voided_count: 0, voided_total: 0, today_total: 0 },
   };
-  it('lists money in and out with totals, and a summary whose net counts the signed adjustments', () => {
-    const [inT, outT, sum] = safeTables(base, labels, (k) => `k:${k}`);
-    expect(inT!.rows).toEqual([
-      ['k:cash_sales', '100.00'],
-      ['k:card_sales', '25.00'],
+  it('one table per section, the lines that take off are marked, the excluded section has no total', () => {
+    const tables = safeTables(
+      base,
+      labels,
+      (k) => `l:${k}`,
+      (k) => `s:${k}`,
+    );
+    expect(tables.map((x) => x.title)).toEqual([
+      's:sales',
+      's:purchases',
+      's:expenses',
+      's:payroll',
+      's:excluded',
+      'summary',
     ]);
-    expect(inT!.totals).toEqual(['total', '125.00']);
-    expect(outT!.rows).toEqual([['k:expenses', '40.00']]);
-    expect(sum!.rows).toEqual([
-      ['in', '125.00'],
-      ['out', '40.00'],
-      ['adjust', '-10.00'],
-      ['net', '75.00'],
+    expect(tables[0]!.rows).toEqual([
+      ['l:cash_sales', '2', '100.00'],
+      ['− l:cash_sales_returns', '1', '10.00'],
     ]);
-    expect(sum!.note).toBeUndefined();
+    expect(tables[0]!.totals).toEqual(['total', '', '90.00']);
+    expect(tables[4]!.totals).toBeUndefined();
   });
-  it('says what was paid from the owner pocket and how many old documents are in', () => {
-    const [, , sum] = safeTables({ ...base, owner_paid: 6000, legacy_count: 3 }, labels, (k) => k);
-    expect(sum!.note).toBe('owner: 60.00 · old: 3');
-  });
-  it('hides the adjustment row when there is none', () => {
-    const [, , sum] = safeTables({ ...base, adjust: [], adjust_total: 0, net: 8500 }, labels, (k) => k);
-    expect(sum!.rows.map((r) => r[0])).toEqual(['in', 'out', 'net']);
+  it('the summary takes purchases, expenses and payroll off the sales and ends at the net', () => {
+    const sum = safeTables(
+      base,
+      labels,
+      (k) => k,
+      (k) => k,
+    )[5]!;
+    expect(sum.rows).toEqual([
+      ['sales', '90.00'],
+      ['− purchases', '30.00'],
+      ['− expenses', '5.00'],
+      ['− payroll', '10.00'],
+    ]);
+    expect(sum.totals).toEqual(['net', '45.00']);
+    expect(sum.note).toBeUndefined();
+    expect(
+      safeTables(
+        { ...base, legacy_count: 3 },
+        labels,
+        (k) => k,
+        (k) => k,
+      )[5]!.note,
+    ).toBe('old: 3');
   });
 });

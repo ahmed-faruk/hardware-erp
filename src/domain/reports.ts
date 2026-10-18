@@ -124,49 +124,72 @@ export function supplierDetailTables(d: SupplierDetailData, t: ReportLabels): Re
   }));
 }
 
+export interface SafeLine {
+  key: string;
+  /** 1 adds to its section, -1 takes off, 0 is listed only (the «excluded» section) */
+  sign: number;
+  amount: number;
+  count: number;
+}
+export interface SafeSection {
+  key: string;
+  total: number;
+  lines: SafeLine[];
+}
 export interface SafeData {
-  in: { key: string; amount: number }[];
-  out: { key: string; amount: number }[];
-  adjust: { key: string; amount: number }[];
-  total_in: number;
-  total_out: number;
-  adjust_total: number;
+  sections: SafeSection[];
   net: number;
-  owner_paid: number;
   legacy_count: number;
+  cash_now: { total: number };
+  returns_today: {
+    returns_count: number;
+    returns_total: number;
+    voided_count: number;
+    voided_total: number;
+    today_total: number;
+  };
+}
+/** One line of «الخزنة» with the documents it was added up from (server: report_safe_detail). */
+export interface SafeDetail {
+  key: string;
+  count: number;
+  total: number;
+  rows: {
+    at: string;
+    number: string;
+    party: string | null;
+    method: string | null;
+    amount: number;
+    source: string;
+  }[];
 }
 
-/** «الخزنة»: the money that came in, the money that went out, and the summary (adjustments carry their sign). */
-export function safeTables(d: SafeData, t: ReportLabels, keyName: (k: string) => string): ReportTable[] {
-  const lines = (rows: { key: string; amount: number }[]): string[][] =>
-    rows.map((r) => [keyName(r.key), m(r.amount)]);
-  const notes = [
-    d.owner_paid > 0 ? `${t.safeOwnerNote}: ${m(d.owner_paid)}` : '',
-    d.legacy_count > 0 ? `${t.legacy}: ${d.legacy_count}` : '',
-  ].filter(Boolean);
+/** «الخزنة» for print and CSV: one table per section (lines with their count), then the sum down to the net. */
+export function safeTables(
+  d: SafeData,
+  t: ReportLabels,
+  lineName: (k: string) => string,
+  sectionName: (k: string) => string,
+): ReportTable[] {
+  const total = (k: string): number => d.sections.find((s) => s.key === k)?.total ?? 0;
   return [
-    {
-      title: t.safeIn!,
-      headers: [t.item!, t.amount!],
-      rows: lines(d.in),
-      totals: [t.total!, m(d.total_in)],
-    },
-    {
-      title: t.safeOut!,
-      headers: [t.item!, t.amount!],
-      rows: lines(d.out),
-      totals: [t.total!, m(d.total_out)],
-    },
+    ...d.sections.map((s): ReportTable => ({
+      title: sectionName(s.key),
+      headers: [t.item!, t.count!, t.amount!],
+      rows: s.lines.map((l) => [`${l.sign < 0 ? '− ' : ''}${lineName(l.key)}`, String(l.count), m(l.amount)]),
+      ...(s.key === 'excluded' ? {} : { totals: [t.total!, '', m(s.total)] }),
+    })),
     {
       title: t.safeSummary!,
       headers: [t.item!, t.amount!],
       rows: [
-        [t.safeIn!, m(d.total_in)],
-        [t.safeOut!, m(d.total_out)],
-        ...(d.adjust.length > 0 ? [[t.safeAdjust!, m(d.adjust_total)]] : []),
-        [t.safeNet!, m(d.net)],
+        [sectionName('sales'), m(total('sales'))],
+        [`− ${sectionName('purchases')}`, m(total('purchases'))],
+        [`− ${sectionName('expenses')}`, m(total('expenses'))],
+        [`− ${sectionName('payroll')}`, m(total('payroll'))],
       ],
-      note: notes.length > 0 ? notes.join(' · ') : undefined,
+      totals: [t.safeNet!, m(d.net)],
+      note: d.legacy_count > 0 ? `${t.legacy}: ${d.legacy_count}` : undefined,
     },
   ];
 }
