@@ -251,3 +251,17 @@
   inline-size: 24px;
   block-size: 24px;
 }
+
+/* a report line that opens its documents: a text link with a full-size tap target */
+.linkButton {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding-inline: var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--primary-strong);
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+}

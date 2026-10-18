@@ -36,7 +36,8 @@ import { CategoryReport } from './CategoryReport';
 import { PeriodBar } from './PeriodBar';
 import { ReportActions, ReportTableView } from './ReportParts';
 import { ProductHistory } from './ProductHistory';
-import { SafeCards, type SafeCardsData } from './SafeCards';
+import { SafeCards } from './SafeCards';
+import { SafeReport } from './SafeReport';
 import { SmartReport } from './SmartReport';
 
 type Tab =
@@ -87,7 +88,8 @@ const reasonName = (r: string): string =>
   r;
 const methodName = (k: string): string => (strings.receipt.pay as Record<string, string>)[k] ?? k;
 const returnReason = (k: string): string => (strings.reports.returnReasons as Record<string, string>)[k] ?? k;
-const safeKeyName = (k: string): string => strings.reports.safeKeys[k] ?? k;
+const safeLineName = (k: string): string => strings.reports.safeLines[k] ?? k;
+const safeSectionName = (k: string): string => strings.reports.safeSections[k] ?? k;
 const returnMethod = (k: string): string => (strings.reports.returnMethods as Record<string, string>)[k] ?? k;
 
 /** Manager reports: sales, profit, exceptions and devices come from the server (they include the old OpenSourcePOS history); stock comes from this device. */
@@ -151,7 +153,7 @@ export function ReportsScreen() {
       };
       const tables =
         tab === 'safe'
-          ? safeTables(d as SafeData, t, (k) => safeKeyName(k))
+          ? safeTables(d as SafeData, t, safeLineName, safeSectionName)
           : tab === 'sales'
             ? salesTables(d, t, methodName)
             : tab === 'profit'
@@ -197,7 +199,7 @@ export function ReportsScreen() {
             (RESULTS.get(key)?.value.tables ?? null);
   const safeRaw =
     tab === 'safe'
-      ? ((loaded?.key === key ? loaded.raw : RESULTS.get(key)?.value.raw) as SafeCardsData | undefined)
+      ? ((loaded?.key === key ? loaded.raw : RESULTS.get(key)?.value.raw) as SafeData | undefined)
       : undefined;
   const error =
     tab !== 'stock' &&
@@ -292,7 +294,11 @@ export function ReportsScreen() {
                 upTo={upTo}
                 filename={`${tab}-${from}-${to}`}
               />
-              <ReportTableView tables={tables} />
+              {tab === 'safe' && safeRaw ? (
+                <SafeReport data={safeRaw} from={from} to={to} />
+              ) : (
+                <ReportTableView tables={tables} />
+              )}
             </>
           )}
         </>
