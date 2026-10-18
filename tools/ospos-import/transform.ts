@@ -497,8 +497,8 @@ export function transform(data: OsposExport): TransformResult {
     note('REQUISITIONS_SKIPPED', 'receivings with zero total (requisitions): not imported as purchases');
 
   // ---- expenses --------------------------------------------------------------------------------------------------
-  // the only two active types after the import (owner decision 2026-10-12, kept on every reload)
-  for (const name of ['مشتريات', 'مصروفات محل'])
+  // the only active type after the import (owner decision 2026-10-19, kept on every reload)
+  for (const name of ['مصروفات محل'])
     push('expense_categories', { ...common(legacyId('expense-category-v2', name)), name, icon: null });
   const expenseCategoryId = new Map<string, string>();
   for (const name of [...new Set(data.expenses.map((e) => cleanText(e.category_name)).filter(Boolean))].sort(
@@ -506,7 +506,7 @@ export function transform(data: OsposExport): TransformResult {
   )) {
     const id = legacyId('expense-category', name);
     expenseCategoryId.set(name, id);
-    // old types stay on old expenses (their names show in the reports) but are retired: only the two real types are offered
+    // old types stay on old expenses (their names show in the reports) but are retired: only «مصروفات محل» is offered
     push('expense_categories', { ...common(id), name, icon: null, deleted_at: exportedAt });
   }
   const uncategorized = legacyId('expense-category', '__none__');

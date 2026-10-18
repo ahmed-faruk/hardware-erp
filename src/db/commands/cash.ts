@@ -117,7 +117,9 @@ export async function closeShift(
 const expenseInput = z.object({
   categoryId: id,
   amount: z.number().int().positive(),
-  cashAccountId: id,
+  /** 'safe' = cash leaves the box (an account is needed); 'owner' = paid from outside the box (no account, no cash) */
+  source: z.enum(['safe', 'owner']).default('safe'),
+  cashAccountId: id.nullable().default(null),
   shiftId: id.nullable().default(null),
 });
 
@@ -131,29 +133,37 @@ export async function postExpense(
   const input = parsed.data;
   if (canCtx(ctx, 'recordExpense') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
+  const outside = input.source === 'owner';
   const [category, account] = await Promise.all([
     db.expenseCategories.get(input.categoryId),
-    db.cashAccounts.get(input.cashAccountId),
+    outside || !input.cashAccountId ? Promise.resolve(undefined) : db.cashAccounts.get(input.cashAccountId),
   ]);
-  if (!category || category.deletedAt || !account || account.deletedAt)
-    return err('NOT_FOUND', 'بيانات ناقصة');
-  const ownDrawer =
-    (account.kind === 'drawer' && account.ownerDeviceId === ctx.deviceId) || account.kind === 'safe';
-  if (ctx.role !== 'manager' && !ownDrawer) return err('E_FORBIDDEN', 'من درج الجهاز بس');
-  if (ownDrawer && input.shiftId && input.amount > (await drawerBalance(db, input.shiftId)))
-    return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
+  if (!category || category.deletedAt) return err('NOT_FOUND', 'بيانات ناقصة');
+  // paid from outside the box (owner decision 2026-10-19): no account, no cash movement, no drawer check
+  if (!outside && (!account || account.deletedAt)) return err('NOT_FOUND', 'بيانات ناقصة');
+  if (account) {
+    const ownDrawer =
+      (account.kind === 'drawer' && account.ownerDeviceId === ctx.deviceId) || account.kind === 'safe';
+    if (ctx.role !== 'manager' && !ownDrawer) return err('E_FORBIDDEN', 'من درج الجهاز بس');
+    if (ownDrawer && input.shiftId && input.amount > (await drawerBalance(db, input.shiftId)))
+      return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
+  }
   const expenseId = uuidv7();
   const at = nowIso();
-  const movement: CashMovement = {
-    ...newCommon(ctx),
-    cashAccountId: account.id,
-    shiftId: input.shiftId,
-    amount: -input.amount,
-    method: 'cash',
-    docType: 'expense',
-    docId: expenseId,
-    occurredAt: at,
-  };
+  const movements: CashMovement[] = account
+    ? [
+        {
+          ...newCommon(ctx),
+          cashAccountId: account.id,
+          shiftId: input.shiftId,
+          amount: -input.amount,
+          method: 'cash',
+          docType: 'expense',
+          docId: expenseId,
+          occurredAt: at,
+        },
+      ]
+    : [];
   return db.transaction(
     'rw',
     [db.expenses, db.cashMovements, db.auditLog, db.numberSequences, db.outbox, db.syncState],
@@ -173,7 +183,8 @@ export async function postExpense(
         legacy: null,
         categoryId: category.id,
         amount: input.amount,
-        cashAccountId: account.id,
+        cashAccountId: account?.id ?? null,
+        source: input.source,
         supplierId: null,
       };
       const a = audit(
@@ -185,9 +196,9 @@ export async function postExpense(
         at,
       );
       await db.expenses.add(doc);
-      await db.cashMovements.add(movement);
+      if (movements.length) await db.cashMovements.bulkAdd(movements);
       await db.auditLog.add(a);
-      await enqueue(db, 'expenses', { ...doc, cashMovements: [movement] }, ctx.workerId);
+      await enqueue(db, 'expenses', { ...doc, cashMovements: movements }, ctx.workerId);
       await enqueue(db, 'auditLog', a, ctx.workerId);
       return { ok: true as const, id: expenseId, number };
     },

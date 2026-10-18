@@ -25,7 +25,7 @@ create function pg_temp.expense(p_number text, amount bigint) returns jsonb lang
   with v as (select gen_random_uuid() eid)
   select pg_temp.row_of('expenses', 'a0000000-0000-7000-8000-0000000000d1', jsonb_build_object('id', eid, 'number', p_number, 'issued_at', now(),
     'worker_id', 'a0000000-0000-7000-8000-0000000000d1', 'created_by', 'a0000000-0000-7000-8000-0000000000d1',
-    'category_id', 'a0000000-0000-7000-8000-000000000e01', 'amount', amount, 'cash_account_id', 'a0000000-0000-7000-8000-000000000a13',
+    'category_id', 'a0000000-0000-7000-8000-000000000e02', 'amount', amount, 'cash_account_id', 'a0000000-0000-7000-8000-000000000a13',
     'cash_movements', jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'created_by', 'a0000000-0000-7000-8000-0000000000d1', 'cash_account_id', 'a0000000-0000-7000-8000-000000000a13',
       'amount', -amount, 'method', 'cash', 'doc_type', 'expense', 'doc_id', eid, 'occurred_at', now())))) from v;
 $$;

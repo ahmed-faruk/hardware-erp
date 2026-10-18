@@ -133,14 +133,14 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
   await page.keyboard.press('Enter');
   await page.getByTestId('collect-save').click();
 
-  // 4. the two expense types, 5.00 and 3.00 from the drawer
+  // 4. two shop expenses, 5.00 and 3.00 from the drawer (the only expense type)
   for (const [cat, amount] of [
     ['مصروفات محل', '5'],
-    ['مشتريات', '3'],
+    ['مصروفات محل', '3'],
   ] as const) {
     await page.getByTestId('shift-menu').click();
     await page.getByTestId('shift-expense').click();
-    await expect(page.locator('[data-testid^="expense-cat-"]')).toHaveText(['مشتريات', 'مصروفات محل']);
+    await expect(page.locator('[data-testid^="expense-cat-"]')).toHaveText(['مصروفات محل']);
     await page.getByTestId(`expense-cat-${cat}`).click();
     await page.keyboard.type(amount);
     await page.keyboard.press('Enter');
@@ -302,7 +302,7 @@ test('a whole shop day with every feature, two devices, and every ledger and rep
   await page.getByTestId('report-tab-expenses').click();
   await page.getByTestId('period-today').click();
   await expect(page.getByTestId('report-table-0')).toContainText('مصروفات محل');
-  await expect(page.getByTestId('report-table-0')).toContainText('مشتريات');
+  await expect(page.getByTestId('report-table-0')).not.toContainText('مشتريات');
   await expect(page.getByTestId('report-totals-0')).toContainText(formatMoney(expTotal));
   await page.getByTestId('report-tab-sales').click();
   await page.getByTestId('period-today').click();

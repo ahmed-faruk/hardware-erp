@@ -4,7 +4,7 @@ import { expect } from 'e2e';
 import { login, newCashierFixture, openShift, sql, typeKeys } from './helpers';
 
 describe('expense types', () => {
-  test('only مشتريات and مصروفات محل are offered, and an expense on one reaches the server', async ({
+  test('only مصروفات محل is offered, and an expense on it reaches the server', async ({
     app,
     screen,
     browser,
@@ -15,7 +15,7 @@ describe('expense types', () => {
     await openShift(screen, browser);
     await screen.getByTestId('shift-menu').tap();
     await screen.getByTestId('shift-expense').tap();
-    await expect(screen.getByTestId('expense-cat-مشتريات')).toBeVisible();
+    await expect(screen.getByTestId('expense-cat-مشتريات')).toHaveCount(0);
     await expect(screen.getByTestId('expense-cat-مصروفات محل')).toBeVisible();
     await screen.getByTestId('expense-cat-مصروفات محل').tap();
     await typeKeys(browser, '5');

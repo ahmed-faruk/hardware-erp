@@ -1,5 +1,5 @@
 begin;
-select plan(9);
+select plan(10);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -23,29 +23,29 @@ create function pg_temp.push(p_row jsonb) returns text language sql as $$
   select pg_temp.code(ingest_batch('a0000000-0000-7000-8000-0000000000f1', '0', jsonb_build_array(p_row)));
 $$;
 
--- old types, like the ones the owner made by hand; "Transport" is also in the seed
+-- old types, like the ones the owner made by hand
 insert into expense_categories (id, company_id, name) values
   ('a0000000-0000-7000-8000-0000000008b1', 'a0000000-0000-7000-8000-000000000001', 'كهرباء'),
   ('a0000000-0000-7000-8000-0000000008b2', 'a0000000-0000-7000-8000-000000000001', 'نثريات');
 insert into expenses (id, company_id, number, issued_at, category_id, amount, cash_account_id, is_legacy, status) values
   ('a0000000-0000-7000-8000-0000000008c1', 'a0000000-0000-7000-8000-000000000001', 'K1-EXP-910001', '2026-10-02 10:00:00+00', 'a0000000-0000-7000-8000-0000000008b1', 2500, 'a0000000-0000-7000-8000-000000000a13', false, 'posted');
--- the seed has "مشتريات" already (reused, not duplicated); the shop type is created by the function
+-- the shop type is created by the function when it is missing
 delete from expense_categories where name = 'مصروفات محل';
 
 select apply_expense_types();
 
-select is((select count(*)::int from expense_categories where company_id = 'a0000000-0000-7000-8000-000000000001' and deleted_at is null), 2, 'B1 exactly two types are active');
-select is((select string_agg(name, ',' order by name) from expense_categories where company_id = 'a0000000-0000-7000-8000-000000000001' and deleted_at is null), 'مشتريات,مصروفات محل', 'B1 they are مشتريات and مصروفات محل');
-select is((select count(*)::int from expense_categories where company_id = 'a0000000-0000-7000-8000-000000000001' and name = 'مشتريات'), 1, 'B2 an existing name is reused, not duplicated');
+select is((select count(*)::int from expense_categories where company_id = 'a0000000-0000-7000-8000-000000000001' and deleted_at is null), 1, 'B1 exactly one type is active');
+select is((select string_agg(name, ',' order by name) from expense_categories where company_id = 'a0000000-0000-7000-8000-000000000001' and deleted_at is null), 'مصروفات محل', 'B1 it is مصروفات محل');
+select ok((select deleted_at is not null from expense_categories where id = 'a0000000-0000-7000-8000-000000000e01'), '«مشتريات» is retired (owner decision 2026-10-19)');
 select ok((select deleted_at is not null from expense_categories where id = 'a0000000-0000-7000-8000-0000000008b1'), 'the old types are retired');
 select ok((select updated_at > now() - interval '1 minute' and version = 2 from expense_categories where id = 'a0000000-0000-7000-8000-0000000008b1'), 'retiring bumps updated_at and version so devices pull it');
-select is((select count(*)::int from expense_categories where company_id = 'b0000000-0000-7000-8000-000000000001' and deleted_at is null), 2, 'another company gets its own two types');
+select is((select count(*)::int from expense_categories where company_id = 'b0000000-0000-7000-8000-000000000001' and deleted_at is null), 1, 'another company gets its own one type');
 select is((report_expenses_core('a0000000-0000-7000-8000-000000000001', '2026-10-01', '2026-10-31') -> 'by_category' -> 0 ->> 'category'), 'كهرباء', 'B7 the old expense still shows its retired type name in the report');
-
 select is((select push_action from sync_tables where table_name = 'expense_categories'), null, 'B8 devices can no longer push expense types');
 
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
 select is(pg_temp.push(pg_temp.expense('K1-EXP-910002', 'a0000000-0000-7000-8000-0000000008b2')), 'E_VALIDATION', 'B3 a new expense on a retired type is refused');
+select is(pg_temp.push(pg_temp.expense('K1-EXP-910003', 'a0000000-0000-7000-8000-000000000e01')), 'E_VALIDATION', 'a new expense on «مشتريات» is refused');
 
 select * from finish();
 rollback;

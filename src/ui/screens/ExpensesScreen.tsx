@@ -15,6 +15,7 @@ import { type Column, DataTable } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { FormField } from '../components/FormField';
 import { NumberField } from '../components/NumberField';
+import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { strings } from '../strings.ar';
 
@@ -31,7 +32,7 @@ const failWord = (code: string): string =>
         ? strings.expenseEdit.legacy
         : strings.expenseEdit.failed;
 
-/** Manager: expenses from any account, cash transfers between accounts, and the list of expense categories the cashier picks from. */
+/** Manager: expenses (from the box or from outside it, only the shop type), cash transfers and adjustments, and the latest 100 expenses. */
 export function ExpensesScreen() {
   const { db } = useServices();
   const { context, can } = useSession();
@@ -57,6 +58,7 @@ export function ExpensesScreen() {
         amount: e.amount as number,
         category: names.get(e.categoryId as string) ?? '',
         categoryId: e.categoryId as string,
+        source: (e.source as string | undefined) ?? 'safe',
         status: e.status,
         isLegacy: e.isLegacy,
       }));
@@ -83,6 +85,11 @@ export function ExpensesScreen() {
       cell: (r) => <span dir="ltr">{cairoTime(r.issuedAt)}</span>,
     },
     { key: 'category', header: strings.cash.category, cell: (r) => r.category },
+    {
+      key: 'source',
+      header: strings.expenseSource.label,
+      cell: (r) => (r.source === 'owner' ? strings.expenseSource.owner : strings.expenseSource.safe),
+    },
     { key: 'amount', header: strings.cash.amount, numeric: true, cell: (r) => formatMoney(r.amount) },
     {
       key: 'actions',
@@ -201,7 +208,7 @@ function MoneyForm({
 }: {
   kind: 'expense' | 'transfer' | 'adjust';
   categories: { id: string; name: string }[];
-  accounts: { id: string; name: string }[];
+  accounts: { id: string; name: string; kind?: string }[];
   editing?: Editing;
   onDone: (word?: string) => void;
 }) {
@@ -212,6 +219,9 @@ function MoneyForm({
       : (categories[0]?.id ?? ''),
   );
   const [from, setFrom] = useState(accounts[0]?.id ?? '');
+  const [source, setSource] = useState<'safe' | 'owner'>('safe');
+  // the shop has one box: an expense from the box always comes out of it
+  const boxId = accounts.find((a) => a.kind === 'safe')?.id ?? accounts[0]?.id ?? '';
   const [to, setTo] = useState(accounts[1]?.id ?? '');
   const [amount, setAmount] = useState<number | null>(editing?.amount ?? null);
   const [sign, setSign] = useState<'plus' | 'minus'>('minus');
@@ -253,7 +263,12 @@ function MoneyForm({
     }
     const r =
       kind === 'expense'
-        ? await postExpense(context, { categoryId, amount, cashAccountId: from })
+        ? await postExpense(context, {
+            categoryId,
+            amount,
+            source,
+            cashAccountId: source === 'safe' ? boxId : null,
+          })
         : kind === 'adjust'
           ? await postCashAdjustment(context, {
               cashAccountId: from,
@@ -270,14 +285,19 @@ function MoneyForm({
       <div className={styles.section}>
         {kind === 'expense' &&
           select(strings.cash.category, categoryId, setCategoryId, categories, 'expense-category')}
-        {!editing &&
-          select(
-            kind === 'expense' ? strings.supplierPay.account : strings.cash.from,
-            from,
-            setFrom,
-            accounts,
-            'money-from',
-          )}
+        {kind === 'expense' && !editing && (
+          <SegmentedControl
+            label={strings.expenseSource.label}
+            options={[
+              { key: 'safe', label: strings.expenseSource.safe },
+              { key: 'owner', label: strings.expenseSource.owner },
+            ]}
+            value={source}
+            onChange={setSource}
+            testIdPrefix="expense-source-"
+          />
+        )}
+        {kind !== 'expense' && select(strings.cash.from, from, setFrom, accounts, 'money-from')}
         {kind === 'transfer' && select(strings.cash.to, to, setTo, accounts, 'money-to')}
         {kind === 'adjust' && (
           <>

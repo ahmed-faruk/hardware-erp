@@ -701,7 +701,7 @@ export const strings = {
     category: 'التصنيف',
     share: 'النسبة',
     noCategory: 'بدون تصنيف',
-    noAccount: 'بدون حساب',
+    noAccount: 'من خارج الخزنة',
     byAccount: 'حسب الحساب',
     byDay: 'حسب اليوم',
     list: 'القائمة',
@@ -1120,6 +1120,11 @@ export const strings = {
     already: 'المصروف محذوف قبل كده',
     legacy: 'ده مصروف قديم من النظام القديم',
     failed: 'ماتحفظش',
+  },
+  expenseSource: {
+    label: 'اتدفع منين',
+    safe: 'من الخزنة',
+    owner: 'من خارج الخزنة',
   },
   payrollEdit: {
     edit: 'تعديل',

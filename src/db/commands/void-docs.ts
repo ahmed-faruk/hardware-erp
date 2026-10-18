@@ -134,7 +134,8 @@ export async function editExpense(
         const p = await postExpense(ctx, {
           categoryId: input.categoryId,
           amount: input.amount,
-          cashAccountId: old.cashAccountId as string,
+          source: old.source === 'owner' ? 'owner' : 'safe',
+          cashAccountId: (old.cashAccountId as string | null) ?? null,
         });
         if (!p.ok) throw new Rollback(p);
         return p;
