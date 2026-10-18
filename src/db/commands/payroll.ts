@@ -38,6 +38,9 @@ export async function loadPayrollEntries(
   employeeId: string,
 ): Promise<PayrollEntry[]> {
   return (await db.payrollEntries.where('employeeId').equals(employeeId).toArray()).map((r) => ({
+    id: r.id,
+    number: r.number,
+    note: (r.notes as string | null) ?? null,
     employeeId: r.employeeId as string,
     kind: r.kind as PayrollEntry['kind'],
     month: r.month as string,

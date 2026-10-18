@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { payrollState, salarySlip, type PayrollEntry } from './payroll';
+import { payrollEntryLocked, payrollState, salarySlip, type PayrollEntry } from './payroll';
 
 describe('salarySlip', () => {
   it('pays what is left after the advances, the deductions and what carried in', () => {
@@ -75,5 +75,51 @@ describe('payrollState', () => {
     expect(nov.carryIn).toBe(20000);
     expect(nov.slip.net).toBe(250000);
     expect(payrollState(later, 'w1', 300000, '2026-10').paid).toBe(true);
+  });
+});
+
+describe('payrollEntryLocked', () => {
+  const base = { employeeId: 'w1', status: 'posted' as const, net: null, carryOut: null };
+  const salary: PayrollEntry = {
+    ...base,
+    kind: 'salary',
+    month: '2026-09',
+    amount: 100000,
+    issuedAt: '2026-09-30T10:00:00Z',
+  };
+  it('locks a deduction of a paid month only', () => {
+    const paid: PayrollEntry = {
+      ...base,
+      kind: 'deduction',
+      month: '2026-09',
+      amount: 100,
+      issuedAt: '2026-09-10T10:00:00Z',
+    };
+    const open: PayrollEntry = { ...paid, month: '2026-10', issuedAt: '2026-10-02T10:00:00Z' };
+    expect(payrollEntryLocked([salary, paid, open], paid)).toBe(true);
+    expect(payrollEntryLocked([salary, paid, open], open)).toBe(false);
+  });
+  it('locks an advance a later salary took, not one given after it', () => {
+    const before: PayrollEntry = {
+      ...base,
+      kind: 'advance',
+      month: '2026-09',
+      amount: 500,
+      issuedAt: '2026-09-15T10:00:00Z',
+    };
+    const after: PayrollEntry = { ...before, month: '2026-10', issuedAt: '2026-10-01T10:00:00Z' };
+    expect(payrollEntryLocked([salary, before, after], before)).toBe(true);
+    expect(payrollEntryLocked([salary, before, after], after)).toBe(false);
+  });
+  it('a voided salary locks nothing; a salary entry itself is always locked', () => {
+    const before: PayrollEntry = {
+      ...base,
+      kind: 'advance',
+      month: '2026-09',
+      amount: 500,
+      issuedAt: '2026-09-15T10:00:00Z',
+    };
+    expect(payrollEntryLocked([{ ...salary, status: 'voided' }, before], before)).toBe(false);
+    expect(payrollEntryLocked([salary], salary)).toBe(true);
   });
 });
