@@ -244,7 +244,11 @@ export function exceptionsTables(
           ? t.voidSalesReturn
           : r.target_type === 'purchase_invoice'
             ? t.voidPurchaseInvoice
-            : t.voidSalesInvoice) ?? '',
+            : r.target_type === 'expense'
+              ? t.voidExpense
+              : r.target_type === 'payroll_entry'
+                ? t.voidPayrollEntry
+                : t.voidSalesInvoice) ?? '',
         r.target_number ?? '—',
         time(r.at),
         reasonName(r.reason),

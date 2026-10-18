@@ -1,12 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { CASH_ADJUST_REASONS, postCashAdjustment, postCashTransfer, postExpense } from '@/db/commands/cash';
+import { editExpense, voidExpense } from '@/db/commands/void-docs';
 import { formatMoney, toPiasters } from '@/domain/money';
 import { cairoTime } from '@/domain/receipt';
 
+import { UndoToast } from '../cashier/UndoToast';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { type Column, DataTable } from '../components/DataTable';
@@ -18,10 +20,27 @@ import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
 
+type Editing = { id: string; categoryId: string; amount: number };
+
+const failWord = (code: string): string =>
+  code === 'NO_SHIFT'
+    ? strings.expenseEdit.noShift
+    : code === 'ALREADY_VOIDED'
+      ? strings.expenseEdit.already
+      : code === 'LEGACY'
+        ? strings.expenseEdit.legacy
+        : strings.expenseEdit.failed;
+
 /** Manager: expenses from any account, cash transfers between accounts, and the list of expense categories the cashier picks from. */
 export function ExpensesScreen() {
   const { db } = useServices();
+  const { context, can } = useSession();
   const [open, setOpen] = useState<'expense' | 'transfer' | 'adjust' | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'danger'; word: string } | null>(null);
+  const running = useRef(false);
+  const mayEdit = can('voidExpense') === 'yes';
   const data = useLiveQuery(async () => {
     // old types stay on old expenses (their names show in the list) but only the two current types can be picked
     const allCategories = await db.expenseCategories.toArray();
@@ -37,9 +56,24 @@ export function ExpensesScreen() {
         issuedAt: e.issuedAt,
         amount: e.amount as number,
         category: names.get(e.categoryId as string) ?? '',
+        categoryId: e.categoryId as string,
+        status: e.status,
+        isLegacy: e.isLegacy,
       }));
     return { categories, accounts, rows };
   }, [db]);
+  const runDelete = (): void => {
+    const id = pending;
+    setPending(null);
+    if (!context || !id || running.current) return;
+    running.current = true;
+    void voidExpense(context, { expenseId: id, reason: 'mistake' }).then((r) => {
+      running.current = false;
+      setNotice(
+        r.ok ? { tone: 'ok', word: strings.expenseEdit.done } : { tone: 'danger', word: failWord(r.code) },
+      );
+    });
+  };
   if (!data) return <Skeleton />;
   const columns: Column<(typeof data.rows)[number]>[] = [
     { key: 'number', header: strings.purchases.number, cell: (r) => <span dir="ltr">{r.number}</span> },
@@ -50,10 +84,49 @@ export function ExpensesScreen() {
     },
     { key: 'category', header: strings.cash.category, cell: (r) => r.category },
     { key: 'amount', header: strings.cash.amount, numeric: true, cell: (r) => formatMoney(r.amount) },
+    {
+      key: 'actions',
+      header: '',
+      cell: (r) =>
+        r.status === 'voided' ? (
+          <strong data-testid={`expense-voided-${r.number}`}>{strings.voidInvoice.deleted}</strong>
+        ) : mayEdit && !r.isLegacy ? (
+          <>
+            <ActionButton
+              label={strings.expenseEdit.edit}
+              icon={Pencil}
+              variant="ghost"
+              onClick={() => {
+                setNotice(null);
+                setEditing({ id: r.id, categoryId: r.categoryId, amount: r.amount });
+              }}
+              testId={`edit-expense-${r.number}`}
+            />
+            <ActionButton
+              label={strings.expenseEdit.delete}
+              icon={Trash2}
+              variant="danger"
+              onClick={() => {
+                setNotice(null);
+                setPending(r.id);
+              }}
+              testId={`delete-expense-${r.number}`}
+            />
+          </>
+        ) : null,
+    },
   ];
   return (
     <section>
       <h1 className={styles.title}>{strings.cash.expenses}</h1>
+      {notice && <BigAlert tone={notice.tone} word={notice.word} />}
+      {pending && (
+        <UndoToast
+          message={strings.expenseEdit.deleting}
+          onUndo={() => setPending(null)}
+          onExpire={runDelete}
+        />
+      )}
       <div className={styles.toolbar}>
         <div className={styles.fixed}>
           <ActionButton
@@ -101,6 +174,20 @@ export function ExpensesScreen() {
           />
         )}
       </Dialog>
+      <Dialog title={strings.expenseEdit.title} open={editing !== null} onClose={() => setEditing(null)}>
+        {editing && (
+          <MoneyForm
+            kind="expense"
+            categories={data.categories}
+            accounts={data.accounts}
+            editing={editing}
+            onDone={(word) => {
+              setEditing(null);
+              if (word) setNotice({ tone: 'ok', word });
+            }}
+          />
+        )}
+      </Dialog>
     </section>
   );
 }
@@ -109,18 +196,24 @@ function MoneyForm({
   kind,
   categories,
   accounts,
+  editing,
   onDone,
 }: {
   kind: 'expense' | 'transfer' | 'adjust';
   categories: { id: string; name: string }[];
   accounts: { id: string; name: string }[];
-  onDone: () => void;
+  editing?: Editing;
+  onDone: (word?: string) => void;
 }) {
   const { context } = useSession();
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
+  const [categoryId, setCategoryId] = useState(
+    editing && categories.some((c) => c.id === editing.categoryId)
+      ? editing.categoryId
+      : (categories[0]?.id ?? ''),
+  );
   const [from, setFrom] = useState(accounts[0]?.id ?? '');
   const [to, setTo] = useState(accounts[1]?.id ?? '');
-  const [amount, setAmount] = useState<number | null>(null);
+  const [amount, setAmount] = useState<number | null>(editing?.amount ?? null);
   const [sign, setSign] = useState<'plus' | 'minus'>('minus');
   const [reason, setReason] = useState<(typeof CASH_ADJUST_REASONS)[number]>('count_error');
   const [note, setNote] = useState('');
@@ -152,6 +245,12 @@ function MoneyForm({
   );
   const save = async (): Promise<void> => {
     if (!context || !amount) return;
+    if (editing) {
+      const r = await editExpense(context, { expenseId: editing.id, categoryId, amount });
+      if (r.ok) onDone(strings.expenseEdit.edited);
+      else setError(failWord(r.code));
+      return;
+    }
     const r =
       kind === 'expense'
         ? await postExpense(context, { categoryId, amount, cashAccountId: from })
@@ -171,13 +270,14 @@ function MoneyForm({
       <div className={styles.section}>
         {kind === 'expense' &&
           select(strings.cash.category, categoryId, setCategoryId, categories, 'expense-category')}
-        {select(
-          kind === 'expense' ? strings.supplierPay.account : strings.cash.from,
-          from,
-          setFrom,
-          accounts,
-          'money-from',
-        )}
+        {!editing &&
+          select(
+            kind === 'expense' ? strings.supplierPay.account : strings.cash.from,
+            from,
+            setFrom,
+            accounts,
+            'money-from',
+          )}
         {kind === 'transfer' && select(strings.cash.to, to, setTo, accounts, 'money-to')}
         {kind === 'adjust' && (
           <>
