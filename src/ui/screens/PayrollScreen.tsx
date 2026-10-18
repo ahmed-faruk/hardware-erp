@@ -1,15 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Banknote } from 'lucide-react';
-import { useState } from 'react';
+import { Banknote, Pencil, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { loadPayrollEntries, paySalary, recordAdvance, recordDeduction } from '@/db/commands/payroll';
+import { editPayrollEntry, voidPayrollEntry } from '@/db/commands/void-docs';
 import type { CashAccount, Worker } from '@/db/types';
 import { formatMoney, toPiasters } from '@/domain/money';
-import { payrollState, type PayrollKind } from '@/domain/payroll';
+import { payrollEntryLocked, payrollState, type PayrollKind } from '@/domain/payroll';
 import { cairoTime } from '@/domain/receipt';
 import type { ReportTable } from '@/domain/reports';
 
+import { UndoToast } from '../cashier/UndoToast';
 import { ActionButton } from '../components/ActionButton';
 import { BigAlert } from '../components/BigAlert';
 import { type Column, DataTable } from '../components/DataTable';
@@ -168,7 +170,7 @@ export function PayrollScreen() {
         onClose={() => setDlg(null)}
       >
         {dlg && data && dlg.kind === 'statement' && (
-          <Statement entries={data.entries.get(dlg.worker.id) ?? []} />
+          <Statement entries={data.entries.get(dlg.worker.id) ?? []} manage={manage} />
         )}
         {dlg && data && (dlg.kind === 'advance' || dlg.kind === 'deduction') && (
           <AmountForm
@@ -424,24 +426,141 @@ function SalaryForm({
   );
 }
 
-function Statement({ entries }: { entries: Parameters<typeof payrollState>[0] }) {
+function Statement({ entries, manage }: { entries: Parameters<typeof payrollState>[0]; manage: boolean }) {
   type Row = (typeof entries)[number];
+  const { context } = useSession();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [amount, setAmount] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'danger'; word: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const pt = strings.payrollEdit;
+  const failWord = (code: string): string =>
+    code === 'NO_SHIFT'
+      ? pt.noShift
+      : code === 'MONTH_PAID'
+        ? t.monthPaid
+        : code === 'ADVANCE_TAKEN'
+          ? pt.advanceTaken
+          : pt.failed;
   const rows = entries
     .filter((e) => e.status === 'posted')
     .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  const runDelete = (): void => {
+    const id = pending;
+    setPending(null);
+    if (!context || !id || running.current) return;
+    running.current = true;
+    void voidPayrollEntry(context, { entryId: id, reason: 'mistake' }).then((r) => {
+      running.current = false;
+      setNotice(r.ok ? { tone: 'ok', word: pt.done } : { tone: 'danger', word: failWord(r.code) });
+    });
+  };
+  const saveEdit = async (): Promise<void> => {
+    if (!context || !editing || !amount) return;
+    setBusy(true);
+    const r = await editPayrollEntry(context, { entryId: editing, amount, note });
+    setBusy(false);
+    if (r.ok) {
+      setEditing(null);
+      setNotice({ tone: 'ok', word: pt.edited });
+    } else setNotice({ tone: 'danger', word: failWord(r.code) });
+  };
   const columns: Column<Row>[] = [
     { key: 'date', header: t.date, cell: (r) => <span dir="ltr">{cairoTime(r.issuedAt)}</span> },
     { key: 'kind', header: t.kind, cell: (r) => t.kinds[r.kind as PayrollKind] },
     { key: 'month', header: t.monthCol, cell: (r) => <span dir="ltr">{r.month}</span> },
     { key: 'amount', header: t.amount, numeric: true, cell: (r) => formatMoney(r.amount) },
+    ...(manage
+      ? [
+          {
+            key: 'actions',
+            header: '',
+            cell: (r: Row) =>
+              r.kind === 'salary' || !r.id ? null : payrollEntryLocked(entries, r) ? (
+                <span className={styles.muted} data-testid={`payroll-locked-${r.number}`}>
+                  {pt.locked}
+                </span>
+              ) : (
+                <>
+                  <ActionButton
+                    label={pt.edit}
+                    icon={Pencil}
+                    variant="ghost"
+                    onClick={() => {
+                      setNotice(null);
+                      setEditing(r.id!);
+                      setAmount(r.amount);
+                      setNote(r.note ?? '');
+                    }}
+                    testId={`edit-payroll-${r.number}`}
+                  />
+                  <ActionButton
+                    label={pt.delete}
+                    icon={Trash2}
+                    variant="danger"
+                    onClick={() => {
+                      setNotice(null);
+                      setPending(r.id!);
+                    }}
+                    testId={`delete-payroll-${r.number}`}
+                  />
+                </>
+              ),
+          },
+        ]
+      : []),
   ];
-  if (rows.length === 0) return <p>{t.noEntries}</p>;
   return (
-    <DataTable
-      label={t.statement}
-      rows={rows}
-      columns={columns}
-      rowKey={(r) => r.issuedAt + r.kind + r.amount}
-    />
+    <>
+      {notice && <BigAlert tone={notice.tone} word={notice.word} />}
+      {pending && <UndoToast message={pt.deleting} onUndo={() => setPending(null)} onExpire={runDelete} />}
+      {rows.length === 0 ? (
+        <p>{t.noEntries}</p>
+      ) : (
+        <DataTable
+          label={t.statement}
+          rows={rows}
+          columns={columns}
+          rowKey={(r) => r.id ?? r.issuedAt + r.kind + r.amount}
+        />
+      )}
+      {editing && (
+        <div className={styles.section}>
+          <NumberField
+            label={t.amount}
+            value={amount}
+            onChange={setAmount}
+            parse={toPiasters}
+            format={formatMoney}
+            required
+          />
+          <FormField label={t.note}>
+            {(id) => (
+              <input
+                id={id}
+                className="control"
+                value={note}
+                onChange={(ev) => setNote(ev.target.value)}
+                data-testid="payroll-edit-note"
+              />
+            )}
+          </FormField>
+          <div className={styles.actions}>
+            <ActionButton
+              label={strings.common.save}
+              variant="ok"
+              loading={busy}
+              disabled={!amount}
+              onClick={() => void saveEdit()}
+              testId="save-payroll-edit"
+            />
+            <ActionButton label={strings.common.cancel} variant="ghost" onClick={() => setEditing(null)} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

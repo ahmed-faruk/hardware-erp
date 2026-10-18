@@ -4,6 +4,9 @@ export type PayrollKind = 'advance' | 'deduction' | 'salary';
 
 /** The slice of a payroll entry the rules need. */
 export interface PayrollEntry {
+  id?: string;
+  number?: string;
+  note?: string | null;
   employeeId: string;
   kind: PayrollKind;
   /** yyyy-mm the entry belongs to */
@@ -78,4 +81,14 @@ export function payrollState(
     paid: salaries.some((x) => x.month === month),
     slip: salarySlip({ salary, deductions, advances, carryIn }),
   };
+}
+
+/** An advance a later salary took, or a deduction of a month already paid, can no longer be deleted or changed (owner decision 2026-10-18). */
+export function payrollEntryLocked(entries: PayrollEntry[], entry: PayrollEntry): boolean {
+  const salaries = entries.filter(
+    (x) => x.employeeId === entry.employeeId && x.kind === 'salary' && x.status === 'posted',
+  );
+  if (entry.kind === 'deduction') return salaries.some((x) => x.month === entry.month);
+  if (entry.kind === 'advance') return salaries.some((x) => x.issuedAt > entry.issuedAt);
+  return true;
 }

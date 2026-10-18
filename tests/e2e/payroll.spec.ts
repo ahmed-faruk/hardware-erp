@@ -65,3 +65,43 @@ test('salary 3000, advance 500, deduction 100: the slip pays 2400 and the server
   await expect(page.getByTestId('report-table-0')).toContainText(f.cashierName);
   await expect(page.getByTestId('report-table-0')).toContainText('2400.00');
 });
+
+test('an advance is edited, then deleted: its cash comes back and the card follows', async ({ page }) => {
+  const f = newCashierFixture();
+  await loginAs(page, f, 'manager');
+  await expect(page.getByTestId('sync-status')).toBeVisible();
+  await page.getByRole('button', { name: strings.nav.sell }).click();
+  await page.getByTestId('open-shift').click();
+  await page.keyboard.type('100');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('sell-search')).toBeVisible();
+
+  await page.getByRole('button', { name: strings.nav.payroll }).click();
+  const card = page.locator('[data-testid^="payroll-"]').filter({ hasText: f.cashierName });
+  await expect(card).toBeVisible();
+  await card.locator('[data-testid^="advance-"]').click();
+  await page.getByLabel(strings.payroll.amount).fill('50');
+  await page.getByTestId('save-payroll').click();
+  await expect(page.getByTestId('save-payroll')).toHaveCount(0);
+  await expect(card.locator('[data-testid^="advances-"]')).toHaveText('50.00');
+
+  await card.locator('[data-testid^="statement-"]').click();
+  await page.getByTestId(`edit-payroll-${f.prefix}-ADV-000001`).click();
+  await page.getByLabel(strings.payroll.amount).fill('80');
+  await page.getByTestId('save-payroll-edit').click();
+  await expect(page.getByText(strings.payrollEdit.edited)).toBeVisible();
+  await page.getByTestId(`delete-payroll-${f.prefix}-ADV-000002`).click();
+  await expect(page.getByTestId('undo-toast')).toBeVisible();
+  await expect(page.getByText(strings.payrollEdit.done)).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await expect(card.locator('[data-testid^="advances-"]')).toHaveText('0.00');
+  await expect
+    .poll(
+      () =>
+        sql(
+          `select count(*) from voids where target_type = 'payroll_entry' and number like '${f.prefix}-VOID-%'`,
+        ),
+      { timeout: 60_000 },
+    )
+    .toBe('2');
+});

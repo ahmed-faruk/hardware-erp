@@ -1117,6 +1117,17 @@ export const strings = {
     legacy: 'ده مصروف قديم من النظام القديم',
     failed: 'ماتحفظش',
   },
+  payrollEdit: {
+    edit: 'تعديل',
+    delete: 'حذف',
+    deleting: 'هيتحذف',
+    done: 'اتحذف',
+    edited: 'اتعدّل',
+    locked: 'اتخصم من المرتب',
+    advanceTaken: 'السلفة دي اتخصمت من مرتب',
+    noShift: 'افتح وردية الأول عشان الفلوس ترجع الخزنة',
+    failed: 'ماتحفظش',
+  },
   collection: {
     button: 'تحصيل',
     title: 'تحصيل من عميل',
