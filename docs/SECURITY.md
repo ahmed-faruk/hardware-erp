@@ -55,6 +55,7 @@ Rules every developer and AI agent follows in this project. If a requested chang
   `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'`, `Permissions-Policy` minimal.
 - Rate limits per `docs/API.md` §7. No endpoint returns stack traces or SQL errors to the client.
 - `import_batch` callable only with the service role.
+- Internal `ingest_*_bundle` helpers are never executable by `anon`/`authenticated` (migration `20261020120000_revoke_ingest_bundles`, test `supabase/tests/function_privileges.test.sql`).
 
 ## 6. Data protection
 
