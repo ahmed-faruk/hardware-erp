@@ -21,7 +21,7 @@ import { strings } from '../strings.ar';
 
 import styles from './screens.module.css';
 
-type Editing = { id: string; categoryId: string; amount: number };
+type Editing = { id: string; categoryId: string; amount: number; note: string };
 
 const failWord = (code: string): string =>
   code === 'NO_SHIFT'
@@ -59,6 +59,7 @@ export function ExpensesScreen() {
         category: names.get(e.categoryId as string) ?? '',
         categoryId: e.categoryId as string,
         source: (e.source as string | undefined) ?? 'safe',
+        note: (e.notes as string | null) ?? '',
         status: e.status,
         isLegacy: e.isLegacy,
       }));
@@ -90,6 +91,7 @@ export function ExpensesScreen() {
       header: strings.expenseSource.label,
       cell: (r) => (r.source === 'owner' ? strings.expenseSource.owner : strings.expenseSource.safe),
     },
+    { key: 'note', header: strings.cash.note, wideOnly: true, cell: (r) => r.note },
     { key: 'amount', header: strings.cash.amount, numeric: true, cell: (r) => formatMoney(r.amount) },
     {
       key: 'actions',
@@ -105,7 +107,7 @@ export function ExpensesScreen() {
               variant="ghost"
               onClick={() => {
                 setNotice(null);
-                setEditing({ id: r.id, categoryId: r.categoryId, amount: r.amount });
+                setEditing({ id: r.id, categoryId: r.categoryId, amount: r.amount, note: r.note });
               }}
               testId={`edit-expense-${r.number}`}
             />
@@ -226,7 +228,7 @@ function MoneyForm({
   const [amount, setAmount] = useState<number | null>(editing?.amount ?? null);
   const [sign, setSign] = useState<'plus' | 'minus'>('minus');
   const [reason, setReason] = useState<(typeof CASH_ADJUST_REASONS)[number]>('count_error');
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(editing?.note ?? '');
   const [error, setError] = useState<string | null>(null);
   const select = (
     label: string,
@@ -256,7 +258,7 @@ function MoneyForm({
   const save = async (): Promise<void> => {
     if (!context || !amount) return;
     if (editing) {
-      const r = await editExpense(context, { expenseId: editing.id, categoryId, amount });
+      const r = await editExpense(context, { expenseId: editing.id, categoryId, amount, note });
       if (r.ok) onDone(strings.expenseEdit.edited);
       else setError(failWord(r.code));
       return;
@@ -267,6 +269,7 @@ function MoneyForm({
             categoryId,
             amount,
             source,
+            note,
             cashAccountId: source === 'safe' ? boxId : null,
           })
         : kind === 'adjust'
@@ -344,6 +347,20 @@ function MoneyForm({
               )}
             </FormField>
           </>
+        )}
+        {kind === 'expense' && (
+          <FormField label={strings.cash.note}>
+            {(id) => (
+              <input
+                id={id}
+                className="control"
+                value={note}
+                maxLength={200}
+                onChange={(e) => setNote(e.target.value)}
+                data-testid="expense-note"
+              />
+            )}
+          </FormField>
         )}
         <NumberField
           label={strings.cash.amount}

@@ -20,6 +20,7 @@ import { NumberField } from '../components/NumberField';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { Skeleton } from '../components/Skeleton';
 import { navigate } from '../router';
+import { focusOnPc } from '../focus';
 import { strings } from '../strings.ar';
 
 import { PurchaseLines, type PurchaseRow } from './PurchaseLines';
@@ -237,7 +238,7 @@ export function PurchaseNewScreen() {
     setScan('');
     setScanError(null);
     if (product) await addProduct(product, null);
-    scanRef.current?.focus();
+    focusOnPc(scanRef.current);
   };
   /** Enter in the product box: a code (6+ digits) goes the scanner way; with no highlighted suggestion the text is searched; else the highlighted one is picked */
   const onScanEnter = (text: string, hasActiveOption: boolean): boolean => {
@@ -432,7 +433,7 @@ export function PurchaseNewScreen() {
                 canPrice={canPrice}
                 onPatch={patch}
                 onRemove={(key) => setRows((list) => list.filter((r) => r.key !== key))}
-                onDone={() => scanRef.current?.focus()}
+                onDone={() => focusOnPc(scanRef.current)}
               />
             )}
           </div>

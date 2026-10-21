@@ -41,8 +41,16 @@ const mapLine = (cart: Cart, key: string, change: (l: CartLine) => CartLine): Ca
 /** Adding the same product in the same unit adds to its quantity (the second scan makes 2). */
 export function addItem(cart: Cart, item: CartItem): Cart {
   const key = lineKey(item.productId, item.productUnitId);
-  if (cart.lines.some((l) => l.key === key))
-    return mapLine(cart, key, (l) => ({ ...l, qtyMilli: l.qtyMilli + item.qtyMilli }));
+  const found = cart.lines.find((l) => l.key === key);
+  // the line touched last goes to the end; the sell screen lists the cart newest first (owner decision 2026-10-21)
+  if (found)
+    return {
+      ...cart,
+      lines: [
+        ...cart.lines.filter((l) => l.key !== key),
+        { ...found, qtyMilli: found.qtyMilli + item.qtyMilli },
+      ],
+    };
   return { ...cart, lines: [...cart.lines, { ...item, key }] };
 }
 

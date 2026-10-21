@@ -47,6 +47,7 @@ import { DiscountDialog } from './DiscountDialog';
 import { NumEntry } from './NumEntry';
 import { PayScreen } from './PayScreen';
 import { VoidReasonDialog } from '../components/VoidReasonDialog';
+import { focusOnPc } from '../focus';
 import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
 import { CollectionDialog } from './CollectionDialog';
 import { ReturnDialog } from './ReturnDialog';
@@ -136,6 +137,7 @@ export function SellScreen() {
   const [shiftMenu, setShiftMenu] = useState(false);
   const [shiftTool, setShiftTool] = useState<Exclude<ShiftTool, 'x'> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const lastScan = useRef<{ code: string; at: number } | null>(null);
 
   const digits = useCallback((text: string) => localizeDigits(text, device.digits), [device.digits]);
   const inv = cartInvoice(cart);
@@ -193,11 +195,21 @@ export function SellScreen() {
     },
     [db, settings.stockNegativePolicy, warehouse, cart.lines, list],
   );
+  // a product picked from the search: the box is emptied and, on a computer, ready for the next search (owner decision 2026-10-21)
+  const addFromSearch = useCallback(
+    (product: Product, unit: ProductUnit | null): void => {
+      add(product, unit);
+      setSearchText('');
+      focusOnPc(searchRef.current);
+    },
+    [add],
+  );
 
   const scan = useCallback(
     (code: string): void => {
       if (returnOpen) return setScannedReceipt(code);
       if (step !== 'items' || !shift) return;
+      lastScan.current = { code, at: Date.now() };
       void findByBarcode(db, code).then((found) => {
         if (found) add(found.product, found.unit, found.qtyMilli);
         else {
@@ -464,10 +476,20 @@ export function SellScreen() {
 
   const onSearchKey = async (e: React.KeyboardEvent<HTMLInputElement>): Promise<void> => {
     if (e.key !== 'Enter' || !searchText.trim()) return;
+    // a scanner burst typed into this box was already added by the scanner listener: do not add the product a second time
+    const scanned = lastScan.current;
+    if (
+      scanned &&
+      scanned.code === searchText.trim() &&
+      Date.now() - scanned.at < 1500 &&
+      (await findByBarcode(db, scanned.code))
+    ) {
+      setSearchText('');
+      return;
+    }
     const [first] = await searchProducts(db, searchText, { limit: 1 });
     if (first) {
-      add(first, null);
-      setSearchText('');
+      addFromSearch(first, null);
     } else {
       play('error');
       flash(strings.sell.scanUnknown);
@@ -649,7 +671,7 @@ export function SellScreen() {
         </div>
         {notice && <BigAlert tone="danger" word={notice} sound={false} />}
         {offerButton}
-        <ProductGrid searchText={searchText} digits={digits} onAdd={add} />
+        <ProductGrid searchText={searchText} digits={digits} onAdd={addFromSearch} />
       </div>
       <aside className={styles.right}>
         <div className={styles.cart}>{cartPanel}</div>

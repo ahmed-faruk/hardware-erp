@@ -46,6 +46,11 @@ describe('cart', () => {
     expect(c.lines).toHaveLength(1);
     expect(c.lines[0]?.qtyMilli).toBe(2000);
   });
+  it('adding a product already in the cart moves its line to the end (the screen shows the cart newest first)', () => {
+    const c = addItem(addItem(addItem(EMPTY_CART, paint), wire), paint);
+    expect(c.lines.map((l) => l.key)).toEqual(['p2:', 'p1:']);
+    expect(c.lines[1]?.qtyMilli).toBe(2000);
+  });
   it('a pack unit is a different line from the base unit', () => {
     expect(addItem(addItem(EMPTY_CART, paint), carton).lines).toHaveLength(2);
   });

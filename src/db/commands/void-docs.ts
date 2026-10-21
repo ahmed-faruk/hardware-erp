@@ -107,7 +107,7 @@ export async function voidExpense(
 /** Edits an expense = void it and post a new one (new type and amount, same account), in ONE transaction. */
 export async function editExpense(
   ctx: DeviceContext,
-  input: { expenseId: string; categoryId: string; amount: number },
+  input: { expenseId: string; categoryId: string; amount: number; note?: string },
 ): Promise<Done> {
   if (canCtx(ctx, 'voidExpense') !== 'yes') return err('E_FORBIDDEN', 'غير مسموح');
   const { db } = ctx;
@@ -135,6 +135,7 @@ export async function editExpense(
           categoryId: input.categoryId,
           amount: input.amount,
           source: old.source === 'owner' ? 'owner' : 'safe',
+          note: input.note ?? (old.notes as string | null) ?? '',
           cashAccountId: (old.cashAccountId as string | null) ?? null,
         });
         if (!p.ok) throw new Rollback(p);

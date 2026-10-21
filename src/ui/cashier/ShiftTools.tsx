@@ -82,12 +82,14 @@ export function ExpenseDialog({
     [db, open],
   );
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   // the category dialog also reports `close` right after a pick; that must not cancel the expense
   const chose = useRef(false);
   const close = (): void => {
     chose.current = false;
     setCategoryId(null);
+    setNote('');
     setError(null);
     onClose();
   };
@@ -100,9 +102,11 @@ export function ExpenseDialog({
     const r = await postExpense(context, {
       categoryId: category,
       amount: amount.value,
+      note,
       cashAccountId,
       shiftId,
     });
+    setNote('');
     if (r.ok) {
       play('done');
       onDone(r.id);
@@ -124,6 +128,15 @@ export function ExpenseDialog({
           <EmptyState icon={Wallet} word={strings.cash.noCategories} />
         ) : (
           <>
+            <input
+              className="control"
+              value={note}
+              maxLength={200}
+              onChange={(e) => setNote(e.target.value)}
+              aria-label={strings.cash.note}
+              placeholder={strings.cash.note}
+              data-testid="expense-note"
+            />
             <p className={styles.lead}>{strings.cash.category}</p>
             <div className={styles.reasons}>
               {(categories ?? []).map((c) => (
