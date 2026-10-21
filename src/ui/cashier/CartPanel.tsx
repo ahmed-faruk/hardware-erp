@@ -39,73 +39,78 @@ export function CartPanel({
   return (
     <div className={styles.panel} data-testid="cart">
       <ul className={styles.lines}>
-        {cart.lines.map((line, i) => (
-          <li key={line.key} className={styles.line} data-testid={`line-${i}`}>
-            <div className={styles.head}>
-              <span className={styles.name}>{line.name}</span>
-              <span className={styles.total}>{digits(formatMoney(invoice.lines[i]?.finalAmount ?? 0))}</span>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.stepper}>
-                <button
-                  type="button"
-                  className={styles.step}
-                  onClick={() => onStep(line.key, -1000)}
-                  aria-label={strings.common.back}
-                >
-                  <Minus size={24} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className={styles.qty}
-                  onClick={() => onQtyPad(line.key)}
-                  aria-label={strings.sell.quantity}
-                  data-testid={`qty-${i}`}
-                >
-                  {digits(formatQty(line.qtyMilli))}
-                </button>
-                <button
-                  type="button"
-                  className={styles.step}
-                  onClick={() => onStep(line.key, 1000)}
-                  aria-label={strings.common.add}
-                >
-                  <Plus size={24} aria-hidden="true" />
-                </button>
+        {cart.lines
+          .map((line, i) => ({ line, i }))
+          .reverse()
+          .map(({ line, i }) => (
+            <li key={line.key} className={styles.line} data-testid={`line-${i}`}>
+              <div className={styles.head}>
+                <span className={styles.name}>{line.name}</span>
+                <span className={styles.total}>
+                  {digits(formatMoney(invoice.lines[i]?.finalAmount ?? 0))}
+                </span>
               </div>
-              <span className={styles.unit}>{`× ${digits(formatMoney(line.unitPrice))}`}</span>
-              <div className={styles.tools}>
-                <button
-                  type="button"
-                  className={styles.tool}
-                  onClick={() => onDiscount(line.key)}
-                  aria-label={strings.sell.discount}
-                  data-testid={`discount-${i}`}
-                >
-                  <Percent size={22} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className={styles.tool}
-                  onClick={() => onPrice(line.key)}
-                  aria-label={strings.sell.price}
-                  data-testid={`price-${i}`}
-                >
-                  <Tag size={22} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className={styles.tool}
-                  onClick={() => onRemove(line.key)}
-                  aria-label={strings.actions.remove}
-                  data-testid={`remove-${i}`}
-                >
-                  <Trash2 size={22} aria-hidden="true" />
-                </button>
+              <div className={styles.row}>
+                <div className={styles.stepper}>
+                  <button
+                    type="button"
+                    className={styles.step}
+                    onClick={() => onStep(line.key, -1000)}
+                    aria-label={strings.common.back}
+                  >
+                    <Minus size={24} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.qty}
+                    onClick={() => onQtyPad(line.key)}
+                    aria-label={strings.sell.quantity}
+                    data-testid={`qty-${i}`}
+                  >
+                    {digits(formatQty(line.qtyMilli))}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.step}
+                    onClick={() => onStep(line.key, 1000)}
+                    aria-label={strings.common.add}
+                  >
+                    <Plus size={24} aria-hidden="true" />
+                  </button>
+                </div>
+                <span className={styles.unit}>{`× ${digits(formatMoney(line.unitPrice))}`}</span>
+                <div className={styles.tools}>
+                  <button
+                    type="button"
+                    className={styles.tool}
+                    onClick={() => onDiscount(line.key)}
+                    aria-label={strings.sell.discount}
+                    data-testid={`discount-${i}`}
+                  >
+                    <Percent size={22} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.tool}
+                    onClick={() => onPrice(line.key)}
+                    aria-label={strings.sell.price}
+                    data-testid={`price-${i}`}
+                  >
+                    <Tag size={22} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.tool}
+                    onClick={() => onRemove(line.key)}
+                    aria-label={strings.actions.remove}
+                    data-testid={`remove-${i}`}
+                  >
+                    <Trash2 size={22} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          ))}
       </ul>
       <ActionButton
         big

@@ -3,7 +3,7 @@ import { Ban, Banknote, CircleHelp, Coins, Eye, Printer, Trash2, Undo2 } from 'l
 import { useState } from 'react';
 
 import { useServices } from '@/app/session';
-import { discardCart, listHeldCarts, type HeldCartRow } from '@/db/commands/carts';
+import { discardCart, listHeldCarts } from '@/db/commands/carts';
 import { todaysInvoices } from '@/db/invoice-search';
 import { NO_SALE_REASONS, type NoSaleReason } from '@/db/commands/receipts';
 import { formatMoney } from '@/domain/money';
@@ -29,7 +29,18 @@ export function HeldCartsDialog({
   onClose: () => void;
 }) {
   const { db } = useServices();
-  const held = useLiveQuery(() => listHeldCarts(db), [db, open]);
+  // each held invoice with the name of its customer (none = the no-customer word)
+  const held = useLiveQuery(async () => {
+    const rows = await listHeldCarts(db);
+    const ids = [...new Set(rows.map((h) => h.cart.customerId).filter((x): x is string => !!x))];
+    const names = new Map(
+      (await db.customers.bulkGet(ids)).filter((c) => !!c).map((c) => [c!.id, c!.name] as const),
+    );
+    return rows.map((h) => ({
+      ...h,
+      customerName: h.cart.customerId ? (names.get(h.cart.customerId) ?? null) : null,
+    }));
+  }, [db, open]);
   const time = (iso: string): string =>
     digits(
       new Intl.DateTimeFormat('en-GB', {
@@ -44,10 +55,11 @@ export function HeldCartsDialog({
       {held && held.length === 0 ? (
         <EmptyState icon={PauseCircle} word={strings.sell.noHeld} />
       ) : (
-        <ul className={styles.list}>
-          {held?.map((h: HeldCartRow) => (
+        <ul className={styles.list} data-testid="held-list">
+          {held?.map((h) => (
             <li key={h.id} className={styles.item}>
               <span>{time(h.heldAt)}</span>
+              <span data-testid={`held-customer-${h.id}`}>{h.customerName ?? strings.sell.noCustomer}</span>
               <span>{`${digits(String(h.cart.lines.length))} ${strings.sell.itemsCount}`}</span>
               <strong>{digits(formatMoney(h.total))}</strong>
               <ActionButton

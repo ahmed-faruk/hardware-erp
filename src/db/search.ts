@@ -11,6 +11,45 @@ const collator = new Intl.Collator('ar');
 
 const live = (p: Product | undefined): p is Product => !!p && !p.deletedAt;
 
+/**
+ * The whole word index in memory (word -> product ids), per database. A search matches any part of a word (owner decision
+ * 2026-10-21), so it looks through every word; reading thousands of rows one by one is far too slow, one range read once is not.
+ * Every index write drops the copy; `generation` stops a load that started before a write from storing the old copy.
+ */
+interface WordIndex {
+  words: string[];
+  ids: Map<string, string[]>;
+}
+const memory = new WeakMap<HanafyDB, WordIndex>();
+const generation = new WeakMap<HanafyDB, number>();
+
+function forget(db: HanafyDB): void {
+  memory.delete(db);
+  generation.set(db, (generation.get(db) ?? 0) + 1);
+}
+
+function remember(db: HanafyDB, rows: { token: string; productIds: string[] }[]): WordIndex {
+  const ids = new Map(rows.map((r) => [r.token, r.productIds] as const));
+  const index = { words: [...ids.keys()], ids };
+  memory.set(db, index);
+  return index;
+}
+
+async function wordIndex(db: HanafyDB): Promise<WordIndex> {
+  const kept = memory.get(db);
+  if (kept) return kept;
+  const startedAt = generation.get(db) ?? 0;
+  const rows = await db.searchIndex.toArray();
+  if ((generation.get(db) ?? 0) !== startedAt) {
+    // the index changed while it was being read: use this answer once, do not keep it
+    return {
+      words: rows.map((r) => r.token),
+      ids: new Map(rows.map((r) => [r.token, r.productIds] as const)),
+    };
+  }
+  return remember(db, rows);
+}
+
 /** Index words of one product: name, sku and every active barcode. */
 export async function tokensOf(db: HanafyDB, productId: string): Promise<Set<string>> {
   const product = await db.products.get(productId);
@@ -22,6 +61,7 @@ export async function tokensOf(db: HanafyDB, productId: string): Promise<Set<str
 }
 
 async function mutate(db: HanafyDB, token: string, productId: string, add: boolean): Promise<void> {
+  forget(db);
   const row = await db.searchIndex.get(token);
   const ids = new Set(row?.productIds ?? []);
   if (add) ids.add(productId);
@@ -50,6 +90,7 @@ export async function patchIndexMany(db: HanafyDB, before: Map<string, Set<strin
     for (const token of was) if (!now.has(token)) slot(token).remove.add(productId);
     for (const token of now) if (!was.has(token)) slot(token).add.add(productId);
   }
+  if (changes.size > 0) forget(db);
   for (const [token, { add, remove }] of changes) {
     const row = await db.searchIndex.get(token);
     const ids = new Set(row?.productIds ?? []);
@@ -60,7 +101,7 @@ export async function patchIndexMany(db: HanafyDB, before: Map<string, Set<strin
   }
 }
 
-/** Full rebuild (first run, or after a restore). */
+/** Full rebuild (first run, or after a restore). The new index is also kept in memory, so the first search is fast. */
 export async function rebuildSearchIndex(db: HanafyDB): Promise<void> {
   const index = new Map<string, Set<string>>();
   const add = (token: string, id: string): void =>
@@ -70,10 +111,13 @@ export async function rebuildSearchIndex(db: HanafyDB): Promise<void> {
   for (const p of products) for (const t of tokenize(`${p.name} ${p.sku ?? ''}`)) add(t, p.id);
   for (const b of await db.barcodes.toArray())
     if (!b.deletedAt && ids.has(b.productId)) for (const t of tokenize(b.code)) add(t, b.productId);
+  const rows = [...index].map(([token, set]) => ({ token, productIds: [...set] }));
+  forget(db);
   await db.transaction('rw', db.searchIndex, async () => {
     await db.searchIndex.clear();
-    await db.searchIndex.bulkPut([...index].map(([token, set]) => ({ token, productIds: [...set] })));
+    await db.searchIndex.bulkPut(rows);
   });
+  remember(db, rows);
 }
 
 export interface SearchOptions {
@@ -82,7 +126,11 @@ export interface SearchOptions {
   includeInactive?: boolean;
 }
 
-/** Products matching every word of the text as a word prefix (name, sku or barcode), best matches first by name. */
+/**
+ * Products matching every word of the text, sorted by name. A word of two letters or more may be any part of a product word
+ * (name, sku or barcode); a single letter matches the start of a word only, because inside words it would match almost every
+ * code (owner decision 2026-10-21).
+ */
 export async function searchProducts(
   db: HanafyDB,
   text: string,
@@ -90,12 +138,15 @@ export async function searchProducts(
 ): Promise<Product[]> {
   const words = tokenize(text);
   if (words.length === 0) return [];
-  // read every word's matches, then start from the most selective one: "دهان" may list 20,000 products, "12345" only one
+  const index = await wordIndex(db);
+  // every word's matching products, then start from the most selective list: "دهان" may list 20,000 products, "12345" only one
   const lists: string[][] = [];
   for (const word of words) {
     const hit = new Set<string>();
-    for (const row of await db.searchIndex.where('token').startsWith(word).toArray())
-      for (const id of row.productIds) hit.add(id);
+    for (const token of index.words) {
+      if (word.length >= 2 ? !token.includes(word) : !token.startsWith(word)) continue;
+      for (const id of index.ids.get(token) ?? []) hit.add(id);
+    }
     if (hit.size === 0) return [];
     lists.push([...hit]);
   }

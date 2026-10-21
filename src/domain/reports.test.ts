@@ -211,7 +211,7 @@ describe('expenses report', () => {
     expect(r[0]!.totals).toEqual(['total', '3', '200.00', '100%']);
     expect(r[0]!.note).toBe('legacy: 1');
     expect(r[1]!.rows[1]).toEqual(['noAccount', '1', '15.00']);
-    expect(r[3]!.rows[0]).toEqual(['K1-EXP-000001', '2026-10-01', 'كهرباء', 'درج', '150.00']);
+    expect(r[3]!.rows[0]).toEqual(['K1-EXP-000001', '2026-10-01', 'كهرباء', 'درج', '150.00', '']);
   });
   it('rounds a share half up and is 0 for an empty period', () => {
     expect(percentOf(1, 3)).toBe(33);

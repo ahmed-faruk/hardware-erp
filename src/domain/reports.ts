@@ -456,13 +456,14 @@ export function expensesTables(
     },
     {
       title: t.list!,
-      headers: [t.number!, t.time!, t.category!, t.account!, t.amount!],
+      headers: [t.number!, t.time!, t.category!, t.account!, t.amount!, t.expenseNote!],
       rows: d.list.map((r) => [
         r.number,
         time(r.at),
         r.category || t.noCategory!,
         r.account ?? t.noAccount!,
         m(r.amount),
+        r.note ?? '',
       ]),
     },
   ];

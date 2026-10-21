@@ -3,7 +3,8 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 
 import { newCommon } from '@/db/commands/context';
-import { rebuildSearchIndex, searchProducts } from '@/db/search';
+import { HanafyDB } from '@/db/schema';
+import { patchIndex, rebuildSearchIndex, searchProducts, tokensOf } from '@/db/search';
 import type { Barcode, Product } from '@/db/types';
 
 import { newDevice } from './helpers';
@@ -42,6 +43,39 @@ describe('product search', () => {
     expect((await searchProducts(ctx.db, 'مدرسه')).map((p) => p.id)).toEqual([c.id]);
     expect((await searchProducts(ctx.db, 'دهان لتر')).map((p) => p.id)).toEqual([a.id]);
     expect(await searchProducts(ctx.db, 'غير موجود')).toEqual([]);
+  });
+
+  it('finds by any part of a word, not only its beginning', async () => {
+    const ctx = newDevice();
+    const [a, b, c] = [
+      product(ctx, 'دهان أبيض 4 لتر'),
+      product(ctx, 'مسمار صلب'),
+      product(ctx, 'مدرسة دهان'),
+    ];
+    await ctx.db.products.bulkPut([a, b, c]);
+    await rebuildSearchIndex(ctx.db);
+    expect((await searchProducts(ctx.db, 'هان')).map((p) => p.id).sort()).toEqual([a.id, c.id].sort());
+    expect((await searchProducts(ctx.db, 'بيض')).map((p) => p.id)).toEqual([a.id]);
+    expect((await searchProducts(ctx.db, 'سمار')).map((p) => p.id)).toEqual([b.id]);
+    expect((await searchProducts(ctx.db, 'هان لت')).map((p) => p.id)).toEqual([a.id]);
+    // a single letter matches from the start of a word only
+    expect((await searchProducts(ctx.db, 'ه')).map((p) => p.id)).toEqual([]);
+    expect((await searchProducts(ctx.db, 'د')).map((p) => p.id).sort()).toEqual([a.id, c.id].sort());
+  });
+
+  it('follows a renamed product at once, and a reopened database finds by any part too', async () => {
+    const ctx = newDevice();
+    const a = product(ctx, 'دهان أبيض');
+    await ctx.db.products.put(a);
+    await rebuildSearchIndex(ctx.db);
+    expect((await searchProducts(ctx.db, 'بيض')).map((p) => p.id)).toEqual([a.id]);
+    const before = await tokensOf(ctx.db, a.id);
+    await ctx.db.products.update(a.id, { name: 'ورنيش لامع' });
+    await patchIndex(ctx.db, a.id, before);
+    expect(await searchProducts(ctx.db, 'بيض')).toEqual([]);
+    expect((await searchProducts(ctx.db, 'رنيش')).map((p) => p.id)).toEqual([a.id]);
+    const reopened = new HanafyDB(ctx.db.name);
+    expect((await searchProducts(reopened, 'امع')).map((p) => p.id)).toEqual([a.id]);
   });
 
   it('finds by barcode prefix and ignores deleted or inactive products', async () => {

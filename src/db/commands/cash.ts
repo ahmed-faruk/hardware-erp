@@ -119,6 +119,8 @@ const expenseInput = z.object({
   amount: z.number().int().positive(),
   /** 'safe' = cash leaves the box (an account is needed); 'owner' = paid from outside the box (no account, no cash) */
   source: z.enum(['safe', 'owner']).default('safe'),
+  /** a free note (owner decision 2026-10-21); empty = none */
+  note: z.string().trim().max(200).default(''),
   cashAccountId: id.nullable().default(null),
   shiftId: id.nullable().default(null),
 });
@@ -178,7 +180,7 @@ export async function postExpense(
         shiftId: input.shiftId,
         status: 'posted' as const,
         voidedBy: null,
-        notes: null,
+        notes: input.note || null,
         isLegacy: false,
         legacy: null,
         categoryId: category.id,
