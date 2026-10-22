@@ -45,20 +45,31 @@ test.describe('sell screen and expenses polish', () => {
     await expect(vis(page, 'cart').locator('li')).toHaveCount(2);
   });
 
-  test('a held invoice shows its customer, or that it has none', async ({ page }) => {
+  test('a held invoice shows its customer, a written name, or that it has none', async ({ page }) => {
     await start(page);
+    // 1. with a customer: held at once, no name asked
     await tile(page, 3).click();
     await vis(page, 'pay').click();
     await page.getByTestId('choose-customer').click();
     await page.getByTestId(`customer-${CUSTOMER}`).click();
     await page.getByTestId('pay-back').click();
     await page.keyboard.press('F8');
+    await expect(page.getByTestId('hold-name')).toHaveCount(0);
     await expect(vis(page, 'held')).toHaveText('1');
+    // 2. no customer: a written name
     await tile(page, 2).click();
-    await page.keyboard.press('F8');
+    await vis(page, 'hold').click();
+    await page.getByTestId('hold-name').fill('أبو أحمد النجار');
+    await page.getByTestId('hold-confirm').click();
     await expect(vis(page, 'held')).toHaveText('2');
+    // 3. no customer, no name
+    await tile(page, 1).click();
+    await page.keyboard.press('F8');
+    await page.getByTestId('hold-confirm').click();
+    await expect(vis(page, 'held')).toHaveText('3');
     await page.keyboard.press('Shift+F8');
     await expect(page.getByTestId('held-list')).toContainText('Test Customer');
+    await expect(page.getByTestId('held-list')).toContainText('أبو أحمد النجار');
     await expect(page.getByTestId('held-list')).toContainText(strings.sell.noCustomer);
   });
 

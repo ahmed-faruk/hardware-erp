@@ -48,7 +48,7 @@ import { NumEntry } from './NumEntry';
 import { PayScreen } from './PayScreen';
 import { VoidReasonDialog } from '../components/VoidReasonDialog';
 import { focusOnPc } from '../focus';
-import { HeldCartsDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
+import { HeldCartsDialog, HoldNameDialog, NoSaleDialog, RecentInvoicesDialog } from './SellDialogs';
 import { CollectionDialog } from './CollectionDialog';
 import { ReturnDialog } from './ReturnDialog';
 import { CloseShiftDialog, ExpenseDialog, ShiftMenuDialog, type ShiftTool } from './ShiftTools';
@@ -222,12 +222,23 @@ export function SellScreen() {
   );
   useBarcodeScanner(scan);
 
+  // an invoice with a customer is held at once; otherwise the cashier may write a name first (owner decision 2026-10-22)
+  const [holdAsk, setHoldAsk] = useState(false);
+  const holdNow = useCallback(
+    async (label: string | null): Promise<void> => {
+      setHoldAsk(false);
+      if (!context || cart.lines.length === 0) return;
+      await holdCart(context, cart, total, label);
+      setCart(EMPTY_CART);
+      play('ok');
+    },
+    [context, cart, total],
+  );
   const hold = useCallback(async (): Promise<void> => {
     if (!context || cart.lines.length === 0) return;
-    await holdCart(context, cart, total);
-    setCart(EMPTY_CART);
-    play('ok');
-  }, [context, cart, total]);
+    if (cart.customerId) return holdNow(null);
+    setHoldAsk(true);
+  }, [context, cart, holdNow]);
 
   useShortcuts({
     search: () => searchRef.current?.focus(),
@@ -719,6 +730,11 @@ export function SellScreen() {
         open={discountTarget !== null}
         onCancel={() => setDiscountTarget(null)}
         onApply={(d) => discountTarget && void applyDiscount(discountTarget, d)}
+      />
+      <HoldNameDialog
+        open={holdAsk}
+        onHold={(label) => void holdNow(label)}
+        onClose={() => setHoldAsk(false)}
       />
       <HeldCartsDialog
         open={heldOpen}

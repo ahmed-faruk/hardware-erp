@@ -141,6 +141,7 @@ test.describe('cashier journeys', () => {
     const f = await start(page);
     await tap(page, 1); // 12.50
     await page.keyboard.press('F8'); // hold
+    await page.getByTestId('hold-confirm').click(); // no customer: the optional name is left empty
     await expect(vis(page, 'total')).toHaveText('0.00');
     await expect(vis(page, 'held')).toHaveText('1');
     await tap(page, 2); // 15.00 stays in the open cart

@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Ban, Banknote, CircleHelp, Coins, Eye, Printer, Trash2, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useServices } from '@/app/session';
 import { discardCart, listHeldCarts } from '@/db/commands/carts';
@@ -12,6 +12,7 @@ import { ActionButton } from '../components/ActionButton';
 import { Dialog } from '../components/Dialog';
 import { EmptyState } from '../components/EmptyState';
 import { InvoiceViewDialog } from '../components/InvoiceView';
+import { focusOnPc } from '../focus';
 import { strings } from '../strings.ar';
 
 import { PauseCircle, Receipt } from 'lucide-react';
@@ -59,7 +60,9 @@ export function HeldCartsDialog({
           {held?.map((h) => (
             <li key={h.id} className={styles.item}>
               <span>{time(h.heldAt)}</span>
-              <span data-testid={`held-customer-${h.id}`}>{h.customerName ?? strings.sell.noCustomer}</span>
+              <span data-testid={`held-customer-${h.id}`}>
+                {h.customerName ?? h.label ?? strings.sell.noCustomer}
+              </span>
               <span>{`${digits(String(h.cart.lines.length))} ${strings.sell.itemsCount}`}</span>
               <strong>{digits(formatMoney(h.total))}</strong>
               <ActionButton
@@ -202,3 +205,47 @@ export function NoSaleDialog({
 }
 
 /** The manager picks why the invoice is cancelled from a fixed list: no typing, no "are you sure" (UX-09). */
+
+/** Holding an invoice that has no customer: an optional written name so the cashier finds it again (owner decision 2026-10-22). */
+export function HoldNameDialog({
+  open,
+  onHold,
+  onClose,
+}: {
+  open: boolean;
+  onHold: (label: string | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog title={strings.sell.hold} open={open} onClose={onClose}>
+      <HoldNameBody onHold={onHold} />
+    </Dialog>
+  );
+}
+
+function HoldNameBody({ onHold }: { onHold: (label: string | null) => void }) {
+  const [name, setName] = useState('');
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => focusOnPc(field.current), []);
+  return (
+    <form
+      className={styles.stack}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onHold(name.trim() || null);
+      }}
+    >
+      <input
+        ref={field}
+        className="control"
+        value={name}
+        maxLength={60}
+        onChange={(e) => setName(e.target.value)}
+        aria-label={strings.sell.holdName}
+        placeholder={strings.sell.holdName}
+        data-testid="hold-name"
+      />
+      <ActionButton big label={strings.sell.hold} type="submit" variant="ok" testId="hold-confirm" />
+    </form>
+  );
+}
