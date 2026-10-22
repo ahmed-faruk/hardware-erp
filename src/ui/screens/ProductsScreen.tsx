@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Package, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useServices, useSession } from '@/app/session';
 import { restoreProduct } from '@/db/commands/archive-product';
@@ -23,6 +23,9 @@ import { useProductDelete } from './useProductDelete';
 import styles from './screens.module.css';
 
 const PAGE = 50;
+
+/** The filters of this screen, kept while the app is open: coming back from a product's form shows the same list (owner decision 2026-10-22). */
+const kept = { text: '', category: '', low: false, archived: false };
 
 type Row = Product & { qty: number; low: boolean };
 
@@ -66,10 +69,16 @@ async function loadRows(
 export function ProductsScreen() {
   const { db } = useServices();
   const { worker, context, can } = useSession();
-  const [text, setText] = useState('');
-  const [category, setCategory] = useState('');
-  const [low, setLow] = useState(false);
-  const [archived, setArchived] = useState(false);
+  const [text, setText] = useState(kept.text);
+  const [category, setCategory] = useState(kept.category);
+  const [low, setLow] = useState(kept.low);
+  const [archived, setArchived] = useState(kept.archived);
+  useEffect(() => {
+    kept.text = text;
+    kept.category = category;
+    kept.low = low;
+    kept.archived = archived;
+  }, [text, category, low, archived]);
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // the delete button of a row: the same flow as inside the product (server check, undo toast; archive when it has history)
   const remove = useProductDelete();
@@ -214,6 +223,7 @@ export function ProductsScreen() {
               className="control"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              data-testid="product-category-filter"
             >
               <option value="">{strings.products.allCategories}</option>
               {categories?.map((c) => (

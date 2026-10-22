@@ -1235,6 +1235,7 @@ export const strings = {
     total: 'الإجمالي',
     itemsCount: 'أصناف',
     noCustomer: 'بدون عميل',
+    holdName: 'اسم على الفاتورة المعلقة (اختياري)',
     emptyCart: 'السلة فاضية',
     quick: 'السريعة',
     search: 'ابحث',

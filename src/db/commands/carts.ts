@@ -12,6 +12,8 @@ export interface HeldCartRow {
   workerId: string;
   total: number;
   heldAt: string;
+  /** a name the cashier wrote when holding (not a customer record); null = none */
+  label?: string | null;
 }
 
 /** POS-06: the open cart is saved on every change, so a reload or a power cut never loses it. Local only, never synced. */
@@ -26,12 +28,17 @@ export async function loadCurrentCart(db: HanafyDB): Promise<Cart | null> {
 }
 
 /** POS-05: park the cart and start a new one. */
-export async function holdCart(ctx: DeviceContext, cart: Cart, total: number): Promise<string> {
+export async function holdCart(
+  ctx: DeviceContext,
+  cart: Cart,
+  total: number,
+  label: string | null = null,
+): Promise<string> {
   const id = uuidv7();
   await ctx.db.transaction('rw', ctx.db.heldCarts, async () => {
     await ctx.db.heldCarts.put({
       id,
-      payload: { cart, workerId: ctx.workerId, total, heldAt: nowIso() },
+      payload: { cart, workerId: ctx.workerId, total, heldAt: nowIso(), label },
       updatedAt: nowIso(),
     });
     await ctx.db.heldCarts.delete(CURRENT);
