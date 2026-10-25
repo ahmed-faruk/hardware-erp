@@ -1,6 +1,8 @@
 import { Minus, Percent, Plus, Tag, Trash2 } from 'lucide-react';
 
-import type { Cart } from '@/domain/cart';
+import type { CartFact } from '@/db/cart-facts';
+import { costForUnit } from '@/db/purchase-hints';
+import { baseQtyInCart, type Cart } from '@/domain/cart';
 import { formatMoney, formatQty } from '@/domain/money';
 import type { InvoiceResult } from '@/domain/totals';
 
@@ -14,6 +16,8 @@ import styles from './CartPanel.module.css';
 export interface CartPanelProps {
   cart: Cart;
   invoice: InvoiceResult;
+  /** stock and last purchase price per product (absent until loaded) */
+  facts?: Map<string, CartFact>;
   digits: (text: string) => string;
   onStep: (key: string, deltaMilli: number) => void;
   onQtyPad: (key: string) => void;
@@ -27,6 +31,7 @@ export interface CartPanelProps {
 export function CartPanel({
   cart,
   invoice,
+  facts,
   digits,
   onStep,
   onQtyPad,
@@ -50,6 +55,25 @@ export function CartPanel({
                   {digits(formatMoney(invoice.lines[i]?.finalAmount ?? 0))}
                 </span>
               </div>
+              {(() => {
+                const fact = facts?.get(line.productId);
+                if (!fact) return null;
+                const left =
+                  fact.stockMilli === null ? null : fact.stockMilli - baseQtyInCart(cart, line.productId);
+                return (
+                  <div className={styles.facts} data-testid={`facts-${i}`}>
+                    <span
+                      className={left !== null && left < 0 ? styles.factsWarn : undefined}
+                      data-testid={`stock-left-${i}`}
+                    >
+                      {`${strings.sell.stockLeft}: ${left === null ? '—' : digits(formatQty(left))}`}
+                    </span>
+                    <span data-testid={`last-cost-${i}`}>
+                      {`${strings.sell.lastCost}: ${digits(formatMoney(costForUnit(fact.costPerBase, line.unitFactorMilli)))}`}
+                    </span>
+                  </div>
+                );
+              })()}
               <div className={styles.row}>
                 <div className={styles.stepper}>
                   <button

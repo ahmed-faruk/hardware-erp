@@ -1,5 +1,5 @@
 import { err, ok, type Result } from './result';
-import type { Milli, Piasters } from './money';
+import { mulDivRound, type Milli, type Piasters } from './money';
 import { priceFor, type PriceList } from './pricing';
 import { computeInvoice, type Discount, type InvoiceResult } from './totals';
 
@@ -52,6 +52,13 @@ export function addItem(cart: Cart, item: CartItem): Cart {
       ],
     };
   return { ...cart, lines: [...cart.lines, { ...item, key }] };
+}
+
+/** Base milli-units of one product over every line of the cart (a carton line counts its pieces). */
+export function baseQtyInCart(cart: Cart, productId: string): Milli {
+  return cart.lines
+    .filter((l) => l.productId === productId)
+    .reduce((a, l) => a + mulDivRound(l.qtyMilli, l.unitFactorMilli, 1000), 0);
 }
 
 export const removeLine = (cart: Cart, key: string): Cart => ({

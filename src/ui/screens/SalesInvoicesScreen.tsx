@@ -3,6 +3,7 @@ import { Eye, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useServices } from '@/app/session';
+import { invoiceProfits } from '@/db/invoice-profit';
 import { resolveProductIds, searchSalesInvoices } from '@/db/invoice-search';
 import { EMPTY_FILTER, type InvoiceFilter } from '@/domain/invoice-filter';
 import { formatMoney, formatQty } from '@/domain/money';
@@ -37,6 +38,8 @@ interface LegacyRow {
   card: number;
   credit: number;
   other: number;
+  /** net minus cost over its lines; negative for a return (server) */
+  profit: number;
 }
 interface LegacyDetail extends LegacyRow {
   lines: { product: string; qty: number; net: number }[];
@@ -76,6 +79,9 @@ export function SalesInvoicesScreen() {
     () => (mode === 'new' ? searchSalesInvoices(db, effective, limit) : Promise.resolve(null)),
     [db, mode, key, limit],
   );
+  // the profit of the invoices on screen, after their posted returns (owner decision 2026-10-25)
+  const rowIds = (result?.rows ?? []).map((r) => r.id).join(',');
+  const profits = useLiveQuery(() => invoiceProfits(db, rowIds ? rowIds.split(',') : []), [db, rowIds]);
   const workers = useLiveQuery(() => db.workers.filter((w) => !w.deletedAt).toArray(), [db]) ?? [];
   const devices = useLiveQuery(() => db.devices.toArray(), [db]) ?? [];
   const shifts =
@@ -142,6 +148,16 @@ export function SalesInvoicesScreen() {
     },
     { key: 'total', header: t.total, numeric: true, cell: (r) => formatMoney(r.total) },
     {
+      key: 'profit',
+      header: t.profit,
+      numeric: true,
+      cell: (r) => (
+        <span data-testid={`profit-${r.number}`}>
+          {r.status === 'voided' ? '—' : profits ? formatMoney(profits.get(r.id) ?? 0) : '…'}
+        </span>
+      ),
+    },
+    {
       key: 'status',
       header: t.status,
       cell: (r) => (
@@ -200,6 +216,12 @@ export function SalesInvoicesScreen() {
           .join(strings.cash.listSeparator) || '—',
     },
     { key: 'total', header: t.total, numeric: true, cell: (r) => formatMoney(r.total) },
+    {
+      key: 'profit',
+      header: t.profit,
+      numeric: true,
+      cell: (r) => <span data-testid={`profit-${r.number}`}>{formatMoney(r.profit ?? 0)}</span>,
+    },
     {
       key: 'kind',
       header: t.status,
