@@ -495,7 +495,8 @@ export function SellScreen() {
       Date.now() - scanned.at < 1500 &&
       (await findByBarcode(db, scanned.code))
     ) {
-      setSearchText('');
+      // only if the box still holds the code: on a slow machine the cashier may have typed the next search meanwhile
+      setSearchText((now) => (now.trim() === scanned.code ? '' : now));
       return;
     }
     const [first] = await searchProducts(db, searchText, { limit: 1 });
