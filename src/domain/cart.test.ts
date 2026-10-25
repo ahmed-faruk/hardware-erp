@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addItem,
+  baseQtyInCart,
   cartInvoice,
   EMPTY_CART,
   removeLine,
@@ -50,6 +51,11 @@ describe('cart', () => {
     const c = addItem(addItem(addItem(EMPTY_CART, paint), wire), paint);
     expect(c.lines.map((l) => l.key)).toEqual(['p2:', 'p1:']);
     expect(c.lines[1]?.qtyMilli).toBe(2000);
+  });
+  it('counts a product over all its lines in base units (a carton counts its pieces)', () => {
+    const c = addItem(addItem(EMPTY_CART, paint), carton);
+    expect(baseQtyInCart(c, 'p1')).toBe(1000 + 12000);
+    expect(baseQtyInCart(c, 'nothing')).toBe(0);
   });
   it('a pack unit is a different line from the base unit', () => {
     expect(addItem(addItem(EMPTY_CART, paint), carton).lines).toHaveLength(2);

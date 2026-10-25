@@ -114,3 +114,17 @@
   color: var(--text-muted);
   font-weight: 600;
 }
+
+/* under each cart line: the stock left after this sale and the last purchase price */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+
+.factsWarn {
+  color: var(--danger);
+  font-weight: 700;
+}

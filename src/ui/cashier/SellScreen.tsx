@@ -9,6 +9,7 @@ import { noSale, reprintInvoice, type NoSaleReason } from '@/db/commands/receipt
 import { voidInvoice, voidReturn, type VOID_REASONS } from '@/db/commands/returns';
 import { findByBarcode } from '@/db/lookup';
 import { searchProducts } from '@/db/search';
+import { cartFacts } from '@/db/cart-facts';
 import { loadDeviceSettings, loadSettings, type DeviceSettings } from '@/db/settings';
 import type { Product, ProductUnit } from '@/db/types';
 import {
@@ -166,6 +167,12 @@ export function SellScreen() {
   };
 
   const list = useLiveQuery(() => customerPriceList(db, cart.customerId), [db, cart.customerId]) ?? 'retail';
+  // stock left and last purchase price under each cart line (owner decision 2026-10-25)
+  const factKey = [...new Set(cart.lines.map((l) => l.productId))].sort().join(',');
+  const facts = useLiveQuery(
+    () => cartFacts(db, factKey ? factKey.split(',') : [], warehouse?.id ?? null),
+    [db, factKey, warehouse?.id],
+  );
   const add = useCallback(
     (product: Product, unit: ProductUnit | null, qtyMilli = 1000): void => {
       setCart((c) =>
@@ -591,6 +598,7 @@ export function SellScreen() {
     <CartPanel
       cart={cart}
       invoice={invoice}
+      facts={facts}
       digits={digits}
       onStep={(key, delta) =>
         setCart((c) => setQty(c, key, (c.lines.find((l) => l.key === key)?.qtyMilli ?? 0) + delta))

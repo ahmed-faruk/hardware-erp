@@ -1046,6 +1046,7 @@ export const strings = {
   },
   invoiceSearch: {
     title: 'فواتير البيع',
+    profit: 'الربح',
     filters: 'البحث',
     reset: 'امسح الفلاتر',
     number: 'رقم الفاتورة',
@@ -1236,6 +1237,8 @@ export const strings = {
     itemsCount: 'أصناف',
     noCustomer: 'بدون عميل',
     holdName: 'اسم على الفاتورة المعلقة (اختياري)',
+    stockLeft: 'الرصيد بعد البيع',
+    lastCost: 'آخر سعر شراء',
     emptyCart: 'السلة فاضية',
     quick: 'السريعة',
     search: 'ابحث',
