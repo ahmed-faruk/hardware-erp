@@ -13,7 +13,7 @@ Rules every developer and AI agent follows in this project. If a requested chang
 - **Devices (owner decision 2026-10-17):** there is no activation code. A new browser opens the app and logs in with a worker's
   username and password; the server (`login_device`) checks the password and registers the browser as a manager device.
   A lost device is revoked (`revoke_device`) and wipes its local data on next start.
-- **Workers:** username + password (≥ 6 characters). The server keeps a bcrypt hash in `worker_credentials`, which no device can read
+- **Workers:** username + password (≥ 6 characters). The server keeps a bcrypt hash (cost 12) in `worker_credentials`, which no device can read
   and which is never pulled. 5 wrong tries lock the username for 15 minutes. The first account is `admin` / `admin` and must set
   a new password at its first login. A worker who logged in on a device before can log in offline: the device keeps a salted PBKDF2 verifier of the password in its own settings (never synced).
   Screen locks after idle time (setting).

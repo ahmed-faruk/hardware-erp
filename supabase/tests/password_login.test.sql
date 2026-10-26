@@ -1,5 +1,5 @@
 begin;
-select plan(18);
+select plan(19);
 
 create function pg_temp.act_as(p_user uuid) returns void language plpgsql as $$
 begin
@@ -49,6 +49,7 @@ select is((set_worker_login('a0000000-0000-7000-8000-0000000000d3', 'a0000000-00
 select throws_ok($$select set_worker_login('a0000000-0000-7000-8000-0000000000d3', 'a0000000-0000-7000-8000-0000000000d2', null, 'abc')$$, 'P0001', 'E_VALIDATION:كلمة السر 6 حروف على الأقل', 'a short password is refused');
 reset role;
 select is((select must_change from worker_credentials where worker_id = 'a0000000-0000-7000-8000-0000000000d1'), false, 'a changed password clears must_change');
+select is((select substr(password_hash, 1, 7) from worker_credentials where worker_id = 'a0000000-0000-7000-8000-0000000000d1'), '$2a$12$', 'a changed password is hashed with bcrypt cost 12');
 
 -- credentials are never readable by devices
 select pg_temp.act_as('a0000000-0000-7000-8000-0000000000e1');
