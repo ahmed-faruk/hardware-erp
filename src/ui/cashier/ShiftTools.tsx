@@ -6,6 +6,7 @@ import { useServices, useSession } from '@/app/session';
 import { closeShift, postExpense, previewClose, type ClosePreview } from '@/db/commands/cash';
 import { formatMoney, toPiasters } from '@/domain/money';
 import { DEFAULT_DENOMINATIONS } from '@/domain/payments';
+import { MAX_COUNT, parseCount } from '@/domain/digits';
 import { countByDenomination } from '@/domain/shift';
 
 import { ActionButton } from '../components/ActionButton';
@@ -208,7 +209,12 @@ function Body({
   const parts = DEFAULT_DENOMINATIONS.map((value) => ({ value, count: counts[value] ?? 0 }));
   const total = countByDenomination(parts);
   const step = (value: number, delta: number): void =>
-    setCounts((c) => ({ ...c, [value]: Math.max(0, (c[value] ?? 0) + delta) }));
+    setCounts((c) => ({ ...c, [value]: Math.min(MAX_COUNT, Math.max(0, (c[value] ?? 0) + delta)) }));
+  // typed counts (owner decision 2026-10-26): anything that is not a count is ignored, so the box keeps its last value
+  const setTyped = (value: number, text: string): void => {
+    const n = parseCount(text);
+    if (n !== null) setCounts((c) => ({ ...c, [value]: n }));
+  };
 
   const show = async (): Promise<void> => {
     if (!context) return;
@@ -296,7 +302,17 @@ function Body({
               onClick={() => step(value, -1)}
               testId={`denom-${value}-minus`}
             />
-            <strong data-testid={`denom-${value}-count`}>{digits(String(counts[value] ?? 0))}</strong>
+            <input
+              className={`control ${styles.countInput}`}
+              inputMode="numeric"
+              dir="ltr"
+              value={counts[value] ? digits(String(counts[value])) : ''}
+              placeholder={digits('0')}
+              onChange={(e) => setTyped(value, e.target.value)}
+              onFocus={(e) => e.target.select()}
+              aria-label={`${strings.shift.countOf} ${formatMoney(value)}`}
+              data-testid={`denom-${value}-count`}
+            />
             <ActionButton
               big
               icon={Plus}
