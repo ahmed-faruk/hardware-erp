@@ -29,8 +29,8 @@ jobs:
           [ "${{ inputs.confirm }}" = "staging" ] || { echo "confirm must be: staging"; exit 1; }
           [ -n "$STAGING_REF" ] || { echo "no staging ref"; exit 1; }
           [ "$STAGING_REF" != "$PROD_REF" ] || { echo "REFUSED: the staging ref equals the production ref"; exit 1; }
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Link staging

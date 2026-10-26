@@ -1,4 +1,14 @@
 version: 2
 updates:
-  - { package-ecosystem: npm, directory: "/", schedule: { interval: weekly }, open-pull-requests-limit: 5 }
+  - package-ecosystem: npm
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    # owner decision 2026-10-26: wait until eslint-plugin-jsx-a11y supports ESLint 10 and typescript-eslint supports TypeScript 7;
+    # @types/node follows the Node major of the shop Mac (22)
+    ignore:
+      - { dependency-name: "typescript", versions: [">=7"] }
+      - { dependency-name: "eslint", versions: [">=10"] }
+      - { dependency-name: "@eslint/js", versions: [">=10"] }
+      - { dependency-name: "@types/node", update-types: ["version-update:semver-major"] }
   - { package-ecosystem: github-actions, directory: "/", schedule: { interval: weekly } }
