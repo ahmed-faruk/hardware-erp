@@ -884,6 +884,7 @@ export const strings = {
     count: 'عدّ الدرج',
     countHint: 'عدّ كل فئة من الفلوس اللي في الدرج',
     countedSoFar: 'اللي عديته',
+    countOf: 'عدد الورق من فئة',
     done: 'خلصت العد',
     result: 'نتيجة العد',
     match: 'مظبوط',

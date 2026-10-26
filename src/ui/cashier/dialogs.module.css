@@ -117,3 +117,15 @@
   display: block;
   font-size: var(--fs-price);
 }
+
+/* shift close: the number of notes of one denomination, typed or changed with + and - */
+.item .countInput {
+  flex: 0 1 4.5rem;
+  inline-size: 4.5rem;
+  min-inline-size: 3rem;
+  min-block-size: var(--target-cashier);
+  padding-inline: var(--space-1);
+  font-size: var(--fs-price);
+  font-weight: 700;
+  text-align: center;
+}
