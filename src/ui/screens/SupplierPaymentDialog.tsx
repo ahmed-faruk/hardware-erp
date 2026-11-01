@@ -39,7 +39,7 @@ function Body({ supplier, onDone }: { supplier: { id: string; name: string }; on
   const { db } = useServices();
   const { context, can } = useSession();
   const accounts = useLiveQuery(
-    async () => (await db.cashAccounts.toArray()).filter((a) => !a.deletedAt),
+    async () => (await db.cashAccounts.toArray()).filter((a) => !a.deletedAt && a.kind !== 'outside'),
     [db],
   );
   const owed = useLiveQuery(

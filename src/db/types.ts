@@ -81,7 +81,8 @@ export interface Setting extends Common {
 }
 export interface CashAccount extends Common {
   name: string;
-  kind: 'drawer' | 'safe' | 'bank' | 'wallet' | 'card_clearing';
+  /** outside = money brought in from outside the shop's box or taken out to it (not a box) */
+  kind: 'drawer' | 'safe' | 'bank' | 'wallet' | 'card_clearing' | 'outside';
   ownerDeviceId: string | null;
 }
 export interface ExpenseCategory extends Common {

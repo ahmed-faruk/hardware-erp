@@ -20,7 +20,7 @@ import styles from './purchase.module.css';
 
 const t = strings.purchases;
 
-/** New product from inside the invoice: name, barcode, unit, category (and the sale price for whoever may set prices). The cost comes from the line. */
+/** New product from inside the invoice: name, barcode, unit, category, and for whoever may set prices the purchase price (it fills the line) and the sale price. */
 export function QuickAddProduct({
   open,
   barcode,
@@ -66,6 +66,7 @@ function ProductBody({
   const [unit, setUnit] = useState<string>(strings.common.pieces);
   const [categoryId, setCategoryId] = useState('');
   const [price, setPrice] = useState('');
+  const [cost, setCost] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const canPrice = can('editPrices') === 'yes';
@@ -83,6 +84,12 @@ function ProductBody({
       const p = toPiasters(price);
       if (!p.ok) return setError(strings.errors.invalid);
       fields.price = p.value;
+    }
+    // the purchase price is the product's cost, so the invoice line starts with it (owner decision 2026-11-01)
+    if (canPrice && cost.trim()) {
+      const c = toPiasters(cost);
+      if (!c.ok) return setError(strings.errors.invalid);
+      fields.unitCost = c.value;
     }
     setBusy(true);
     setError(null);
@@ -176,20 +183,36 @@ function ProductBody({
         </FormField>
       </div>
       {canPrice ? (
-        <FormField label={`${strings.products.price} (${strings.common.egp})`}>
-          {(id) => (
-            <input
-              id={id}
-              className="control"
-              dir="ltr"
-              inputMode="decimal"
-              value={price}
-              placeholder={formatMoney(0)}
-              onChange={(e) => setPrice(e.target.value)}
-              data-testid="qa-price"
-            />
-          )}
-        </FormField>
+        <>
+          <FormField label={`${t.quickCost} (${strings.common.egp})`}>
+            {(id) => (
+              <input
+                id={id}
+                className="control"
+                dir="ltr"
+                inputMode="decimal"
+                value={cost}
+                placeholder={formatMoney(0)}
+                onChange={(e) => setCost(e.target.value)}
+                data-testid="qa-cost"
+              />
+            )}
+          </FormField>
+          <FormField label={`${t.quickPrice} (${strings.common.egp})`}>
+            {(id) => (
+              <input
+                id={id}
+                className="control"
+                dir="ltr"
+                inputMode="decimal"
+                value={price}
+                placeholder={formatMoney(0)}
+                onChange={(e) => setPrice(e.target.value)}
+                data-testid="qa-price"
+              />
+            )}
+          </FormField>
+        </>
       ) : (
         <p className={styles.hint}>{t.newProductNoPrice}</p>
       )}

@@ -54,7 +54,9 @@ export function PayrollScreen() {
     const entries = await Promise.all(
       workers.map(async (w) => [w.id, await loadPayrollEntries(db, w.id)] as const),
     );
-    const accounts = (await db.cashAccounts.toArray()).filter((a) => !a.deletedAt && a.kind !== 'drawer');
+    const accounts = (await db.cashAccounts.toArray()).filter(
+      (a) => !a.deletedAt && a.kind !== 'drawer' && a.kind !== 'outside',
+    );
     return {
       workers: workers.sort((a, b) => a.name.localeCompare(b.name, 'ar')),
       entries: new Map(entries),

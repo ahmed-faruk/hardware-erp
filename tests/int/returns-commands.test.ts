@@ -241,9 +241,32 @@ describe('return without invoice with many items (D1..D11)', () => {
     expect(moved.find((m) => m.productId === t.s.products[1]!.id)?.warehouseId).toBe(t.main.id);
   });
 
-  it('D6: a refund bigger than the drawer holds is refused, with the same rule as before', async () => {
+  it('D6: a manager may give back more cash than the box holds (owner decision 2026-11-01)', async () => {
     const t = await setup('manager');
-    expect(await free(t, [[0, 2000, 50_000]])).toMatchObject({ ok: false, code: 'DRAWER_SHORT' });
+    expect((await free(t, [[0, 2000, 50_000]])).ok).toBe(true);
+  });
+
+  it('a cashier giving back more cash than the box holds needs a manager approval, kept on the return', async () => {
+    const t = await setup('cashier');
+    // the box was counted short during the shift
+    await t.ctx.db.cashMovements.add({
+      ...newCommon(t.ctx),
+      cashAccountId: t.s.cashAccountId,
+      shiftId: null,
+      amount: -1_000_000,
+      method: 'cash',
+      docType: 'cash_adjustment',
+      docId: uuidv7(),
+      occurredAt: new Date().toISOString(),
+    });
+    expect(await t.ret(1000)).toMatchObject({ ok: false, code: 'DRAWER_SHORT' });
+    expect(await t.ret(1000, { approvedBy: uuidv7() })).toMatchObject({ ok: false, code: 'DRAWER_SHORT' });
+    const r = await t.ret(1000, { approvedBy: t.manager.id });
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      expect(
+        ((await t.ctx.db.salesReturns.get(r.id)) as { approvedBy?: string } | undefined)?.approvedBy,
+      ).toBe(t.manager.id);
   });
 
   it('D11: the total is the sum of the lines only', async () => {
