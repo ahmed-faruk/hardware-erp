@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 
 import { useServices } from '@/app/session';
+import { findByBarcode } from '@/db/lookup';
 import type { HanafyDB } from '@/db/schema';
 import { searchProducts } from '@/db/search';
 import { tileStockText } from '@/domain/stock';
@@ -26,10 +27,25 @@ export interface GridProps {
   searchText: string;
   digits: (text: string) => string;
   onAdd: (product: Product, unit: ProductUnit | null) => void;
+  /** the category the search is limited to (tapping it again clears it); null = search everything */
+  scope: string | null;
+  onScope: (categoryId: string | null) => void;
 }
 
-async function load(db: HanafyDB, view: string, text: string, quickIds: string[]): Promise<Product[]> {
-  if (text.trim()) return searchProducts(db, text, { limit: SEARCH_LIMIT });
+async function load(
+  db: HanafyDB,
+  view: string,
+  text: string,
+  quickIds: string[],
+  scope: string | null,
+): Promise<Product[]> {
+  if (text.trim()) {
+    const found = await searchProducts(db, text, { limit: SEARCH_LIMIT, categoryId: scope });
+    if (!scope) return found;
+    // a barcode finds its product in any category (owner decision 2026-11-01)
+    const byCode = await findByBarcode(db, text.trim());
+    return byCode && !found.some((p) => p.id === byCode.product.id) ? [byCode.product, ...found] : found;
+  }
   if (view === QUICK)
     return (
       (await db.products.bulkGet(quickIds)).filter((p) => p && p.active && !p.deletedAt) as Product[]
@@ -41,7 +57,7 @@ async function load(db: HanafyDB, view: string, text: string, quickIds: string[]
 }
 
 /** Category rail + product tiles. The quick grid (products pinned on this device) is the first stop; typing a search replaces the view. */
-export function ProductGrid({ searchText, digits, onAdd }: GridProps) {
+export function ProductGrid({ searchText, digits, onAdd, scope, onScope }: GridProps) {
   const { db } = useServices();
   const categories = useLiveQuery(() => db.categories.filter((c) => !c.deletedAt).sortBy('sort'), [db]);
   const quickIds = useLiveQuery(
@@ -51,8 +67,8 @@ export function ProductGrid({ searchText, digits, onAdd }: GridProps) {
   const [chosen, setChosen] = useState<string | null>(null);
   const view = chosen ?? (quickIds && quickIds.length > 0 ? QUICK : (categories?.[0]?.id ?? QUICK));
   const products = useLiveQuery(
-    () => load(db, view, searchText, quickIds ?? []),
-    [db, view, searchText, quickIds],
+    () => load(db, view, searchText, quickIds ?? [], scope),
+    [db, view, searchText, quickIds, scope],
   );
   const units = useLiveQuery(
     async () =>
@@ -96,7 +112,10 @@ export function ProductGrid({ searchText, digits, onAdd }: GridProps) {
           <button
             type="button"
             className={cx(styles.cat, view === QUICK && !searchText && styles.on)}
-            onClick={() => setChosen(QUICK)}
+            onClick={() => {
+              setChosen(QUICK);
+              onScope(null);
+            }}
             data-testid="cat-quick"
           >
             <Star size={24} aria-hidden="true" />
@@ -107,9 +126,16 @@ export function ProductGrid({ searchText, digits, onAdd }: GridProps) {
           <li key={c.id}>
             <button
               type="button"
-              className={cx(styles.cat, view === c.id && !searchText && styles.on)}
+              className={cx(styles.cat, (scope === c.id || (view === c.id && !searchText)) && styles.on)}
               style={{ ['--tint' as string]: `var(--${c.colorToken ?? 'cat-8'})` }}
-              onClick={() => setChosen(c.id)}
+              onClick={() => {
+                // a second tap on the chosen category clears it: the search looks everywhere again
+                const again = scope === c.id;
+                setChosen(again ? null : c.id);
+                onScope(again ? null : c.id);
+              }}
+              aria-pressed={scope === c.id}
+              data-testid={`cat-${c.id}`}
             >
               <IconView iconKey={c.icon} size={24} aria-hidden="true" />
               <span>{c.name}</span>

@@ -16,7 +16,7 @@ export interface SafeCardsData {
   };
 }
 
-/** The three numbers the owner reads first: the net of the period, the cash in the shop now, and today's returns. */
+/** The numbers the owner reads first: the net of the period and today's returns (the cash-now card was removed, owner decision 2026-11-01). */
 export function SafeCards({ data }: { data: SafeCardsData }) {
   const t = strings.reports.safe;
   const r = data.returns_today;
@@ -25,10 +25,6 @@ export function SafeCards({ data }: { data: SafeCardsData }) {
       <div className={`${styles.kpi} ${data.net < 0 ? styles.kpiWarn : ''}`}>
         <span>{t.net}</span>
         <strong data-testid="safe-net">{formatMoney(data.net)}</strong>
-      </div>
-      <div className={styles.kpi} data-testid="safe-cash-now-card">
-        <span>{t.cashNow}</span>
-        <strong data-testid="safe-cash-now">{formatMoney(data.cash_now.total)}</strong>
       </div>
       <div
         className={`${styles.kpi} ${r.today_total > 0 ? styles.kpiWarn : ''}`}

@@ -81,6 +81,7 @@ export function CartPanel({
                     className={styles.step}
                     onClick={() => onStep(line.key, -1000)}
                     aria-label={strings.common.back}
+                    data-testid={`step-down-${i}`}
                   >
                     <Minus size={24} aria-hidden="true" />
                   </button>
@@ -98,6 +99,7 @@ export function CartPanel({
                     className={styles.step}
                     onClick={() => onStep(line.key, 1000)}
                     aria-label={strings.common.add}
+                    data-testid={`step-up-${i}`}
                   >
                     <Plus size={24} aria-hidden="true" />
                   </button>

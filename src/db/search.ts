@@ -124,6 +124,8 @@ export interface SearchOptions {
   limit?: number;
   /** managers also look for products that are switched off */
   includeInactive?: boolean;
+  /** only products of this category (the category chosen on the sell screen); null or absent = every category */
+  categoryId?: string | null;
 }
 
 /**
@@ -155,6 +157,13 @@ export async function searchProducts(
   for (const other of lists.slice(1)) {
     const set = new Set(other);
     candidates = candidates.filter((id) => set.has(id));
+    if (candidates.length === 0) return [];
+  }
+  if (options.categoryId) {
+    const inCategory = new Set(
+      await db.products.where('categoryId').equals(options.categoryId).primaryKeys(),
+    );
+    candidates = candidates.filter((id) => inCategory.has(id));
     if (candidates.length === 0) return [];
   }
   const ids = candidates.slice(0, MAX_CANDIDATES);

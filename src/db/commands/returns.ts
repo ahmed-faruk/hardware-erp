@@ -37,6 +37,8 @@ const returnInput = z.object({
   reason: z.enum(RETURN_REASONS).nullable().default(null),
   shiftId: uuid,
   cashAccountId: uuid,
+  /** the manager who let a cashier give back more cash than the box holds (owner decision 2026-11-01) */
+  approvedBy: uuid.nullable().default(null),
 });
 export type ReturnInput = z.input<typeof returnInput>;
 
@@ -171,8 +173,14 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
   if (!split.ok) return split;
   const customerId = invoice?.customerId ?? input.customerId;
   if (split.credit > 0 && !customerId) return err('E_VALIDATION', 'العميل مطلوب');
-  if (split.cash > (await drawerBalance(db, input.shiftId)))
-    return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
+  // more cash back than the box holds: a manager may do it, a cashier only with a manager's approval (owner decision 2026-11-01)
+  let approvedBy: string | null = null;
+  if (split.cash > (await drawerBalance(db, input.shiftId)) && ctx.role !== 'manager') {
+    const approver = input.approvedBy ? await db.workers.get(input.approvedBy) : undefined;
+    if (!approver || approver.role !== 'manager' || !approver.active || approver.deletedAt)
+      return err('DRAWER_SHORT', 'الدرج مفيهوش فلوس كفاية');
+    approvedBy = approver.id;
+  }
 
   const row = () => newCommon(ctx);
   const payments: Payment[] = [
@@ -246,7 +254,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
         total,
         refundMethod: split.cash > 0 ? 'cash' : 'credit',
         reason: input.reason,
-        approvedBy: null,
+        approvedBy,
       };
       const audit: AuditRow = {
         ...row(),
@@ -256,7 +264,7 @@ export async function postSalesReturn(ctx: DeviceContext, raw: ReturnInput): Pro
         before: null,
         after: { number, total },
         workerId: ctx.workerId,
-        approvedBy: null,
+        approvedBy,
         occurredAt: now,
       };
       await db.salesReturns.add(doc);

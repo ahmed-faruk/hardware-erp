@@ -220,11 +220,18 @@ function MoneyForm({
       ? editing.categoryId
       : (categories[0]?.id ?? ''),
   );
-  const [from, setFrom] = useState(accounts[0]?.id ?? '');
-  const [source, setSource] = useState<'safe' | 'owner'>('safe');
   // the shop has one box: an expense from the box always comes out of it
-  const boxId = accounts.find((a) => a.kind === 'safe')?.id ?? accounts[0]?.id ?? '';
-  const [to, setTo] = useState(accounts[1]?.id ?? '');
+  const boxes = accounts.filter((a) => a.kind !== 'outside');
+  const boxId = boxes.find((a) => a.kind === 'safe')?.id ?? boxes[0]?.id ?? '';
+  const outsideId = accounts.find((a) => a.kind === 'outside')?.id ?? '';
+  // a transfer goes between inside the box and outside it (owner decision 2026-11-01)
+  const places = [
+    { id: boxId, name: strings.cash.insideSafe },
+    ...(outsideId ? [{ id: outsideId, name: strings.cash.outsideSafe }] : []),
+  ];
+  const [from, setFrom] = useState(kind === 'transfer' ? outsideId : boxId);
+  const [source, setSource] = useState<'safe' | 'owner'>('safe');
+  const [to, setTo] = useState(kind === 'transfer' ? boxId : '');
   const [amount, setAmount] = useState<number | null>(editing?.amount ?? null);
   const [sign, setSign] = useState<'plus' | 'minus'>('minus');
   const [reason, setReason] = useState<(typeof CASH_ADJUST_REASONS)[number]>('count_error');
@@ -300,8 +307,9 @@ function MoneyForm({
             testIdPrefix="expense-source-"
           />
         )}
-        {kind !== 'expense' && select(strings.cash.from, from, setFrom, accounts, 'money-from')}
-        {kind === 'transfer' && select(strings.cash.to, to, setTo, accounts, 'money-to')}
+        {kind !== 'expense' &&
+          select(strings.cash.from, from, setFrom, kind === 'transfer' ? places : boxes, 'money-from')}
+        {kind === 'transfer' && select(strings.cash.to, to, setTo, places, 'money-to')}
         {kind === 'adjust' && (
           <>
             <FormField label={strings.cash.direction}>
@@ -376,7 +384,7 @@ function MoneyForm({
         <ActionButton
           label={strings.cash.save}
           variant="ok"
-          disabled={!amount || (kind === 'expense' && !categoryId)}
+          disabled={!amount || (kind === 'expense' && !categoryId) || (kind === 'transfer' && from === to)}
           onClick={() => void save()}
           testId="save-money"
         />

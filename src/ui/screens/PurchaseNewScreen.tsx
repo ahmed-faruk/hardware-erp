@@ -210,7 +210,10 @@ export function PurchaseNewScreen() {
       const same = list.find(
         (r) => r.product.id === product.id && (r.unit?.id ?? null) === (unit?.id ?? null),
       );
-      return same ? list.map((r) => (r === same ? { ...r, qty: (r.qty ?? 0) + 1000 } : r)) : [...list, row];
+      // the line touched last is shown on top (owner decision 2026-11-01): a repeated item moves to the end of the list
+      return same
+        ? [...list.filter((r) => r !== same), { ...same, qty: (same.qty ?? 0) + 1000 }]
+        : [...list, row];
     });
   };
 

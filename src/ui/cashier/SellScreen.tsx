@@ -114,6 +114,8 @@ export function SellScreen() {
   const loaded = useRef(false);
   const [step, setStep] = useState<Step>('items');
   const [searchText, setSearchText] = useState('');
+  // the category the search is limited to (owner decision 2026-11-01)
+  const [categoryScope, setCategoryScope] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** after a return, collection, void, expense, transfer or shift close nothing prints by itself: one print button offers it */
   const [printOffer, setPrintOffer] = useState<(() => void) | null>(null);
@@ -139,6 +141,15 @@ export function SellScreen() {
   const [shiftTool, setShiftTool] = useState<Exclude<ShiftTool, 'x'> | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const lastScan = useRef<{ code: string; at: number } | null>(null);
+  // after the quantity pad closes, the cursor goes back to the search box (owner decision 2026-11-01)
+  const qtyWasOpen = useRef(false);
+  useEffect(() => {
+    if (qtyKey !== null) qtyWasOpen.current = true;
+    else if (qtyWasOpen.current) {
+      qtyWasOpen.current = false;
+      focusOnPc(searchRef.current);
+    }
+  }, [qtyKey]);
 
   const digits = useCallback((text: string) => localizeDigits(text, device.digits), [device.digits]);
   const inv = cartInvoice(cart);
@@ -506,9 +517,13 @@ export function SellScreen() {
       setSearchText((now) => (now.trim() === scanned.code ? '' : now));
       return;
     }
-    const [first] = await searchProducts(db, searchText, { limit: 1 });
+    const [first] = await searchProducts(db, searchText, { limit: 1, categoryId: categoryScope });
+    // inside a category a typed barcode still finds its product anywhere
+    const byCode = !first && categoryScope ? await findByBarcode(db, searchText.trim()) : null;
     if (first) {
       addFromSearch(first, null);
+    } else if (byCode) {
+      addFromSearch(byCode.product, null);
     } else {
       play('error');
       flash(strings.sell.scanUnknown);
@@ -600,9 +615,11 @@ export function SellScreen() {
       invoice={invoice}
       facts={facts}
       digits={digits}
-      onStep={(key, delta) =>
-        setCart((c) => setQty(c, key, (c.lines.find((l) => l.key === key)?.qtyMilli ?? 0) + delta))
-      }
+      onStep={(key, delta) => {
+        setCart((c) => setQty(c, key, (c.lines.find((l) => l.key === key)?.qtyMilli ?? 0) + delta));
+        // the cursor goes back to the search box after + or - (owner decision 2026-11-01)
+        focusOnPc(searchRef.current);
+      }}
       onQtyPad={setQtyKey}
       onRemove={(key) => {
         const gone = cart.lines.find((l) => l.key === key);
@@ -691,7 +708,13 @@ export function SellScreen() {
         </div>
         {notice && <BigAlert tone="danger" word={notice} sound={false} />}
         {offerButton}
-        <ProductGrid searchText={searchText} digits={digits} onAdd={addFromSearch} />
+        <ProductGrid
+          searchText={searchText}
+          digits={digits}
+          onAdd={addFromSearch}
+          scope={categoryScope}
+          onScope={setCategoryScope}
+        />
       </div>
       <aside className={styles.right}>
         <div className={styles.cart}>{cartPanel}</div>

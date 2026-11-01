@@ -19,6 +19,7 @@ import { NumPad } from '../components/NumPad';
 import { play } from '../sound';
 import { strings } from '../strings.ar';
 
+import { ManagerApproval } from './ManagerApproval';
 import { NumEntry } from './NumEntry';
 import styles from './dialogs.module.css';
 
@@ -206,6 +207,7 @@ function InvoiceReturn({
   const [cond, setCond] = useState<Record<string, Cond>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [approving, setApproving] = useState(false);
   if (!data) return null;
 
   const priors: PriorReturn[] = data.prior.map((r) => ({
@@ -236,20 +238,25 @@ function InvoiceReturn({
   const step = (id: string, left: number, delta: number): void =>
     setQty((m) => ({ ...m, [id]: Math.max(0, Math.min(left, (m[id] ?? 0) + delta)) }));
 
-  const confirm = async (): Promise<void> => {
+  const confirm = async (approvedBy: string | null = null): Promise<void> => {
     if (!context || total <= 0) return;
     setBusy(true);
     setError(null);
     const lines = rows
       .filter((r) => r.q > 0)
       .map((r) => ({ originalLineId: r.l.id, qtyMilli: r.q, condition: cond[r.l.id] ?? 'good' }));
-    const base = { originalInvoiceId: invoiceId, lines, shiftId, cashAccountId };
+    const base = { originalInvoiceId: invoiceId, lines, shiftId, cashAccountId, approvedBy };
     const r = await postSalesReturn(context, base);
     setBusy(false);
     if (r.ok) {
+      setApproving(false);
       play('done');
       onDone(r);
+    } else if (r.code === 'DRAWER_SHORT' && approvedBy === null) {
+      // more than the box holds: a manager lets it through with their login (owner decision 2026-11-01)
+      setApproving(true);
     } else {
+      setApproving(false);
       play('error');
       setError(r.code === 'DRAWER_SHORT' ? strings.returns.drawerShort : strings.returns.failed);
     }
@@ -333,6 +340,11 @@ function InvoiceReturn({
         testId="confirm-return"
       />
       <ActionButton big variant="ghost" label={strings.common.back} onClick={onBack} />
+      <ManagerApproval
+        open={approving}
+        onCancel={() => setApproving(false)}
+        onApproved={(managerId) => void confirm(managerId)}
+      />
     </div>
   );
 }
