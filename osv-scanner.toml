@@ -1,0 +1,18 @@
+# Owner decision 2026-11-01: these advisories are on build-time tools only (the service-worker builder, the linter and the xlsx test
+# helper), never shipped to the shop, and no fixed version exists upstream (workbox-build 7.4.1 and deepmerge 4.3.1 are the latest).
+# Each one expires on 2026-12-01 so it comes back for review; remove it as soon as upstream publishes a fix.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2026-12-01
+reason = "deepmerge 4.3.1 (via vite-plugin-pwa > workbox-build): build tool only, no fixed version exists"
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-12-01
+reason = "glob 11.1.0 (via workbox-build): build tool only, fix is a new major that workbox-build does not accept yet"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-01
+reason = "minimatch 3.1.5, 5.1.9 and 10.2.6 (via eslint, archiver and workbox-build): lint and build tools only, fix is a new major they do not accept yet"
